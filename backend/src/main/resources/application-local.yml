@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    url: ${APP_DB_URL:jdbc:h2:file:./backend/data/localdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE}
+    username: ${APP_DB_USERNAME:sa}
+    password: ${APP_DB_PASSWORD:}
+    driver-class-name: ${APP_DB_DRIVER:org.h2.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+logging:
+  level:
+    root: INFO
+    com.dasisuhgi.mentalhealth: DEBUG
+
+app:
+  backup:
+    root-path: ./local-backups
+  seed:
+    enabled: true
