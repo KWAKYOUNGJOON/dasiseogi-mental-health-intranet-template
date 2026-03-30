@@ -1,22 +1,12 @@
 import { isAxiosError } from 'axios'
 import { useState, type ChangeEvent, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import type { ApiResponse } from '../../../shared/types/api'
-import {
-  createSignupRequest,
-  type CreateSignupRequestPayload,
-  type CreateSignupRequestResponse,
-} from '../api/signupRequestApi'
+import { createSignupRequest, type CreateSignupRequestPayload } from '../api/signupRequestApi'
 
-type SignupRequestFieldName =
-  | 'name'
-  | 'loginId'
-  | 'password'
-  | 'phone'
-  | 'positionName'
-  | 'teamName'
-  | 'requestMemo'
+const SIGNUP_REQUEST_FIELDS = ['name', 'loginId', 'password', 'phone', 'positionName', 'teamName', 'requestMemo'] as const
 
+type SignupRequestFieldName = (typeof SIGNUP_REQUEST_FIELDS)[number]
 type SignupRequestFieldErrors = Partial<Record<SignupRequestFieldName, string>>
 type SignupRequestTouched = Partial<Record<SignupRequestFieldName, boolean>>
 
@@ -30,6 +20,17 @@ interface SignupRequestFormValues {
   requestMemo: string
 }
 
+interface SignupRequestFieldDefinition {
+  name: SignupRequestFieldName
+  label: string
+  autoComplete?: string
+  hint?: string
+  inputMode?: 'text' | 'tel'
+  maxLength?: number
+  rows?: number
+  type?: 'password' | 'text'
+}
+
 const INITIAL_FORM: SignupRequestFormValues = {
   name: '',
   loginId: '',
@@ -40,20 +41,49 @@ const INITIAL_FORM: SignupRequestFormValues = {
   requestMemo: '',
 }
 
-const FIELD_ORDER: SignupRequestFieldName[] = [
-  'name',
-  'loginId',
-  'password',
-  'phone',
-  'positionName',
-  'teamName',
-  'requestMemo',
+const FIELD_DEFINITIONS: ReadonlyArray<SignupRequestFieldDefinition> = [
+  { name: 'name', label: '이름', autoComplete: 'name', maxLength: 50 },
+  {
+    name: 'loginId',
+    label: '아이디',
+    autoComplete: 'username',
+    hint: '영문 소문자, 숫자, -, _를 사용할 수 있습니다.',
+    maxLength: 20,
+  },
+  {
+    name: 'password',
+    label: '비밀번호',
+    autoComplete: 'new-password',
+    hint: '8자 이상 20자 이하로 입력해주세요.',
+    maxLength: 20,
+    type: 'password',
+  },
+  { name: 'phone', label: '연락처', autoComplete: 'tel', inputMode: 'tel', maxLength: 20 },
+  { name: 'positionName', label: '직책 또는 역할', maxLength: 50 },
+  { name: 'teamName', label: '소속 팀', maxLength: 100 },
+  { name: 'requestMemo', label: '가입 신청 메모', hint: '0/500', maxLength: 500, rows: 4 },
 ]
 
-const GENERIC_VALIDATION_MESSAGE = '입력값을 다시 확인해주세요.'
-const GENERIC_SIGNUP_ERROR_MESSAGE = '회원가입 신청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+const VALIDATION_MESSAGE = '입력값을 다시 확인해주세요.'
+const DUPLICATED_LOGIN_ID_MESSAGE = '이미 사용 중인 아이디입니다.'
+const GENERIC_SIGNUP_ERROR_MESSAGE = '회원가입 신청에 실패했습니다. 잠시 후 다시 시도해주세요.'
 const LOGIN_ID_PATTERN = /^[a-z0-9_-]+$/
 const PHONE_PATTERN = /^\d{2,3}-?\d{3,4}-?\d{4}$/
+const SERVER_FIELD_ALIASES: Readonly<Record<string, SignupRequestFieldName>> = {
+  contact: 'phone',
+  loginId: 'loginId',
+  memo: 'requestMemo',
+  name: 'name',
+  password: 'password',
+  phone: 'phone',
+  position: 'positionName',
+  positionName: 'positionName',
+  positionOrRole: 'positionName',
+  requestMemo: 'requestMemo',
+  role: 'positionName',
+  team: 'teamName',
+  teamName: 'teamName',
+}
 
 function trimValue(value: string) {
   return value.trim()
@@ -116,10 +146,10 @@ function validateField(field: SignupRequestFieldName, values: SignupRequestFormV
       return undefined
     case 'positionName':
       if (!value) {
-        return '직책을 입력해주세요.'
+        return '직책 또는 역할을 입력해주세요.'
       }
       if (value.length > 50) {
-        return '직책은 50자 이하로 입력해주세요.'
+        return '직책 또는 역할은 50자 이하로 입력해주세요.'
       }
       return undefined
     case 'teamName':
@@ -132,14 +162,14 @@ function validateField(field: SignupRequestFieldName, values: SignupRequestFormV
       return undefined
     case 'requestMemo':
       if (value.length > 500) {
-        return '신청 메모는 500자 이하로 입력해주세요.'
+        return '가입 신청 메모는 500자 이하로 입력해주세요.'
       }
       return undefined
   }
 }
 
 function validateForm(values: SignupRequestFormValues) {
-  return FIELD_ORDER.reduce<SignupRequestFieldErrors>((errors, field) => {
+  return SIGNUP_REQUEST_FIELDS.reduce<SignupRequestFieldErrors>((errors, field) => {
     const message = validateField(field, values)
     if (message) {
       errors[field] = message
@@ -154,6 +184,7 @@ function hasErrors(errors: SignupRequestFieldErrors) {
 
 function buildPayload(values: SignupRequestFormValues): CreateSignupRequestPayload {
   const normalized = normalizeFormValues(values)
+
   return {
     name: normalized.name,
     loginId: normalized.loginId,
@@ -165,39 +196,49 @@ function buildPayload(values: SignupRequestFormValues): CreateSignupRequestPaylo
   }
 }
 
-function isSignupRequestField(field: string): field is SignupRequestFieldName {
-  return FIELD_ORDER.includes(field as SignupRequestFieldName)
+function isDuplicatedLoginIdErrorCode(errorCode: string | null | undefined) {
+  const normalizedErrorCode = errorCode?.trim().toUpperCase() ?? ''
+  if (!normalizedErrorCode) {
+    return false
+  }
+
+  return (
+    normalizedErrorCode === 'LOGIN_ID_DUPLICATED' ||
+    (normalizedErrorCode.includes('LOGIN_ID') && normalizedErrorCode.includes('DUPLICAT')) ||
+    (normalizedErrorCode.includes('LOGIN_ID') && normalizedErrorCode.includes('ALREADY_EXISTS'))
+  )
+}
+
+function resolveSignupRequestField(field: string) {
+  return SERVER_FIELD_ALIASES[field.trim()]
 }
 
 function getRepresentativeMessage(response: ApiResponse<unknown> | undefined) {
-  if (!response) {
-    return GENERIC_SIGNUP_ERROR_MESSAGE
+  if (isDuplicatedLoginIdErrorCode(response?.errorCode)) {
+    return response?.message?.trim() || DUPLICATED_LOGIN_ID_MESSAGE
   }
 
-  const message = response.message?.trim()
-  if (response.errorCode === 'VALIDATION_ERROR') {
-    return message || GENERIC_VALIDATION_MESSAGE
+  if (response?.errorCode === 'VALIDATION_ERROR') {
+    return VALIDATION_MESSAGE
   }
-  if (response.errorCode === 'LOGIN_ID_DUPLICATED') {
-    return message || '이미 사용 중인 아이디입니다.'
-  }
-  if (response.errorCode === 'INTERNAL_SERVER_ERROR' || !response.errorCode) {
-    return GENERIC_SIGNUP_ERROR_MESSAGE
-  }
-  return message || GENERIC_SIGNUP_ERROR_MESSAGE
+
+  return response?.message?.trim() || GENERIC_SIGNUP_ERROR_MESSAGE
 }
 
 function mapServerErrors(response: ApiResponse<unknown> | undefined): SignupRequestFieldErrors {
-  const serverFieldErrors = response?.fieldErrors ?? []
-  const nextErrors = serverFieldErrors.reduce<SignupRequestFieldErrors>((errors, fieldError) => {
-    if (isSignupRequestField(fieldError.field)) {
-      errors[fieldError.field] = fieldError.reason
+  const nextErrors = (response?.fieldErrors ?? []).reduce<SignupRequestFieldErrors>((errors, fieldError) => {
+    const field = resolveSignupRequestField(fieldError.field)
+    const reason = fieldError.reason.trim()
+
+    if (field && reason) {
+      errors[field] = reason
     }
+
     return errors
   }, {})
 
-  if (response?.errorCode === 'LOGIN_ID_DUPLICATED' && !nextErrors.loginId) {
-    nextErrors.loginId = response.message?.trim() || '이미 사용 중인 아이디입니다.'
+  if (isDuplicatedLoginIdErrorCode(response?.errorCode) && !nextErrors.loginId) {
+    nextErrors.loginId = response?.message?.trim() || DUPLICATED_LOGIN_ID_MESSAGE
   }
 
   return nextErrors
@@ -207,6 +248,7 @@ function getApiResponse(error: unknown) {
   if (!isAxiosError<ApiResponse<unknown>>(error)) {
     return undefined
   }
+
   return error.response?.data
 }
 
@@ -214,24 +256,45 @@ function getFieldInputClassName(error: string | undefined) {
   return error ? 'input-error' : undefined
 }
 
+function getFieldInputId(field: SignupRequestFieldName) {
+  return `signup-request-${field}`
+}
+
+function getFieldHintId(field: SignupRequestFieldName) {
+  return `signup-request-${field}-hint`
+}
+
+function getFieldErrorId(field: SignupRequestFieldName) {
+  return `signup-request-${field}-error`
+}
+
+function getFieldDescribedBy(field: SignupRequestFieldName, hasHint: boolean, hasError: boolean) {
+  const describedBy = [hasHint ? getFieldHintId(field) : null, hasError ? getFieldErrorId(field) : null].filter(
+    (value): value is string => Boolean(value),
+  )
+
+  return describedBy.length > 0 ? describedBy.join(' ') : undefined
+}
+
 export function SignupRequestForm() {
+  const navigate = useNavigate()
   const [form, setForm] = useState(INITIAL_FORM)
   const [touched, setTouched] = useState<SignupRequestTouched>({})
   const [fieldErrors, setFieldErrors] = useState<SignupRequestFieldErrors>({})
   const [formMessage, setFormMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [success, setSuccess] = useState<CreateSignupRequestResponse | null>(null)
-  const memoLengthLabel = `${form.requestMemo.length}/500`
 
   function updateFieldError(field: SignupRequestFieldName, nextForm: SignupRequestFormValues) {
     setFieldErrors((current) => {
       const nextErrors = { ...current }
       const message = validateField(field, nextForm)
+
       if (message) {
         nextErrors[field] = message
       } else {
         delete nextErrors[field]
       }
+
       return nextErrors
     })
   }
@@ -240,6 +303,7 @@ export function SignupRequestForm() {
     return (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const value = event.target.value
       const nextForm = { ...form, [field]: value }
+
       setForm(nextForm)
 
       if (touched[field]) {
@@ -262,11 +326,11 @@ export function SignupRequestForm() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (submitting || success) {
+    if (submitting) {
       return
     }
 
-    const nextTouched = FIELD_ORDER.reduce<SignupRequestTouched>((current, field) => {
+    const nextTouched = SIGNUP_REQUEST_FIELDS.reduce<SignupRequestTouched>((current, field) => {
       current[field] = true
       return current
     }, {})
@@ -276,7 +340,7 @@ export function SignupRequestForm() {
     setFieldErrors(nextErrors)
 
     if (hasErrors(nextErrors)) {
-      setFormMessage(GENERIC_VALIDATION_MESSAGE)
+      setFormMessage(VALIDATION_MESSAGE)
       return
     }
 
@@ -284,11 +348,11 @@ export function SignupRequestForm() {
     setSubmitting(true)
 
     try {
-      const response = await createSignupRequest(buildPayload(form))
-      setSuccess(response)
-      setFieldErrors({})
+      await createSignupRequest(buildPayload(form))
+      navigate('/login?notice=signup-requested', { replace: true })
     } catch (error) {
       const response = getApiResponse(error)
+
       setFieldErrors(mapServerErrors(response))
       setFormMessage(getRepresentativeMessage(response))
     } finally {
@@ -296,27 +360,7 @@ export function SignupRequestForm() {
     }
   }
 
-  if (success) {
-    return (
-      <div className="card login-card stack">
-        <div className="stack" style={{ gap: 8 }}>
-          <div>
-            <h1 style={{ marginBottom: 8 }}>회원가입 신청 완료</h1>
-            <p className="muted">관리자 승인 후 로그인할 수 있습니다.</p>
-          </div>
-          <div className="success-panel" role="status">
-            가입 신청이 접수되었습니다. 관리자 승인 후 로그인 가능합니다.
-          </div>
-        </div>
-        <div className="muted">신청 번호: {success.requestId}</div>
-        <div className="actions">
-          <Link className="primary-button" to="/login?notice=signup-requested">
-            로그인 화면으로 이동
-          </Link>
-        </div>
-      </div>
-    )
-  }
+  const memoLengthLabel = `${form.requestMemo.length}/500`
 
   return (
     <form className="card login-card stack" noValidate onSubmit={handleSubmit}>
@@ -332,67 +376,46 @@ export function SignupRequestForm() {
         ) : null}
       </div>
 
-      <label className="field">
-        <span>이름</span>
-        <input className={getFieldInputClassName(fieldErrors.name)} onBlur={handleBlur('name')} onChange={handleChange('name')} value={form.name} />
-        {fieldErrors.name ? <span className="field-error">{fieldErrors.name}</span> : null}
-      </label>
+      {FIELD_DEFINITIONS.map((field) => {
+        const errorMessage = fieldErrors[field.name]
+        const inputId = getFieldInputId(field.name)
+        const hintText = field.name === 'requestMemo' ? memoLengthLabel : field.hint
+        const hintId = hintText ? getFieldHintId(field.name) : undefined
+        const errorId = errorMessage ? getFieldErrorId(field.name) : undefined
+        const describedBy = getFieldDescribedBy(field.name, Boolean(hintId), Boolean(errorId))
+        const commonProps = {
+          'aria-describedby': describedBy,
+          'aria-invalid': errorMessage ? 'true' : undefined,
+          autoComplete: field.autoComplete,
+          className: getFieldInputClassName(errorMessage),
+          id: inputId,
+          maxLength: field.maxLength,
+          name: field.name,
+          onBlur: handleBlur(field.name),
+          onChange: handleChange(field.name),
+        } as const
 
-      <label className="field">
-        <span>아이디</span>
-        <input className={getFieldInputClassName(fieldErrors.loginId)} onBlur={handleBlur('loginId')} onChange={handleChange('loginId')} value={form.loginId} />
-        <span className="field-hint">영문 소문자, 숫자, -, _를 사용할 수 있습니다.</span>
-        {fieldErrors.loginId ? <span className="field-error">{fieldErrors.loginId}</span> : null}
-      </label>
-
-      <label className="field">
-        <span>비밀번호</span>
-        <input
-          className={getFieldInputClassName(fieldErrors.password)}
-          onBlur={handleBlur('password')}
-          onChange={handleChange('password')}
-          type="password"
-          value={form.password}
-        />
-        <span className="field-hint">8자 이상 20자 이하로 입력해주세요.</span>
-        {fieldErrors.password ? <span className="field-error">{fieldErrors.password}</span> : null}
-      </label>
-
-      <label className="field">
-        <span>연락처</span>
-        <input className={getFieldInputClassName(fieldErrors.phone)} onBlur={handleBlur('phone')} onChange={handleChange('phone')} value={form.phone} />
-        {fieldErrors.phone ? <span className="field-error">{fieldErrors.phone}</span> : null}
-      </label>
-
-      <label className="field">
-        <span>직책</span>
-        <input
-          className={getFieldInputClassName(fieldErrors.positionName)}
-          onBlur={handleBlur('positionName')}
-          onChange={handleChange('positionName')}
-          value={form.positionName}
-        />
-        {fieldErrors.positionName ? <span className="field-error">{fieldErrors.positionName}</span> : null}
-      </label>
-
-      <label className="field">
-        <span>소속 팀</span>
-        <input className={getFieldInputClassName(fieldErrors.teamName)} onBlur={handleBlur('teamName')} onChange={handleChange('teamName')} value={form.teamName} />
-        {fieldErrors.teamName ? <span className="field-error">{fieldErrors.teamName}</span> : null}
-      </label>
-
-      <label className="field">
-        <span>가입 신청 메모</span>
-        <textarea
-          className={getFieldInputClassName(fieldErrors.requestMemo)}
-          onBlur={handleBlur('requestMemo')}
-          onChange={handleChange('requestMemo')}
-          rows={4}
-          value={form.requestMemo}
-        />
-        <span className="field-hint">{memoLengthLabel}</span>
-        {fieldErrors.requestMemo ? <span className="field-error">{fieldErrors.requestMemo}</span> : null}
-      </label>
+        return (
+          <label className="field" key={field.name} htmlFor={inputId}>
+            <span>{field.label}</span>
+            {field.rows ? (
+              <textarea {...commonProps} rows={field.rows} value={form[field.name]} />
+            ) : (
+              <input {...commonProps} inputMode={field.inputMode} type={field.type ?? 'text'} value={form[field.name]} />
+            )}
+            {hintText ? (
+              <span className="field-hint" id={hintId}>
+                {hintText}
+              </span>
+            ) : null}
+            {errorMessage ? (
+              <span className="field-error" id={errorId}>
+                {errorMessage}
+              </span>
+            ) : null}
+          </label>
+        )
+      })}
 
       <div className="actions">
         <button className="primary-button" disabled={submitting} type="submit">

@@ -11,13 +11,15 @@ export interface CreateSignupRequestPayload {
   requestMemo?: string
 }
 
+export type SignupRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
 export interface CreateSignupRequestResponse {
   requestId: number
   userId: number
-  requestStatus: string
+  requestStatus: SignupRequestStatus
 }
 
-export async function createSignupRequest(payload: CreateSignupRequestPayload) {
+export async function createSignupRequest(payload: CreateSignupRequestPayload): Promise<CreateSignupRequestResponse> {
   const response = await http.post<ApiResponse<CreateSignupRequestResponse>>('/signup-requests', payload)
   return response.data.data
 }

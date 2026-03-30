@@ -2,8 +2,8 @@ import { SignupRequestForm } from '../../features/auth/components/SignupRequestF
 
 export function SignupRequestPage() {
   return (
-    <div className="login-shell">
+    <main className="login-shell">
       <SignupRequestForm />
-    </div>
+    </main>
   )
 }
