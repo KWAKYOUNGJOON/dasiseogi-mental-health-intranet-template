@@ -30,9 +30,17 @@ logging:
 app:
   organization:
     name: 다시서기 정신건강 평가관리 시스템
+  scale:
+    resource-path: classpath:scales
+  export:
+    temp-path: ./tmp/exports
   backup:
     root-path: ./local-backups
     db-dump-command:
+    auto:
+      enabled: true
+      cron: 0 0 2 * * *
+      zone: Asia/Seoul
   security:
     trust-proxy-headers: false
   seed:

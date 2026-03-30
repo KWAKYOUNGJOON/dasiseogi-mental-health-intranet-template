@@ -25,18 +25,28 @@ export function AdminBackupsPage() {
   const [reason, setReason] = useState('')
   const [running, setRunning] = useState(false)
   const [data, setData] = useState<BackupHistoryPage | null>(null)
+  const [latestAutoBackup, setLatestAutoBackup] = useState<BackupHistoryPage['items'][number] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   async function load() {
     try {
-      setData(await fetchBackups({
-        backupType: backupType || undefined,
-        status: status || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-        page,
-        size,
-      }))
+      const [historyPage, autoPage] = await Promise.all([
+        fetchBackups({
+          backupType: backupType || undefined,
+          status: status || undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+          page,
+          size,
+        }),
+        fetchBackups({
+          backupType: 'AUTO',
+          page: 1,
+          size: 1,
+        }),
+      ])
+      setData(historyPage)
+      setLatestAutoBackup(autoPage.items[0] ?? null)
       setError(null)
     } catch (requestError: any) {
       setError(requestError?.response?.data?.message ?? '백업 이력을 불러오지 못했습니다.')
@@ -77,6 +87,15 @@ export function AdminBackupsPage() {
       <PageHeader description="MariaDB/MySQL은 DB dump를 우선 시도하고, 그 외 환경은 snapshot ZIP으로 백업합니다." title="백업 관리" />
       <div className="card stack">
         <div className="field">
+          <span className="muted">마지막 자동 백업</span>
+          <strong>{latestAutoBackup?.completedAt ?? latestAutoBackup?.startedAt ?? '아직 자동 백업 이력이 없습니다.'}</strong>
+          {latestAutoBackup ? (
+            <span className="muted">
+              {latestAutoBackup.status} / {latestAutoBackup.backupMethod} / {latestAutoBackup.filePath}
+            </span>
+          ) : null}
+        </div>
+        <div className="field">
           <span className="muted">실행 사유</span>
           <textarea onChange={(event) => setReason(event.target.value)} rows={3} value={reason} />
         </div>
@@ -90,6 +109,7 @@ export function AdminBackupsPage() {
         <div className="toolbar">
           <select onChange={(event) => setBackupType(event.target.value)} value={backupType}>
             <option value="">전체 유형</option>
+            <option value="AUTO">AUTO</option>
             <option value="MANUAL">MANUAL</option>
           </select>
           <select onChange={(event) => setStatus(event.target.value)} value={status}>

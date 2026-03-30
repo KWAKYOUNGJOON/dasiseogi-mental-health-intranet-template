@@ -26,17 +26,20 @@ public class StatisticsExportService {
     private final AssessmentQueryRepository assessmentQueryRepository;
     private final AccessPolicyService accessPolicyService;
     private final ActivityLogService activityLogService;
+    private final ExportTempFileService exportTempFileService;
 
     public StatisticsExportService(
             StatisticsService statisticsService,
             AssessmentQueryRepository assessmentQueryRepository,
             AccessPolicyService accessPolicyService,
-            ActivityLogService activityLogService
+            ActivityLogService activityLogService,
+            ExportTempFileService exportTempFileService
     ) {
         this.statisticsService = statisticsService;
         this.assessmentQueryRepository = assessmentQueryRepository;
         this.accessPolicyService = accessPolicyService;
         this.activityLogService = activityLogService;
+        this.exportTempFileService = exportTempFileService;
     }
 
     @Transactional
@@ -127,7 +130,8 @@ public class StatisticsExportService {
 
     private StatisticsExportFile file(String prefix, LocalDate dateFrom, LocalDate dateTo, String csv) {
         String filename = prefix + "-" + value(dateFrom) + "-" + value(dateTo) + ".csv";
-        return new StatisticsExportFile(filename, csv.getBytes(StandardCharsets.UTF_8));
+        byte[] content = exportTempFileService.materializeBytes(prefix, ".csv", csv.getBytes(StandardCharsets.UTF_8));
+        return new StatisticsExportFile(filename, content);
     }
 
     private String csv(String value) {

@@ -56,6 +56,7 @@ export function ClientDetailPage() {
   }
 
   const canMarkMisregistered = user?.role === 'ADMIN' || user?.id === client.createdById
+  const canEditClient = user?.role === 'ADMIN' || user?.id === client.createdById
 
   return (
     <div className="stack">
@@ -65,6 +66,14 @@ export function ClientDetailPage() {
             {client.status === 'ACTIVE' ? (
               <Link className="primary-button" to={`/assessments/start/${client.id}/scales`}>
                 검사 시작
+              </Link>
+            ) : null}
+            <Link className="secondary-button" to={`/assessment-records?clientName=${encodeURIComponent(client.name)}`}>
+              전체 기록 보기
+            </Link>
+            {canEditClient ? (
+              <Link className="secondary-button" to={`/clients/${client.id}/edit`}>
+                정보 수정
               </Link>
             ) : null}
             {canMarkMisregistered && client.status !== 'MISREGISTERED' ? (

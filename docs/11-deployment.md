@@ -129,7 +129,7 @@
 운영 서버 기준으로 아래 구조를 권장한다.
 
 ```text
-D:/mental-health-system/
+<app-home>/
 ├── app/
 │   ├── backend/
 │   │   ├── mental-health-app.jar
@@ -179,20 +179,30 @@ D:/mental-health-system/
 
 - `scripts/health-check.bat`
   - `/api/v1/health` 응답을 확인하는 점검 스크립트다.
-  - 기본 대상은 `http://127.0.0.1:8080/api/v1/health` 이며, 인자 1 또는 `BASE_URL`, `APP_BASE_URL` 로 대상을 바꿀 수 있다.
+  - 인자 없이 실행하면 기본 대상 `http://127.0.0.1:8080/api/v1/health` 를 확인한다.
+  - 인자 1에는 base URL (`http://127.0.0.1:8080/api/v1`) 또는 full `/health` URL (`http://127.0.0.1:8080/api/v1/health`) 을 받을 수 있다.
+  - 인자 1은 `http://` 또는 `https://` URL만 지원한다.
 - `scripts/run-backup.bat`
   - 운영자가 직접 DB dump 파일을 생성할 때 사용하는 보조 스크립트다.
+  - 명령행 인자는 받지 않고 환경 변수만 사용한다.
   - `APP_BACKUP_ROOT_PATH`, `APP_DB_URL`, `APP_DB_USERNAME`, `APP_DB_PASSWORD` 가 필요하다.
-  - `.sql` 파일 생성까지가 범위이며, 애플리케이션 관리자 화면/API 호출은 포함하지 않는다.
+  - `.sql` 파일 생성까지가 범위이며, `/api/v1/admin/backups/run` 대체 용도가 아니다.
+  - `backup_histories` 적재와 관리자 활동 로그 기록은 수행하지 않는다.
 - `scripts/deploy-backend.bat`
   - 새 backend jar 를 `app/backend/mental-health-app.jar` 위치에 배치하는 보조 스크립트다.
+  - 인자 1로 배포 대상 jar 파일 경로를 필수로 받는다.
+  - 인자 1은 실제 존재하는 `.jar` 파일이어야 하며, 디렉터리 경로는 허용하지 않는다.
   - `APP_HOME` 이 있으면 해당 경로를, 없으면 스크립트 기준 상위 경로를 앱 루트로 해석한다.
-  - 기존 jar 는 `backups/release/` 아래에 백업한다.
+  - 기존 backend 프로세스는 운영자가 먼저 수동 중지해야 하며, 스크립트는 서비스 시작/중지를 수행하지 않는다.
+  - 기존 jar 가 있으면 `app/backend/backup/mental-health-app-YYYYMMDD-HHMMSS.jar` 형식으로 백업한다.
 - `scripts/deploy-frontend.bat`
   - 새 frontend `dist` 를 `app/frontend/dist` 위치에 배치하는 보조 스크립트다.
+  - 인자 1로 배포 대상 `dist` 디렉터리 경로를 필수로 받으며, `index.html` 가 존재하고 해당 경로가 디렉터리가 아닌 실제 파일인지 검증한다.
   - `APP_HOME` 이 있으면 해당 경로를, 없으면 스크립트 기준 상위 경로를 앱 루트로 해석한다.
-  - 기존 `dist` 는 `backups/release/` 아래에 백업하고, temp 디렉터리에 복사한 뒤 최종 교체한다.
-  - 별도 웹서버 반영과 재시작은 별도 운영 절차를 따른다.
+  - 기존 `dist` 는 `backups/release/frontend-dist-YYYYMMDD-HHMMSS/` 아래에 백업하고, `temp/deploy-frontend-YYYYMMDD-HHMMSS` 경로를 거쳐 최종 교체한다.
+  - 웹서버 재시작, health check 호출, IIS/Nginx 설정 반영, cache invalidation 확인은 별도 운영 절차를 따른다.
+
+- 4개 스크립트 모두 성공 시 종료코드 `0`, 실패 시 `0` 이외 값을 반환한다.
 
 아래 작업은 이번 스크립트 범위에 포함되지 않는다.
 
@@ -269,6 +279,8 @@ D:/mental-health-system/
 - `logging.level.root`
 - `logging.level.com.dasisuhgi.mentalhealth`
 - `app.organization.name`
+- `app.scale.resource-path`
+- `app.export.temp-path`
 - `app.backup.root-path`
 - `app.backup.db-dump-command`
 - `app.security.trust-proxy-headers`
@@ -332,6 +344,10 @@ logging:
 app:
   organization:
     name: ${APP_ORGANIZATION_NAME:다시서기 정신건강 평가관리 시스템}
+  scale:
+    resource-path: ${APP_SCALE_RESOURCE_PATH:classpath:scales}
+  export:
+    temp-path: ${APP_EXPORT_TEMP_PATH:./tmp/exports}
   backup:
     root-path: ${APP_BACKUP_ROOT_PATH:BACKUP_ROOT_PATH_PLACEHOLDER}
     db-dump-command: ${APP_DB_DUMP_COMMAND:${APP_BACKUP_DB_DUMP_COMMAND:mariadb-dump}}
@@ -339,17 +355,14 @@ app:
     trust-proxy-headers: ${APP_TRUST_PROXY_HEADERS:false}
   seed:
     enabled: false
-
-# app.scale.resource-path: 현재 코드 미지원
-# app.export.temp-path: 현재 코드 미지원
 ```
 
 ### 운영 설정 원칙
 - 운영에서는 `ddl-auto=validate` 를 권장한다.
 - 운영 로그는 DEBUG 대신 INFO 중심으로 시작한다.
 - reverse proxy 환경이면 `server.forward-headers-strategy` 와 `app.security.trust-proxy-headers` 값을 함께 점검한다.
-- `app.scale.resource-path`, `app.export.temp-path` 는 현재 코드 미지원이므로 `application-prod.yml` 실제 설정 키로 간주하지 않는다.
-- scale JSON 배치 위치와 운영 작업용 temp 경로는 운영 파일 관리 항목으로 별도 관리한다.
+- `app.scale.resource-path` 는 실제 지원되는 설정이며, `classpath:scales` 또는 `<app-home>/app/backend/scales` 같은 filesystem 경로를 사용할 수 있다.
+- `app.export.temp-path` 는 실제 지원되는 설정이며, CSV export 시 사용할 writable 임시 디렉터리를 가리켜야 한다.
 
 ---
 
@@ -390,6 +403,7 @@ app:
 
 ### 현재 추천
 - **운영 외부 파일 경로 방식**을 권장한다.
+- 운영 외부 파일 경로를 쓰면 `app.scale.resource-path` 를 `<app-home>/app/backend/scales` 같은 실제 서버 경로로 맞춘다.
 
 ### 이유
 - 척도 정의 변경 시 전체 jar 재빌드 없이 추적 가능
@@ -436,13 +450,13 @@ app:
 
 ## 11.2 파일 로그 경로 권장
 ```text
-D:/mental-health-system/logs/application/
+<app-home>/logs/application/
 ```
 
 필요 시 접근 로그를 분리한다.
 
 ```text
-D:/mental-health-system/logs/access/
+<app-home>/logs/access/
 ```
 
 ## 11.3 로그 보존 정책 권장안
@@ -475,7 +489,7 @@ D:/mental-health-system/logs/access/
 
 ## 12.2 권장 백업 경로
 ```text
-D:/mental-health-system/backups/
+<app-home>/backups/
 ├── db/
 ├── app-config/
 └── release/
@@ -593,6 +607,9 @@ frontend-dist-20260329-231500/
 
 ## 15. 권장 배포 절차
 
+배포 결과 기록은 [docs/14-deploy-result-template.md](./14-deploy-result-template.md) 를 참조해 `docs/deploy-results/YYYY-MM-DD.md` 에 남긴다.
+검증 환경에서 미리 확인한 성공 항목은 같은 문서의 `검증 환경 결과` 에, 실제 운영 서버 반영과 배포 후 확인 결과는 `실제 운영 배포 결과` 에 분리 기록한다.
+
 ## 15.1 배포 전
 1. 운영 DB 수동 백업 실행
 2. 척도 JSON / 설정 파일 백업
@@ -616,6 +633,10 @@ scripts\run-backup.bat
 - 이 스크립트는 운영자용 직접 DB dump 파일 생성 보조만 수행한다.
 - `backup_histories` 적재 확인이 필요하면 관리자 화면/API 기반 수동 백업을 별도로 수행한다.
 
+기록:
+- 배포 직전 검증 환경에서 다시 확인한 테스트/백업 결과는 `docs/deploy-results/YYYY-MM-DD.md` 의 `검증 환경 결과` 에 기록한다.
+- 실제 운영 서버에서 수행한 배포 전 백업, 설정 확인, 배포 시작 준비 상태는 같은 문서의 `실제 운영 배포 결과` 에 기록한다.
+
 ## 15.2 배포 중
 1. 사용자 사용 중지 안내
 2. 기존 앱 프로세스 중지
@@ -635,8 +656,14 @@ scripts\deploy-frontend.bat "<release-dist-path>"
 
 주의:
 - `scripts\deploy-backend.bat` 는 backend jar 배치 보조만 수행하므로, 기존 프로세스 중지와 새 프로세스 시작은 운영자가 별도 수행해야 한다.
-- `scripts\deploy-frontend.bat` 는 frontend `dist` 배치 보조만 수행하므로, 웹서버 재시작이나 IIS/Nginx 설정 반영은 별도 운영 절차로 수행해야 한다.
-- 두 스크립트 모두 기존 배포본을 `backups/release/` 아래에 백업하지만, 서비스 정상화 여부까지 보장하지는 않는다.
+- `scripts\deploy-backend.bat` 는 인자 1로 전달한 실제 `.jar` 파일을 `app\backend\mental-health-app.jar` 로 교체하고, 기존 jar 가 있으면 `app\backend\backup\mental-health-app-YYYYMMDD-HHMMSS.jar` 형식으로 백업한다.
+- `scripts\deploy-frontend.bat` 는 인자 1로 전달한 `dist` 디렉터리를 `app\frontend\dist` 로 교체하며, `index.html` 가 존재하고 디렉터리가 아닌 실제 파일인지 확인한다.
+- `scripts\deploy-frontend.bat` 는 기존 `dist` 를 `backups/release/frontend-dist-YYYYMMDD-HHMMSS/` 아래에 백업하고 `temp/deploy-frontend-YYYYMMDD-HHMMSS` 경유로 교체하지만, 웹서버 재시작, health check 호출, IIS/Nginx 설정 반영, cache invalidation 확인은 별도 운영 절차로 수행해야 한다.
+- `scripts\deploy-frontend.bat` 실행 성공만으로 정적 파일 서비스 전환 완료까지 보장하지는 않는다.
+
+기록:
+- 실제 운영 반영을 수행했다면 배포 시작 시각, 완료 시각, 담당자, 반영 대상 버전/커밋, 배포 중 오류 여부를 `docs/deploy-results/YYYY-MM-DD.md` 의 `실제 운영 배포 결과` 에 기록한다.
+- 검증 환경에서 파일 배치 절차를 리허설한 경우는 실제 운영 배포 성공으로 기록하지 않고 `검증 환경 결과` 에만 남긴다.
 
 ## 15.3 배포 후
 1. 로그인 확인
@@ -655,7 +682,16 @@ scripts\deploy-frontend.bat "<release-dist-path>"
 ```powershell
 scripts\health-check.bat
 scripts\health-check.bat "http://127.0.0.1:8080/api/v1"
+scripts\health-check.bat "http://127.0.0.1:8080/api/v1/health"
 ```
+
+주의:
+- `scripts\health-check.bat` 는 무인자 실행 시 기본 health URL 을 확인한다.
+- 인자 1은 base URL 과 full `/health` URL 둘 다 받을 수 있다.
+
+기록:
+- 실제 운영 반영 직후 수행한 로그인/세션 저장/통계/백업/health 결과는 `docs/deploy-results/YYYY-MM-DD.md` 의 `실제 운영 배포 결과` 에 기록한다.
+- 검증 환경에서 같은 스모크 테스트가 성공했더라도, 실제 운영 서버에서 다시 확인하기 전에는 실제 운영 배포 성공으로 보지 않는다.
 
 ---
 
@@ -831,11 +867,14 @@ scripts\health-check.bat "http://127.0.0.1:8080/api/v1"
 - 변경 대상
 - 변경 사유
 - 관련 문서/이슈
+- 결과 기록 문서 위치
 - 배포 후 확인 결과
 - 롤백 필요 여부
 
 ## 21.3 권장 방식
 - 최소한 `release-note.md` 또는 운영 변경 이력 문서를 유지한다.
+- 실제 운영 변경이나 재배포를 수행한 날짜에는 [docs/14-deploy-result-template.md](./14-deploy-result-template.md) 를 참고해 `docs/deploy-results/YYYY-MM-DD.md` 를 생성 또는 갱신한다.
+- 같은 문서 안에서 `검증 환경 결과` 와 `실제 운영 배포 결과` 를 분리한다.
 - 척도 JSON 변경은 일반 코드 변경과 구분해서 적는다.
 
 ---

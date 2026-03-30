@@ -11,8 +11,10 @@ import { AdminLogsPage } from '../../pages/admin/AdminLogsPage'
 import { AdminSignupRequestsPage } from '../../pages/admin/AdminSignupRequestsPage'
 import { AdminUsersPage } from '../../pages/admin/AdminUsersPage'
 import { LoginPage } from '../../pages/auth/LoginPage'
+import { SignupRequestPage } from '../../pages/auth/SignupRequestPage'
 import { ClientCreatePage } from '../../pages/clients/ClientCreatePage'
 import { ClientDetailPage } from '../../pages/clients/ClientDetailPage'
+import { ClientEditPage } from '../../pages/clients/ClientEditPage'
 import { ClientListPage } from '../../pages/clients/ClientListPage'
 import { StatisticsPage } from '../../pages/statistics/StatisticsPage'
 import { AppLayout } from '../layouts/AppLayout'
@@ -81,6 +83,14 @@ export function AppRouter() {
         }
       />
       <Route
+        path="/signup"
+        element={
+          <GuestOnly>
+            <SignupRequestPage />
+          </GuestOnly>
+        }
+      />
+      <Route
         path="/assessments/sessions/:sessionId/print"
         element={
           <ProtectedOnly>
@@ -93,6 +103,7 @@ export function AppRouter() {
         <Route path="/clients" element={<ClientListPage />} />
         <Route path="/clients/new" element={<ClientCreatePage />} />
         <Route path="/clients/:clientId" element={<ClientDetailPage />} />
+        <Route path="/clients/:clientId/edit" element={<ClientEditPage />} />
         <Route path="/assessment-records" element={<AssessmentRecordListPage />} />
         <Route path="/statistics" element={<StatisticsPage />} />
         <Route path="/assessments/start/:clientId/scales" element={<AssessmentScaleSelectPage />} />

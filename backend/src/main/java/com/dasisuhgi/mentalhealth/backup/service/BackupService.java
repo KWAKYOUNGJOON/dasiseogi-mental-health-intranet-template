@@ -32,12 +32,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +60,8 @@ public class BackupService {
     private final String datasourceUsername;
     private final String datasourcePassword;
     private final String dbDumpCommand;
+    private final boolean backupAutoEnabled;
+    private final AtomicBoolean backupRunning = new AtomicBoolean(false);
 
     public BackupService(
             BackupHistoryRepository backupHistoryRepository,
@@ -71,7 +75,8 @@ public class BackupService {
             @Value("${spring.datasource.url}") String datasourceUrl,
             @Value("${spring.datasource.username:}") String datasourceUsername,
             @Value("${spring.datasource.password:}") String datasourcePassword,
-            @Value("${app.backup.db-dump-command:}") String dbDumpCommand
+            @Value("${app.backup.db-dump-command:}") String dbDumpCommand,
+            @Value("${app.backup.auto.enabled:true}") boolean backupAutoEnabled
     ) {
         this.backupHistoryRepository = backupHistoryRepository;
         this.backupHistoryQueryRepository = backupHistoryQueryRepository;
@@ -85,6 +90,7 @@ public class BackupService {
         this.datasourceUsername = datasourceUsername;
         this.datasourcePassword = datasourcePassword;
         this.dbDumpCommand = dbDumpCommand;
+        this.backupAutoEnabled = backupAutoEnabled;
     }
 
     @Transactional(readOnly = true)
@@ -109,61 +115,90 @@ public class BackupService {
     public ManualBackupRunResponse runManualBackup(ManualBackupRunRequest request, SessionUser sessionUser) {
         User currentUser = accessPolicyService.getCurrentUser(sessionUser);
         accessPolicyService.assertAdmin(currentUser);
+        return executeBackup(BackupType.MANUAL, request == null ? null : request.reason(), currentUser);
+    }
 
-        LocalDateTime startedAt = LocalDateTime.now();
-        Path root = Path.of(backupRootPath).toAbsolutePath().normalize();
+    @Scheduled(cron = "${app.backup.auto.cron:0 0 2 * * *}", zone = "${app.backup.auto.zone:Asia/Seoul}")
+    @Transactional(noRollbackFor = Exception.class)
+    public void runAutomaticBackup() {
+        if (!backupAutoEnabled) {
+            return;
+        }
+        executeBackup(BackupType.AUTO, "scheduled automatic backup", null);
+    }
 
-        BackupHistory history = new BackupHistory();
-        history.setBackupType(BackupType.MANUAL);
-        history.setBackupMethod(BackupMethod.SNAPSHOT);
-        history.setStatus(BackupStatus.FAILED);
-        history.setFileName("backup-" + FILE_FORMAT.format(startedAt) + "-pending.tmp");
-        history.setFilePath(root.resolve(history.getFileName()).toString());
-        history.setStartedAt(startedAt);
-        history.setExecutedById(currentUser.getId());
-        history.setExecutedByNameSnapshot(currentUser.getName());
-        backupHistoryRepository.save(history);
+    private ManualBackupRunResponse executeBackup(BackupType backupType, String reason, User currentUser) {
+        if (!backupRunning.compareAndSet(false, true)) {
+            if (backupType == BackupType.AUTO) {
+                return null;
+            }
+            throw new AppException(HttpStatus.CONFLICT, "BACKUP_ALREADY_RUNNING", "이미 백업이 실행 중입니다.");
+        }
 
         try {
-            BackupPreflight preflight = performPreflight(root);
-            history.setBackupMethod(preflight.preferredMethod());
-            BackupArtifact artifact = createBackupArtifact(preflight, root, startedAt, request == null ? null : request.reason(), currentUser);
-            history.setBackupMethod(artifact.method());
-            history.setFileName(artifact.fileName());
-            history.setFilePath(artifact.filePath().toString());
-            history.setStatus(BackupStatus.SUCCESS);
-            history.setFileSizeBytes(Files.size(artifact.filePath()));
-            history.setCompletedAt(LocalDateTime.now());
-            history.setFailureReason(null);
+            LocalDateTime startedAt = LocalDateTime.now();
+            Path root = Path.of(backupRootPath).toAbsolutePath().normalize();
+
+            BackupHistory history = new BackupHistory();
+            history.setBackupType(backupType);
+            history.setBackupMethod(BackupMethod.SNAPSHOT);
+            history.setStatus(BackupStatus.FAILED);
+            history.setFileName("backup-" + FILE_FORMAT.format(startedAt) + "-pending.tmp");
+            history.setFilePath(root.resolve(history.getFileName()).toString());
+            history.setStartedAt(startedAt);
+            history.setExecutedById(currentUser == null ? null : currentUser.getId());
+            history.setExecutedByNameSnapshot(currentUser == null ? "SYSTEM" : currentUser.getName());
             backupHistoryRepository.save(history);
 
-            activityLogService.log(
-                    currentUser,
-                    ActivityActionType.BACKUP_RUN,
-                    ActivityTargetType.BACKUP,
-                    history.getId(),
-                    history.getFileName(),
-                    "수동 백업 실행: " + history.getBackupMethod().name() + " / " + history.getFileName()
-            );
+            try {
+                BackupPreflight preflight = performPreflight(root);
+                history.setBackupMethod(preflight.preferredMethod());
+                BackupArtifact artifact = createBackupArtifact(preflight, root, startedAt, reason, currentUser);
+                history.setBackupMethod(artifact.method());
+                history.setFileName(artifact.fileName());
+                history.setFilePath(artifact.filePath().toString());
+                history.setStatus(BackupStatus.SUCCESS);
+                history.setFileSizeBytes(Files.size(artifact.filePath()));
+                history.setCompletedAt(LocalDateTime.now());
+                history.setFailureReason(null);
+                backupHistoryRepository.save(history);
 
-            return new ManualBackupRunResponse(
-                    history.getId(),
-                    history.getBackupType().name(),
-                    history.getBackupMethod().name(),
-                    preflight.datasourceType(),
-                    preflight.summary(),
-                    history.getStatus().name(),
-                    history.getFileName(),
-                    history.getFilePath()
-            );
-        } catch (Exception exception) {
-            history.setCompletedAt(LocalDateTime.now());
-            history.setFailureReason(buildFailureReason(exception));
-            backupHistoryRepository.save(history);
-            if (exception instanceof AppException appException) {
-                throw appException;
+                activityLogService.log(
+                        currentUser,
+                        ActivityActionType.BACKUP_RUN,
+                        ActivityTargetType.BACKUP,
+                        history.getId(),
+                        history.getFileName(),
+                        (backupType == BackupType.AUTO ? "자동" : "수동") + " 백업 실행: " + history.getBackupMethod().name() + " / " + history.getFileName()
+                );
+
+                if (backupType == BackupType.AUTO) {
+                    return null;
+                }
+                return new ManualBackupRunResponse(
+                        history.getId(),
+                        history.getBackupType().name(),
+                        history.getBackupMethod().name(),
+                        preflight.datasourceType(),
+                        preflight.summary(),
+                        history.getStatus().name(),
+                        history.getFileName(),
+                        history.getFilePath()
+                );
+            } catch (Exception exception) {
+                history.setCompletedAt(LocalDateTime.now());
+                history.setFailureReason(buildFailureReason(exception));
+                backupHistoryRepository.save(history);
+                if (backupType == BackupType.AUTO) {
+                    return null;
+                }
+                if (exception instanceof AppException appException) {
+                    throw appException;
+                }
+                throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "BACKUP_RUN_FAILED", "백업 실행에 실패했습니다.");
             }
-            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "BACKUP_RUN_FAILED", "백업 실행에 실패했습니다.");
+        } finally {
+            backupRunning.set(false);
         }
     }
 
@@ -307,7 +342,7 @@ public class BackupService {
             Path probe = Files.createTempFile(root, "backup-preflight-", ".tmp");
             Files.deleteIfExists(probe);
         } catch (IOException exception) {
-            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "BACKUP_RUN_FAILED",
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "BACKUP_PATH_NOT_WRITABLE",
                     "백업 경로를 사용할 수 없습니다: " + exception.getMessage());
         }
 

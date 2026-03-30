@@ -21,47 +21,22 @@ function Write-Step {
 function Invoke-Git {
     param([string[]]$Arguments)
 
-    $stdoutPath = [System.IO.Path]::GetTempFileName()
-    $stderrPath = [System.IO.Path]::GetTempFileName()
-    $gitExecutable = (Get-Command git).Source
-
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     try {
-        $process = Start-Process `
-            -FilePath $gitExecutable `
-            -ArgumentList (@("-C", $repoRoot) + $Arguments) `
-            -RedirectStandardOutput $stdoutPath `
-            -RedirectStandardError $stderrPath `
-            -Wait `
-            -NoNewWindow `
-            -PassThru
-
-        $stdoutLines = if ((Test-Path -LiteralPath $stdoutPath) -and ((Get-Item -LiteralPath $stdoutPath).Length -gt 0)) {
-            Get-Content -LiteralPath $stdoutPath
-        } else {
-            @()
-        }
-        $stderrLines = if ((Test-Path -LiteralPath $stderrPath) -and ((Get-Item -LiteralPath $stderrPath).Length -gt 0)) {
-            Get-Content -LiteralPath $stderrPath
-        } else {
-            @()
-        }
+        $output = & git -C $repoRoot @Arguments 2>&1
     } finally {
-        foreach ($path in @($stdoutPath, $stderrPath)) {
-            if (Test-Path -LiteralPath $path) {
-                Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
-            }
-        }
+        $ErrorActionPreference = $previousErrorActionPreference
     }
 
-    $output = @($stdoutLines + $stderrLines)
-
-    if ($process.ExitCode -ne 0) {
+    if ($LASTEXITCODE -ne 0) {
         $message = ($output | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
         throw "Git command failed: git $($Arguments -join ' ')$([Environment]::NewLine)$message"
     }
 
     return @(
         $output |
+            Where-Object { $null -ne $_ } |
             ForEach-Object { $_.ToString() } |
             Where-Object { $_ -and -not $_.StartsWith("warning:", [System.StringComparison]::OrdinalIgnoreCase) }
     )
@@ -102,12 +77,13 @@ function Get-TopAreas {
 
 $null = Invoke-Git -Arguments @("rev-parse", "--show-toplevel")
 
-if ([string]::IsNullOrWhiteSpace($Branch)) {
-    $Branch = (Invoke-Git -Arguments @("rev-parse", "--abbrev-ref", "HEAD") | Select-Object -First 1)
+$currentBranch = (Invoke-Git -Arguments @("rev-parse", "--abbrev-ref", "HEAD") | Select-Object -First 1)
+if ([string]::IsNullOrWhiteSpace($currentBranch) -or $currentBranch -eq "HEAD") {
+    throw "Current checkout is detached. Switch to a branch before auto-publishing."
 }
 
-if ([string]::IsNullOrWhiteSpace($Branch) -or $Branch -eq "HEAD") {
-    throw "Current checkout is detached. Switch to a branch before auto-publishing."
+if ([string]::IsNullOrWhiteSpace($Branch)) {
+    $Branch = $currentBranch
 }
 
 $unmerged = @(Invoke-Git -Arguments @("diff", "--name-only", "--diff-filter=U"))
@@ -164,7 +140,21 @@ if ([string]::IsNullOrWhiteSpace($CommitMessage)) {
 Write-Step "Creating commit: $CommitMessage"
 $null = Invoke-Git -Arguments @("commit", "-m", $CommitMessage)
 
-Write-Step "Pushing to $Remote/$Branch"
-$null = Invoke-Git -Arguments @("push", $Remote, $Branch)
+$pushOperations = @()
+if ($Branch -ne $currentBranch) {
+    $pushOperations += @{
+        Label = "$Remote/$currentBranch"
+        Target = $currentBranch
+    }
+}
+$pushOperations += @{
+    Label = "$Remote/$Branch"
+    Target = if ($Branch -eq $currentBranch) { $Branch } else { "HEAD:refs/heads/$Branch" }
+}
+
+foreach ($pushOperation in $pushOperations) {
+    Write-Step "Pushing to $($pushOperation.Label)"
+    $null = Invoke-Git -Arguments @("push", $Remote, $pushOperation.Target)
+}
 
 Write-Step "Publish completed"

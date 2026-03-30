@@ -1,15 +1,17 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../app/providers/AuthProvider'
 
 export function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [loginId, setLoginId] = useState('admina')
   const [password, setPassword] = useState('Test1234!')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const notice = searchParams.get('notice')
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -40,10 +42,16 @@ export function LoginPage() {
           <span>비밀번호</span>
           <input onChange={(event) => setPassword(event.target.value)} type="password" value={password} />
         </label>
+        {notice === 'signup-requested' ? <div className="success-text">가입 신청이 접수되었습니다. 관리자 승인 후 로그인할 수 있습니다.</div> : null}
         {error ? <div className="error-text">{error}</div> : null}
-        <button className="primary-button" disabled={submitting} type="submit">
-          {submitting ? '로그인 중...' : '로그인'}
-        </button>
+        <div className="actions">
+          <button className="primary-button" disabled={submitting} type="submit">
+            {submitting ? '로그인 중...' : '로그인'}
+          </button>
+          <Link className="secondary-button" to="/signup">
+            회원가입 신청
+          </Link>
+        </div>
       </form>
     </div>
   )

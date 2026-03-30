@@ -2,7 +2,8 @@
 param(
     [string]$AutoStartName = "DasiseogiRepoAutoPushWatcher",
     [int]$DebounceSeconds = 5,
-    [string]$LegacyTaskName = "DasiseogiWorklogAutoPush"
+    [string]$LegacyTaskName = "DasiseogiWorklogAutoPush",
+    [string]$Branch = "main"
 )
 
 Set-StrictMode -Version Latest
@@ -16,7 +17,8 @@ $watcherArguments = @(
     "-WindowStyle", "Hidden",
     "-ExecutionPolicy", "Bypass",
     "-File", $watcherScript,
-    "-DebounceSeconds", $DebounceSeconds
+    "-DebounceSeconds", $DebounceSeconds,
+    "-Branch", $Branch
 )
 $watcherCommand = 'powershell.exe ' + (($watcherArguments | ForEach-Object {
     if ($_ -match '\s') { '"' + $_ + '"' } else { $_ }
@@ -37,6 +39,14 @@ try {
 } catch {
 }
 
+$watcherProcesses = @(Get-CimInstance Win32_Process | Where-Object {
+    $_.Name -match '^powershell(\.exe)?$' -and $_.CommandLine -like '*watch-and-publish-repo.ps1*'
+})
+
+foreach ($watcherProcess in $watcherProcesses) {
+    Stop-Process -Id $watcherProcess.ProcessId -Force -ErrorAction SilentlyContinue
+}
+
 $process = Start-Process -FilePath "powershell.exe" -ArgumentList $watcherArguments -WindowStyle Hidden -PassThru
 
-Write-Host "[register-repo-autopush-watcher] autostart enabled via HKCU Run and watcher launched (pid $($process.Id))"
+Write-Host "[register-repo-autopush-watcher] autostart enabled via HKCU Run and watcher launched for branch $Branch (pid $($process.Id))"

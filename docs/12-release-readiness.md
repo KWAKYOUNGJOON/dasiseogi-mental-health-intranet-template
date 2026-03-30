@@ -3,7 +3,7 @@
 ## 1. 현재 판정
 
 - 판정: `READY`
-- 의미: 현재 증빙 범위 기준 `배포 가능` 판정이며, 실제 운영 배포 완료를 뜻하지 않는다. 실제 운영 배포 여부는 일자별 배포 결과 문서의 `실제 운영 배포 결과` 에 별도 기록한다.
+- 의미: 현재 증빙 범위 기준 `배포 가능` 이자 `release readiness 확보` 판정이며, 실제 운영 배포 완료를 뜻하지 않는다. 실제 운영 반영 여부, 배포 시작/완료 시각, 배포 결과는 `docs/deploy-results/YYYY-MM-DD.md` 의 `실제 운영 배포 결과` 에 별도 기록한다.
 
 ### 판정 요약
 - 핵심 업무 흐름과 관리자 기능은 구현되어 있고, 현재 코드베이스 기준 `backend test`, `frontend build` 는 통과한다.
@@ -35,7 +35,7 @@
 
 ## 3. 지금 당장 배포를 막는 항목
 
-`2026-03-30` go-live 검증으로 기존 blocker 2건은 모두 해소되었다. 아래 증빙은 `검증 환경 결과` 기준이며, 실제 운영 배포 완료 기록은 아니다.
+`2026-03-30` go-live 검증으로 기존 blocker 2건은 모두 해소되었다. 아래 증빙은 `검증 환경 결과` 기준이며, 실제 운영 배포 완료 기록은 아니다. 실제 운영 반영 시각과 결과는 `docs/deploy-results/YYYY-MM-DD.md` 에 별도 남긴다.
 
 1. MariaDB/MySQL 실검증 완료
    - 확인한 근거: `backend/build/test-results/mariaDbTest/TEST-com.dasisuhgi.mentalhealth.MariaDbCompatibilityTest.xml` 에 `tests="4" skipped="0"` 기록
@@ -44,14 +44,14 @@
 
 2. 검증 환경에서 DB_DUMP 실제 성공 확인 완료
    - 확인한 근거: `POST /api/v1/admin/backups/run` 응답 `status=SUCCESS`, `backupMethod=DB_DUMP`, `datasourceType=MARIADB`
-   - 현재 상태: `backup_histories` 최신 이력과 `D:\dasiseogi-mental-health-intranet-template\local-backups\go-live-mariadb-check\backup-20260330-003830-db-dump.sql` 파일이 일치
+   - 현재 상태: `backup_histories` 최신 이력과 생성된 `backup-20260330-003830-db-dump.sql` 파일이 일치
    - 비고: PowerShell 환경변수 주입 + Gradle daemon 조합으로 H2 fallback 이 섞일 수 있어, 이번 검증은 `bootRun --args` 로 datasource/backup 설정을 직접 넘겨 MariaDB 를 고정했다
 
 ---
 
 ## 4. 실제 운영 배포 전 최종 선행 조치
 
-아래 항목을 끝내면 현재 저장소 상태로 실제 운영 배포 진행 가능하다.
+아래 항목을 끝내면 현재 저장소 상태로 실제 운영 배포 진행 가능하다. 실제 운영 반영을 수행했다면 결과는 `docs/deploy-results/YYYY-MM-DD.md` 의 `실제 운영 배포 결과` 에 별도 기록한다.
 
 1. Docker 가능 환경 또는 스테이징 DB 에서 MariaDB 호환 테스트 수행
 2. 운영 설정 파일에 실제 DB 접속 정보, 백업 경로, `APP_TRUST_PROXY_HEADERS` 값 반영
@@ -64,6 +64,8 @@
 ---
 
 ## 5. 배포 전 필수 확인 항목
+
+아래 `[x]` 표시는 현재 readiness 증빙 범위에서 이미 확보된 항목을 뜻하며, 실제 운영 반영 완료 여부를 뜻하지 않는다. 실제 운영 배포 결과는 `docs/deploy-results/YYYY-MM-DD.md` 에 별도 기록한다.
 
 - [ ] `backend`: `.\gradlew.bat test` 성공
 - [x] `backend`: `.\gradlew.bat mariaDbTest` 실제 실행 또는 동등한 MariaDB/MySQL 스모크 확인
@@ -81,6 +83,8 @@
 ---
 
 ## 6. 배포 후 스모크 테스트
+
+아래 항목은 실제 운영 배포 직후 다시 확인해야 하는 스모크 테스트다. 검증 환경에서의 성공 기록은 readiness 증빙으로 유지하되, 실제 운영 서버 결과와 혼용하지 않는다.
 
 1. 관리자 로그인
 2. 대상자 목록 조회
@@ -175,5 +179,5 @@
 
 - 현재 저장소 상태는 핵심 기능/권한/문서/스크립트와 운영 직전 blocker 해소 증거까지 갖춰져 있어 `READY` 이다.
 - 실제 운영 배포 직전에는 운영 DB 접속 정보, 백업 경로, reverse proxy / `APP_TRUST_PROXY_HEADERS` 값만 다시 대조하면 된다.
-- 현재 `READY` 판정은 readiness 증빙 정리 완료를 뜻하며, 실제 운영 배포 시작/완료 시각과 반영 결과는 `docs/deploy-results/YYYY-MM-DD.md` 의 `실제 운영 배포 결과` 에 별도 기록한다.
+- 현재 `READY` 판정은 readiness 증빙 정리 완료와 배포 가능 상태 확보를 뜻하며, 실제 운영 반영 여부, 시작/완료 시각, 배포 후 결과는 `docs/deploy-results/YYYY-MM-DD.md` 의 `실제 운영 배포 결과` 에 별도 기록한다.
 - 현재 코드베이스와 문서 기준으로 실제 운영 배포 진행 가능하다.

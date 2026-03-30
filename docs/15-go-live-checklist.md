@@ -11,8 +11,8 @@
 - 상세 기준과 결과 기록은 아래 문서를 함께 본다.
   - [docs/12-release-readiness.md](./12-release-readiness.md)
   - [docs/13-pre-deploy-runbook.md](./13-pre-deploy-runbook.md)
-  - [docs/14-deploy-result-template.md](./14-deploy-result-template.md)
-  - 일자별 실제 결과 문서는 `docs/deploy-results/YYYY-MM-DD.md` 형식으로 보관한다.
+  - [docs/14-deploy-result-template.md](./14-deploy-result-template.md) (`docs/deploy-results/YYYY-MM-DD.md` 작성을 위한 참조용 템플릿)
+  - 일자별 실제 결과 문서는 `docs/deploy-results/YYYY-MM-DD.md` 형식으로 생성해 보관한다.
 
 ---
 
@@ -30,7 +30,7 @@
 - [x] 10. `CSV export` 확인
 - [x] 11. 활동 로그 확인
 - [x] 12. 수동 백업 이력 확인
-- [x] 13. `READY` 판정 및 배포 미실행 상태를 `docs/14` 기록
+- [x] 13. `READY` 판정 및 배포 미실행 상태를 `docs/deploy-results/YYYY-MM-DD.md` 에 기록
 
 ---
 
@@ -169,7 +169,7 @@
   - 수동 백업 실패 또는 `backupMethod=SNAPSHOT`
   - `health` endpoint `DOWN` 또는 503
   - MariaDB/MySQL 실검증 미완료
-- 실패 시 조치: 새 버전 운영 반영 결정을 중지하고 [docs/11-deployment.md](./11-deployment.md) 의 롤백 절차를 따른다. 결과는 [docs/14-deploy-result-template.md](./14-deploy-result-template.md) 에 즉시 기록한다.
+- 실패 시 조치: 새 버전 운영 반영 결정을 중지하고 [docs/11-deployment.md](./11-deployment.md) 의 롤백 절차를 따른다. 결과는 `docs/deploy-results/YYYY-MM-DD.md` 에 즉시 기록한다.
 - 판단 결과 (`2026-03-30`, 오늘 검증 기준):
   - 위 배포 중지 조건 모두 `아니오`
   - `1`, `2`, `12` blocker 해소 완료

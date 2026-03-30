@@ -33,6 +33,12 @@ logging:
 app:
   organization:
     name: ${APP_ORGANIZATION_NAME:다시서기 정신건강 평가관리 시스템}
+  scale:
+    # classpath:scales or a filesystem path such as D:/apps/mental-health/app/backend/scales
+    resource-path: ${APP_SCALE_RESOURCE_PATH:classpath:scales}
+  export:
+    # writable directory used for temporary export file materialization
+    temp-path: ${APP_EXPORT_TEMP_PATH:./tmp/exports}
   backup:
     root-path: ${APP_BACKUP_ROOT_PATH:BACKUP_ROOT_PATH_PLACEHOLDER}
     db-dump-command: ${APP_DB_DUMP_COMMAND:${APP_BACKUP_DB_DUMP_COMMAND:mariadb-dump}}
@@ -40,6 +46,3 @@ app:
     trust-proxy-headers: ${APP_TRUST_PROXY_HEADERS:false}
   seed:
     enabled: false
-
-# app.scale.resource-path: 현재 코드 미지원
-# app.export.temp-path: 현재 코드 미지원

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchAssessmentRecords, type AssessmentRecordPage } from '../../features/assessment/api/assessmentApi'
 import { PageHeader } from '../../shared/components/PageHeader'
 
@@ -7,12 +7,13 @@ const DEFAULT_SIZE = 20
 
 export function AssessmentRecordListPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [records, setRecords] = useState<AssessmentRecordPage | null>(null)
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [clientName, setClientName] = useState('')
-  const [scaleCode, setScaleCode] = useState('')
-  const [includeMisentered, setIncludeMisentered] = useState(false)
+  const [dateFrom, setDateFrom] = useState(searchParams.get('dateFrom') ?? '')
+  const [dateTo, setDateTo] = useState(searchParams.get('dateTo') ?? '')
+  const [clientName, setClientName] = useState(searchParams.get('clientName') ?? '')
+  const [scaleCode, setScaleCode] = useState(searchParams.get('scaleCode') ?? '')
+  const [includeMisentered, setIncludeMisentered] = useState(searchParams.get('includeMisentered') === 'true')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

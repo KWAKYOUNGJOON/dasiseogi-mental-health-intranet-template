@@ -6,49 +6,29 @@ import com.dasisuhgi.mentalhealth.scale.dto.ScaleListItemResponse;
 import com.dasisuhgi.mentalhealth.scale.dto.ScaleOptionResponse;
 import com.dasisuhgi.mentalhealth.scale.dto.ScaleQuestionResponse;
 import com.dasisuhgi.mentalhealth.scale.registry.ScaleDefinition;
-import com.dasisuhgi.mentalhealth.scale.registry.ScaleRegistryFile;
 import com.dasisuhgi.mentalhealth.scale.registry.ScaleRegistryItem;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ScaleService {
-    private final ObjectMapper objectMapper;
-    private final ResourceLoader resourceLoader;
-    private final Map<String, ScaleRegistryItem> registryItems = new HashMap<>();
-    private final Map<String, ScaleDefinition> definitions = new HashMap<>();
+    private final ScaleResourceLoader scaleResourceLoader;
+    private Map<String, ScaleRegistryItem> registryItems = Map.of();
+    private Map<String, ScaleDefinition> definitions = Map.of();
 
-    public ScaleService(ObjectMapper objectMapper, ResourceLoader resourceLoader) {
-        this.objectMapper = objectMapper;
-        this.resourceLoader = resourceLoader;
+    public ScaleService(ScaleResourceLoader scaleResourceLoader) {
+        this.scaleResourceLoader = scaleResourceLoader;
     }
 
     @PostConstruct
-    void load() throws IOException {
-        Resource registryResource = resourceLoader.getResource("classpath:scales/common/scale-registry.json");
-        try (InputStream inputStream = registryResource.getInputStream()) {
-            ScaleRegistryFile registryFile = objectMapper.readValue(inputStream, ScaleRegistryFile.class);
-            for (ScaleRegistryItem item : registryFile.items()) {
-                registryItems.put(item.scaleCode(), item);
-                if (item.implemented() && item.definitionFile() != null) {
-                    Resource definitionResource = resourceLoader.getResource(item.definitionFile());
-                    try (InputStream definitionInputStream = definitionResource.getInputStream()) {
-                        ScaleDefinition definition = objectMapper.readValue(definitionInputStream, ScaleDefinition.class);
-                        definitions.put(definition.scaleCode(), definition);
-                    }
-                }
-            }
-        }
+    void load() {
+        ScaleResourceLoader.LoadedScaleResources loadedScales = scaleResourceLoader.load();
+        registryItems = loadedScales.registryItems();
+        definitions = loadedScales.definitions();
     }
 
     public List<ScaleListItemResponse> getScales() {

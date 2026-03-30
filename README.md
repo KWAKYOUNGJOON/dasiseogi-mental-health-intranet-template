@@ -188,8 +188,8 @@ snapshot ZIP 포함 항목:
 권장 순서:
 1. `application-prod.yml` 또는 동등한 외부 설정 파일에 운영 값을 채웁니다.
    - `APP_TRUST_PROXY_HEADERS=true` 는 신뢰 가능한 리버스 프록시 뒤에서만 켭니다.
-2. `scripts/deploy-backend.bat` 로 백엔드 기동 템플릿을 확인합니다.
-3. `scripts/deploy-frontend.bat` 로 프론트 빌드를 생성합니다.
+2. `scripts/deploy-backend.bat` 로 배포 대상 backend jar 를 운영 경로에 배치합니다.
+3. `scripts/deploy-frontend.bat` 로 빌드된 frontend `dist` 를 운영 경로에 배치합니다.
 4. 배포 직전 `scripts/run-backup.bat` 로 수동 백업을 실행합니다.
 5. 배포 직후 `scripts/health-check.bat` 또는 `GET /api/v1/health` 로 앱/DB/scale registry 상태를 확인합니다.
 
@@ -244,12 +244,20 @@ snapshot ZIP 포함 항목:
 - 통계 차트/시각화 고도화
 - 운영 알림과 배치 자동화 보강
 
-## 설계 문서
-- 프로젝트 개요: [docs/00-project-overview.md](/d:/dasiseogi-mental-health-intranet-template/docs/00-project-overview.md)
-- 화면 구조: [docs/01-screen-structure.md](/d:/dasiseogi-mental-health-intranet-template/docs/01-screen-structure.md)
-- DB 설계: [docs/02-db-design.md](/d:/dasiseogi-mental-health-intranet-template/docs/02-db-design.md)
-- API 명세: [docs/03-api-spec.md](/d:/dasiseogi-mental-health-intranet-template/docs/03-api-spec.md)
-- 척도 규칙: [docs/04-scale-json.md](/d:/dasiseogi-mental-health-intranet-template/docs/04-scale-json.md)
-- 배포 판정 문서: [docs/12-release-readiness.md](/d:/dasiseogi-mental-health-intranet-template/docs/12-release-readiness.md)
-- 배포 직전 실행 문서: [docs/13-pre-deploy-runbook.md](/d:/dasiseogi-mental-health-intranet-template/docs/13-pre-deploy-runbook.md)
-- 배포 결과 기록 양식: [docs/14-deploy-result-template.md](/d:/dasiseogi-mental-health-intranet-template/docs/14-deploy-result-template.md)
+## 문서 세트
+- 프로젝트 개요: [`docs/00-project-overview.md`](./docs/00-project-overview.md)
+- 화면 구조: [`docs/01-screen-structure.md`](./docs/01-screen-structure.md)
+- DB 설계: [`docs/02-db-design.md`](./docs/02-db-design.md)
+- API 명세: [`docs/03-api-spec.md`](./docs/03-api-spec.md)
+- 척도 규칙: [`docs/04-scale-json.md`](./docs/04-scale-json.md)
+- 백엔드 아키텍처: [`docs/05-backend-architecture.md`](./docs/05-backend-architecture.md)
+- 프론트엔드 아키텍처: [`docs/06-frontend-architecture.md`](./docs/06-frontend-architecture.md)
+- 검증 규칙: [`docs/07-validation-rules.md`](./docs/07-validation-rules.md)
+- 오류 처리: [`docs/08-error-handling.md`](./docs/08-error-handling.md)
+- 테스트 시나리오: [`docs/09-test-scenarios.md`](./docs/09-test-scenarios.md)
+- 개발 환경: [`docs/10-dev-setup.md`](./docs/10-dev-setup.md)
+- 배포 절차: [`docs/11-deployment.md`](./docs/11-deployment.md)
+- 배포 판정 문서: [`docs/12-release-readiness.md`](./docs/12-release-readiness.md)
+- 배포 직전 실행 문서: [`docs/13-pre-deploy-runbook.md`](./docs/13-pre-deploy-runbook.md)
+- 배포 결과 기록 양식: [`docs/14-deploy-result-template.md`](./docs/14-deploy-result-template.md)
+- Go-live 체크리스트: [`docs/15-go-live-checklist.md`](./docs/15-go-live-checklist.md)

@@ -477,27 +477,62 @@ backend/src/main/resources/scales/
 ## 12.1 첫 실행 전 체크
 1. Java 21 설치 확인
 2. DB 생성 확인
-3. `application-local.yml` 설정 확인
+3. MariaDB 접속 정보 확인
 4. 척도 JSON 파일 존재 확인
 5. `local-backups/` 폴더 생성 확인
+6. `mariadb-dump` 실행 경로 또는 `-SkipBackupCheck` 사용 여부 결정
 
 ## 12.2 실행 명령
-프로젝트 루트 기준이 아니라 `backend/` 기준으로 실행한다.
+로컬 MariaDB 검증 또는 운영 전 점검용 backend 실행은 프로젝트 루트에서 표준 스크립트로 실행한다.
 
-```bash
-./gradlew bootRun --args='--spring.profiles.active=local'
+```powershell
+.\scripts\run-local-mariadb-backend.ps1 `
+  -DbHost 127.0.0.1 `
+  -DbPort 3306 `
+  -DbName mental_health_local `
+  -DbUsername mental_user `
+  -DbPassword mental_pass `
+  -ServerPort 8080 `
+  -BackupRootPath .\local-backups `
+  -DbDumpCommand "C:\Program Files\MariaDB 11.4\bin\mariadb-dump.exe" `
+  -ScaleResourcePath classpath:scales `
+  -ExportTempPath .\tmp\exports
 ```
 
-또는
+백업 dump command 확인을 이번 실행에서 제외할 때만 아래처럼 `-SkipBackupCheck` 를 붙인다.
 
-```bash
-SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
+```powershell
+.\scripts\run-local-mariadb-backend.ps1 `
+  -DbHost 127.0.0.1 `
+  -DbPort 3306 `
+  -DbName mental_health_local `
+  -DbUsername mental_user `
+  -DbPassword mental_pass `
+  -ServerPort 8080 `
+  -BackupRootPath .\local-backups `
+  -DbDumpCommand mariadb-dump `
+  -ScaleResourcePath classpath:scales `
+  -ExportTempPath .\tmp\exports `
+  -SkipBackupCheck
 ```
+
+이 스크립트는 `bootRun --args` 로 아래 값을 직접 고정해 전달한다.
+- `spring.profiles.active=local`
+- `spring.datasource.url/username/password/driver-class-name`
+- `app.backup.root-path`
+- `app.backup.db-dump-command`
+- `app.scale.resource-path`
+- `app.export.temp-path`
+
+따라서 PowerShell 환경변수 주입 + Gradle daemon 조합으로 `application.yml` 의 H2 기본값이 조용히 섞이는 상황을 피할 수 있다. 로컬 MariaDB 검증/운영 전 점검에서는 환경변수 방식 대신 이 스크립트를 사용한다.
 
 ## 12.3 실행 성공 확인
+- 콘솔 요약에 `datasource : MariaDB fixed via bootRun --args` 출력
+- 콘솔 요약에 `jdbc:mariadb://...` 와 `org.mariadb.jdbc.Driver` 기준 설정 확인
 - 콘솔에 scale registry preload 성공 로그 출력
 - `Tomcat started on port 8080`
 - `/api/v1/auth/me` 비로그인 401 확인
+- 필요 시 `scripts\health-check.bat "http://127.0.0.1:8080/api/v1"` 실행
 - DB에 기본 테이블 생성 확인
 
 ---

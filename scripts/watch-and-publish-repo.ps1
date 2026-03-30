@@ -3,7 +3,8 @@ param(
     [int]$DebounceSeconds = 5,
     [string]$Remote = "origin",
     [string]$Branch,
-    [switch]$SkipWorklogUpdate
+    [switch]$SkipWorklogUpdate,
+    [switch]$SkipInitialPublish
 )
 
 Set-StrictMode -Version Latest
@@ -43,6 +44,29 @@ function Write-Log {
     $line = "$timestamp $Message"
     Write-Host $line
     Add-Content -LiteralPath $logPath -Value $line
+}
+
+function Invoke-Publish {
+    param([string]$Reason)
+
+    Write-Log "[watcher] $Reason"
+
+    $publishArgs = @{
+        Remote = $Remote
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Branch)) {
+        $publishArgs.Branch = $Branch
+    }
+    if ($SkipWorklogUpdate) {
+        $publishArgs.SkipWorklogUpdate = $true
+    }
+
+    $output = & $publishScript @publishArgs 2>&1
+    foreach ($line in @($output)) {
+        if (-not [string]::IsNullOrWhiteSpace($line)) {
+            Write-Log ($line.ToString())
+        }
+    }
 }
 
 if (-not (Test-Path -LiteralPath $publishScript)) {
@@ -125,6 +149,16 @@ try {
     $watcher.EnableRaisingEvents = $true
     Write-Log "[watcher] started for $repoRoot"
 
+    if (-not $SkipInitialPublish) {
+        try {
+            Invoke-Publish -Reason "startup sync"
+            $state.IgnoreUntil = (Get-Date).AddSeconds($DebounceSeconds)
+        } catch {
+            Write-Log "[watcher] startup publish failed: $($_.Exception.Message)"
+            $state.IgnoreUntil = (Get-Date).AddSeconds(2)
+        }
+    }
+
     while ($true) {
         Start-Sleep -Seconds 1
 
@@ -141,24 +175,7 @@ try {
         $changedPath = $state.LastPath
 
         try {
-            Write-Log "[watcher] change detected: $changedPath"
-            $publishArgs = @{
-                Remote = $Remote
-            }
-            if (-not [string]::IsNullOrWhiteSpace($Branch)) {
-                $publishArgs.Branch = $Branch
-            }
-            if ($SkipWorklogUpdate) {
-                $publishArgs.SkipWorklogUpdate = $true
-            }
-
-            $output = & $publishScript @publishArgs 2>&1
-            foreach ($line in @($output)) {
-                if (-not [string]::IsNullOrWhiteSpace($line)) {
-                    Write-Log ($line.ToString())
-                }
-            }
-
+            Invoke-Publish -Reason "change detected: $changedPath"
             $state.IgnoreUntil = (Get-Date).AddSeconds($DebounceSeconds)
         } catch {
             Write-Log "[watcher] publish failed: $($_.Exception.Message)"

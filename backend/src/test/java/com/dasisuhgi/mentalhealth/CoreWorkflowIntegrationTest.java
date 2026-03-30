@@ -1480,7 +1480,7 @@ class CoreWorkflowIntegrationTest {
                             .contentType(APPLICATION_JSON)
                             .content(json(Map.of("reason", "실패 테스트"))))
                     .andExpect(status().isInternalServerError())
-                    .andExpect(jsonPath("$.errorCode").value("BACKUP_RUN_FAILED"))
+                    .andExpect(jsonPath("$.errorCode").value("BACKUP_PATH_NOT_WRITABLE"))
                     .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("백업 경로를 사용할 수 없습니다")));
 
             BackupHistory history = latestBackupHistory();

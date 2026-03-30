@@ -76,6 +76,20 @@ export async function createClient(payload: {
   return response.data.data
 }
 
+export async function updateClient(
+  clientId: number,
+  payload: {
+    name: string
+    gender: string
+    birthDate: string
+    phone?: string
+    primaryWorkerId: number
+  },
+) {
+  const response = await http.patch<ApiResponse<ClientDetail>>(`/clients/${clientId}`, payload)
+  return response.data.data
+}
+
 export async function duplicateCheck(payload: { name: string; birthDate: string }) {
   const response = await http.post<
     ApiResponse<{
