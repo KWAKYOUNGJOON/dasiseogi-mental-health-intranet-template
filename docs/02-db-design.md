@@ -467,11 +467,13 @@
 - `created_at` DATETIME NOT NULL
 
 ### 설계 메모
-- 현재 `backup_histories` 는 백업 방식(`backup_method`)과 실행 결과 이력을 저장한다.
-- `datasource type`, `preflight summary` 같은 실행 보조 정보는 현재 이 테이블 컬럼으로 저장하지 않는다.
+- 현재 `backup_histories` 는 `BackupHistory` persistence 모델 기준으로 `backup_type`, `status`, `backup_method` 와 파일 메타데이터, 실행 시각, 실행자 스냅샷, 실패 사유를 저장한다.
+- 백업 목록 응답의 `executedByName` 은 `executed_by_name_snapshot` 값을 사용한다.
+- 수동 백업 실행 응답의 `datasourceType`, `preflightSummary` 는 `ManualBackupRunResponse` 전용 값이며, 현재 이 테이블 컬럼으로 저장하지 않는다.
 
 ### 인덱스
 - 현재 `schema.sql` 기준으로 PK 외 별도 보조 인덱스는 두지 않는다.
+- 현재 백업 목록 조회는 `backup_type`, `status`, `started_at` 조건과 `started_at DESC`, `id DESC` 정렬을 사용한다.
 
 ---
 
@@ -627,7 +629,11 @@
 - `SUCCESS`
 - `FAILED`
 
-### 10.7 경고 유형
+### 10.7 백업 방식
+- `DB_DUMP`
+- `SNAPSHOT`
+
+### 10.8 경고 유형
 - `HIGH_RISK`
 - `CAUTION`
 - `CRITICAL_ITEM`
