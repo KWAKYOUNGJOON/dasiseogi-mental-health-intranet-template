@@ -7,7 +7,14 @@ backend/logs/
 frontend/node_modules/
 frontend/dist/
 
+# Scratch/runtime area. Current contents include local DB runtime files and
+# environment-specific helper scripts, so keep the whole tree out of Git.
 tmp/
 local-backups/
 logs/
 *.log
+*.db
+*.mv.db
+*.lock.db
+*.sqlite
+*.sqlite3

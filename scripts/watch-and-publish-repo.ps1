@@ -28,6 +28,14 @@ $ignoredPrefixes = @(
     "local-backups/",
     "logs/"
 )
+$ignoredRegexes = @(
+    '\.log$',
+    '\.db$',
+    '\.mv\.db$',
+    '\.lock\.db$',
+    '\.sqlite$',
+    '\.sqlite3$'
+)
 
 function Ensure-Directory {
     param([string]$Path)
@@ -125,6 +133,12 @@ try {
 
         foreach ($prefix in $using:ignoredPrefixes) {
             if ($relative.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return
+            }
+        }
+
+        foreach ($regex in $using:ignoredRegexes) {
+            if ($relative -match $regex) {
                 return
             }
         }
