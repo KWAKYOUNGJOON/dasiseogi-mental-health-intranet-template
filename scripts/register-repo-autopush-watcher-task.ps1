@@ -3,7 +3,8 @@ param(
     [string]$AutoStartName = "DasiseogiRepoAutoPushWatcher",
     [int]$DebounceSeconds = 5,
     [string]$LegacyTaskName = "DasiseogiWorklogAutoPush",
-    [string]$Branch = "main"
+    [string]$Branch = "main",
+    [switch]$SkipInitialPublish
 )
 
 Set-StrictMode -Version Latest
@@ -20,6 +21,9 @@ $watcherArguments = @(
     "-DebounceSeconds", $DebounceSeconds,
     "-Branch", $Branch
 )
+if ($SkipInitialPublish) {
+    $watcherArguments += "-SkipInitialPublish"
+}
 $watcherCommand = 'powershell.exe ' + (($watcherArguments | ForEach-Object {
     if ($_ -match '\s') { '"' + $_ + '"' } else { $_ }
 }) -join ' ')
