@@ -363,18 +363,12 @@ export function SignupRequestForm() {
   const memoLengthLabel = `${form.requestMemo.length}/500`
 
   return (
-    <form className="card login-card stack" noValidate onSubmit={handleSubmit}>
-      <div className="stack" style={{ gap: 8 }}>
-        <div>
-          <h1 style={{ marginBottom: 8 }}>회원가입 신청</h1>
-          <p className="muted">관리자 승인 후 로그인할 수 있습니다.</p>
+    <form className="stack" noValidate onSubmit={handleSubmit}>
+      {formMessage ? (
+        <div className="error-text" role="alert">
+          {formMessage}
         </div>
-        {formMessage ? (
-          <div className="error-text" role="alert">
-            {formMessage}
-          </div>
-        ) : null}
-      </div>
+      ) : null}
 
       {FIELD_DEFINITIONS.map((field) => {
         const errorMessage = fieldErrors[field.name]

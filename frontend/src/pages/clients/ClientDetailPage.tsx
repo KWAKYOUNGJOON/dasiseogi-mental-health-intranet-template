@@ -1,9 +1,19 @@
+import { isAxiosError } from 'axios'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { fetchClientDetail, markClientMisregistered, type ClientDetail } from '../../features/clients/api/clientApi'
 import { useAuth } from '../../app/providers/AuthProvider'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { PageHeader } from '../../shared/components/PageHeader'
+import type { ApiResponse } from '../../shared/types/api'
+
+function getErrorMessage(error: unknown, fallbackMessage: string) {
+  if (!isAxiosError<ApiResponse<unknown>>(error)) {
+    return fallbackMessage
+  }
+
+  return error.response?.data?.message ?? fallbackMessage
+}
 
 export function ClientDetailPage() {
   const { clientId } = useParams()
@@ -25,8 +35,8 @@ export function ClientDetailPage() {
       const data = await fetchClientDetail(id)
       setClient(data)
       setError(null)
-    } catch (requestError: any) {
-      setError(requestError?.response?.data?.message ?? '대상자 정보를 불러오지 못했습니다.')
+    } catch (requestError: unknown) {
+      setError(getErrorMessage(requestError, '대상자 정보를 불러오지 못했습니다.'))
     }
   }
 
@@ -40,8 +50,8 @@ export function ClientDetailPage() {
       setNotice('오등록 처리되었습니다.')
       setDialogOpen(false)
       setReason('')
-    } catch (requestError: any) {
-      setError(requestError?.response?.data?.message ?? '오등록 처리에 실패했습니다.')
+    } catch (requestError: unknown) {
+      setError(getErrorMessage(requestError, '오등록 처리에 실패했습니다.'))
     } finally {
       setProcessing(false)
     }
@@ -64,7 +74,7 @@ export function ClientDetailPage() {
         actions={
           <div className="actions">
             {client.status === 'ACTIVE' ? (
-              <Link className="primary-button" to={`/assessments/start/${client.id}/scales`}>
+              <Link className="primary-button" to={`/assessments/start/${client.id}`}>
                 검사 시작
               </Link>
             ) : null}

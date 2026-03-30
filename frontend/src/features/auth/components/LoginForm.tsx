@@ -100,11 +100,7 @@ export function LoginForm() {
   }
 
   return (
-    <form className="card login-card stack" onSubmit={handleSubmit}>
-      <div>
-        <h1 style={{ marginBottom: 8 }}>다시서기 정신건강 평가관리 시스템</h1>
-        <p className="muted">seed 계정: `admina / Test1234!`, `usera / Test1234!`</p>
-      </div>
+    <form className="stack" onSubmit={handleSubmit}>
       <label className="field" htmlFor="login-id">
         <span>아이디</span>
         <input

@@ -106,6 +106,7 @@ export function AppRouter() {
         <Route path="/clients/:clientId/edit" element={<ClientEditPage />} />
         <Route path="/assessment-records" element={<AssessmentRecordListPage />} />
         <Route path="/statistics" element={<StatisticsPage />} />
+        <Route path="/assessments/start/:clientId" element={<AssessmentScaleSelectPage />} />
         <Route path="/assessments/start/:clientId/scales" element={<AssessmentScaleSelectPage />} />
         <Route path="/assessments/start/:clientId/input" element={<AssessmentInputPage />} />
         <Route path="/assessments/start/:clientId/summary" element={<AssessmentSummaryPage />} />
