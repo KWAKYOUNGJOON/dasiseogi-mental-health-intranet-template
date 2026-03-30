@@ -1,0 +1,172 @@
+{
+  "scaleCode": "AUDITK",
+  "scaleName": "AUDIT-K",
+  "version": "1.0.0",
+  "displayOrder": 7,
+  "isActive": true,
+  "questionCount": 10,
+  "screeningThreshold": 8,
+  "screeningLabel": "위험 음주 추가 평가 권고",
+  "items": [
+    {
+      "questionNo": 1,
+      "questionKey": "auditk_q1",
+      "text": "지난 1년 동안 술을 얼마나 자주 마셨습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 마시지 않았다", "score": 0 },
+        { "value": "1", "label": "월 1회 이하", "score": 1 },
+        { "value": "2", "label": "월 2~4회", "score": 2 },
+        { "value": "3", "label": "주 2~3회", "score": 3 },
+        { "value": "4", "label": "주 4회 이상", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 2,
+      "questionKey": "auditk_q2",
+      "text": "술을 마시는 날에는 보통 몇 잔 정도 마셨습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "1~2잔", "score": 0 },
+        { "value": "1", "label": "3~4잔", "score": 1 },
+        { "value": "2", "label": "5~6잔", "score": 2 },
+        { "value": "3", "label": "7~9잔", "score": 3 },
+        { "value": "4", "label": "10잔 이상", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 3,
+      "questionKey": "auditk_q3",
+      "text": "한 번에 많은 양의 술을 마신 적이 얼마나 자주 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "월 1회 미만", "score": 1 },
+        { "value": "2", "label": "월 1회", "score": 2 },
+        { "value": "3", "label": "주 1회", "score": 3 },
+        { "value": "4", "label": "거의 매일", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 4,
+      "questionKey": "auditk_q4",
+      "text": "술을 마시기 시작하면 멈추기 어려웠던 적이 얼마나 자주 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "월 1회 미만", "score": 1 },
+        { "value": "2", "label": "월 1회", "score": 2 },
+        { "value": "3", "label": "주 1회", "score": 3 },
+        { "value": "4", "label": "거의 매일", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 5,
+      "questionKey": "auditk_q5",
+      "text": "음주 때문에 해야 할 일을 하지 못한 적이 얼마나 자주 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "월 1회 미만", "score": 1 },
+        { "value": "2", "label": "월 1회", "score": 2 },
+        { "value": "3", "label": "주 1회", "score": 3 },
+        { "value": "4", "label": "거의 매일", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 6,
+      "questionKey": "auditk_q6",
+      "text": "과음 후 다음 날 해장술이 필요했던 적이 얼마나 자주 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "월 1회 미만", "score": 1 },
+        { "value": "2", "label": "월 1회", "score": 2 },
+        { "value": "3", "label": "주 1회", "score": 3 },
+        { "value": "4", "label": "거의 매일", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 7,
+      "questionKey": "auditk_q7",
+      "text": "음주 후 죄책감이나 후회를 느낀 적이 얼마나 자주 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "월 1회 미만", "score": 1 },
+        { "value": "2", "label": "월 1회", "score": 2 },
+        { "value": "3", "label": "주 1회", "score": 3 },
+        { "value": "4", "label": "거의 매일", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 8,
+      "questionKey": "auditk_q8",
+      "text": "음주 후 전날 밤의 일을 기억하지 못한 적이 얼마나 자주 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "월 1회 미만", "score": 1 },
+        { "value": "2", "label": "월 1회", "score": 2 },
+        { "value": "3", "label": "주 1회", "score": 3 },
+        { "value": "4", "label": "거의 매일", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 9,
+      "questionKey": "auditk_q9",
+      "text": "음주 때문에 자신이나 다른 사람이 다친 적이 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "없었다", "score": 0 },
+        { "value": "2", "label": "있었다. 하지만 지난 1년은 아니었다", "score": 2 },
+        { "value": "4", "label": "있었다. 지난 1년 이내였다", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 10,
+      "questionKey": "auditk_q10",
+      "text": "가족이나 지인, 의료인이 음주를 줄이라고 권한 적이 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "없었다", "score": 0 },
+        { "value": "2", "label": "있었다. 하지만 지난 1년은 아니었다", "score": 2 },
+        { "value": "4", "label": "있었다. 지난 1년 이내였다", "score": 4 }
+      ]
+    }
+  ],
+  "interpretationRules": [
+    { "min": 0, "max": 7, "code": "LOW_RISK", "label": "저위험" },
+    { "min": 8, "max": 15, "code": "HAZARDOUS", "label": "위험 음주" },
+    { "min": 16, "max": 19, "code": "HARMFUL", "label": "해로운 음주" },
+    { "min": 20, "max": 40, "code": "POSSIBLE_DEPENDENCE", "label": "알코올 의존 의심" }
+  ],
+  "alertRules": [
+    {
+      "code": "AUDITK_TOTAL_16",
+      "type": "CAUTION",
+      "message": "해로운 음주 수준 가능성",
+      "minTotalScore": 16
+    },
+    {
+      "code": "AUDITK_TOTAL_20",
+      "type": "HIGH_RISK",
+      "message": "알코올 의존 가능성 높음",
+      "minTotalScore": 20
+    },
+    {
+      "code": "AUDITK_DEPENDENCE_ITEMS",
+      "type": "CAUTION",
+      "message": "의존 증상 문항 주의",
+      "questionKeys": ["auditk_q4", "auditk_q5", "auditk_q6"],
+      "minAnswerValue": 2
+    },
+    {
+      "code": "AUDITK_HARM_ITEMS",
+      "type": "HIGH_RISK",
+      "message": "음주 관련 해로운 결과 문항 주의",
+      "questionKeys": ["auditk_q9", "auditk_q10"],
+      "minAnswerValue": 4
+    }
+  ]
+}

@@ -10,9 +10,15 @@ public record ClientDetailResponse(
         String birthDate,
         String phone,
         String registeredAt,
+        Long createdById,
+        String createdByName,
         Long primaryWorkerId,
         String primaryWorkerName,
         String status,
+        String misregisteredAt,
+        Long misregisteredById,
+        String misregisteredByName,
+        String misregisteredReason,
         List<RecentSessionSummaryResponse> recentSessions
 ) {
 }

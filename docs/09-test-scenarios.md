@@ -934,6 +934,14 @@
   - 수동 백업
 - 기대결과:
   - action_type, target_type, target_id, created_at 저장
+  - IP 주소 저장 규칙이 적용된다.
+- 자동화 권장 여부: 예
+
+## ADMIN-P1-02A 프록시 IP 신뢰 규칙
+- 우선순위: P1
+- 기대결과:
+  - 기본값에서는 `remoteAddr` 가 저장된다.
+  - trusted proxy 설정 활성화 시 `X-Forwarded-For` 첫 유효 IP 가 저장된다.
 - 자동화 권장 여부: 예
 
 ## ADMIN-P1-03 백업 이력 조회
@@ -948,6 +956,7 @@
 - 기대결과:
   - 백업 파일 생성
   - backup_histories 저장
+  - 응답 또는 이력에서 `backupMethod` 확인 가능
 - 자동화 권장 여부: 예
 
 ## ADMIN-P1-05 백업 경로 쓰기 불가 처리
@@ -957,10 +966,24 @@
   - 사용자 메시지와 운영 로그 분리
 - 자동화 권장 여부: 예
 
+## ADMIN-P1-05A 백업 preflight fallback
+- 우선순위: P1
+- 기대결과:
+  - MariaDB/MySQL 환경에서 dump command 가 없으면 `SNAPSHOT` fallback
+  - `preflightSummary` 에 fallback 정보가 남음
+- 자동화 권장 여부: 예
+
 ## ADMIN-P1-06 일반 사용자의 백업 실행 차단
 - 우선순위: P1
 - 기대결과:
   - 403
+- 자동화 권장 여부: 예
+
+## ADMIN-P1-07 health endpoint 상태 확인
+- 우선순위: P1
+- 기대결과:
+  - `/api/v1/health` 가 `status/appStatus/dbStatus/scaleRegistryStatus` 를 반환
+  - DB 또는 scale registry 이상 시 503
 - 자동화 권장 여부: 예
 
 ---
@@ -999,6 +1022,13 @@
 - 기대결과:
   - 500 표준 응답
   - 운영 로그에는 상세 원인 기록
+- 자동화 권장 여부: 예
+
+## VALID-P1-06 승인 requestId/userId 혼동 방지
+- 우선순위: P1
+- 기대결과:
+  - 승인/반려 경로는 requestId 만 허용
+  - userId 를 보내면 400 `SIGNUP_REQUEST_ID_REQUIRED`
 - 자동화 권장 여부: 예
 
 ---

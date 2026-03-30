@@ -46,7 +46,7 @@
 
 ## 3. 전체 엔터티 구성
 
-본 시스템의 핵심 엔터티는 아래와 같다.
+본 시스템의 핵심 엔터티와 현재 persistence unit validate 에 필요한 기술 보조 테이블은 아래와 같다.
 
 ### 3.1 사용자/권한 영역
 - `users` : 시스템 사용자 계정
@@ -65,7 +65,13 @@
 - `activity_logs` : 주요 기능 사용 로그
 - `backup_histories` : 백업 실행 이력
 
-### 3.5 선택적 공통 코드 영역
+### 3.5 기술 보조 영역
+- `identifier_sequences` : 대상자 번호(`client_no`), 세션 번호(`session_no`) 생성에 사용하는 기술 보조 테이블
+
+`identifier_sequences` 는 핵심 업무 도메인 테이블은 아니다.  
+다만 현재 식별자/번호 생성 구조와 `schema.sql` 기반 validate 검증 기준상 초기 스키마에 함께 포함한다.
+
+### 3.6 선택적 공통 코드 영역
 - `common_codes` : 상태값, 역할값 등 공통 코드 관리가 필요할 경우 사용
 
 초기 버전은 코드 테이블을 최소화하고, 역할/상태/척도명은 애플리케이션 enum과 DB CHECK 제약 또는 VARCHAR 코드로 관리하는 방식을 우선 추천한다.
@@ -447,19 +453,45 @@
 - `status` VARCHAR(20) NOT NULL
   - `SUCCESS`
   - `FAILED`
-- `file_path` VARCHAR(500) NOT NULL
+- `backup_method` VARCHAR(20) NOT NULL
+  - `DB_DUMP`
+  - `SNAPSHOT`
 - `file_name` VARCHAR(255) NOT NULL
+- `file_path` VARCHAR(500) NOT NULL
 - `file_size_bytes` BIGINT NULL
 - `started_at` DATETIME NOT NULL
 - `completed_at` DATETIME NULL
-- `executed_by` BIGINT NULL FK -> `users.id`
+- `executed_by_id` BIGINT NULL
+- `executed_by_name_snapshot` VARCHAR(50) NULL
 - `failure_reason` VARCHAR(500) NULL
 - `created_at` DATETIME NOT NULL
 
+### 설계 메모
+- 현재 `backup_histories` 는 백업 방식(`backup_method`)과 실행 결과 이력을 저장한다.
+- `datasource type`, `preflight summary` 같은 실행 보조 정보는 현재 이 테이블 컬럼으로 저장하지 않는다.
+
 ### 인덱스
-- INDEX `idx_backup_histories_backup_type` (`backup_type`)
-- INDEX `idx_backup_histories_status` (`status`)
-- INDEX `idx_backup_histories_started_at` (`started_at`)
+- 현재 `schema.sql` 기준으로 PK 외 별도 보조 인덱스는 두지 않는다.
+
+---
+
+## 5.10 identifier_sequences
+
+### 목적
+업무 도메인 테이블이 사용하는 외부 노출 번호 생성 흐름을 지원하는 기술 보조 테이블이다.
+
+### 사용 위치
+- 대상자 번호 자동 생성
+- 세션 번호 자동 생성
+
+### 주요 컬럼
+- `id` BIGINT PK
+- `sequence_type` VARCHAR(30) NOT NULL
+- `created_at` DATETIME NOT NULL
+
+### 설계 메모
+- 이 테이블은 대상자, 세션, 척도 결과처럼 직접 조회하는 핵심 업무 엔터티는 아니다.
+- 하지만 현재 식별자 생성 컴포넌트가 persistence unit 에 포함되어 있으므로, `schema.sql` 과 MariaDB validate 기준에서는 함께 관리한다.
 
 ---
 
@@ -607,15 +639,16 @@
 
 실제 DB 생성 시에는 아래 순서를 권장한다.
 
-1. `users`
-2. `user_approval_requests`
-3. `clients`
-4. `assessment_sessions`
-5. `session_scales`
-6. `session_answers`
-7. `session_alerts`
-8. `activity_logs`
-9. `backup_histories`
+1. `identifier_sequences`
+2. `users`
+3. `user_approval_requests`
+4. `clients`
+5. `assessment_sessions`
+6. `session_scales`
+7. `session_answers`
+8. `session_alerts`
+9. `activity_logs`
+10. `backup_histories`
 
 이 순서를 따르면 FK 의존성 충돌을 줄일 수 있다.
 
@@ -735,3 +768,4 @@
 - 세션 상세는 세션 전체 단위로 조회한다.
 - 경고 기록은 별도 테이블로 관리한다.
 - 로그와 백업 이력은 운영 테이블로 분리한다.
+- `identifier_sequences` 는 현재 번호 생성 구조를 위한 기술 보조 테이블로 함께 관리한다.

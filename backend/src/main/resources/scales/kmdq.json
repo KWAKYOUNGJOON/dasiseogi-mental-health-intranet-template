@@ -1,0 +1,176 @@
+{
+  "scaleCode": "KMDQ",
+  "scaleName": "K-MDQ",
+  "version": "1.0.0",
+  "displayOrder": 4,
+  "isActive": true,
+  "questionCount": 15,
+  "screeningThreshold": 7,
+  "screeningLabel": "양극성 장애 추가 평가 권고",
+  "items": [
+    {
+      "questionNo": 1,
+      "questionKey": "kmdq_symptom_1",
+      "text": "평소보다 기분이 들뜨거나 자신감이 지나치게 높아진 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 2,
+      "questionKey": "kmdq_symptom_2",
+      "text": "평소보다 잠이 훨씬 줄어도 피곤하지 않았던 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 3,
+      "questionKey": "kmdq_symptom_3",
+      "text": "평소보다 말이 많아지고 멈추기 어려웠던 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 4,
+      "questionKey": "kmdq_symptom_4",
+      "text": "머릿속 생각이 너무 빨라 따라가기 어려웠던 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 5,
+      "questionKey": "kmdq_symptom_5",
+      "text": "쉽게 산만해지고 집중이 어려웠던 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 6,
+      "questionKey": "kmdq_symptom_6",
+      "text": "평소보다 활동량이 커지고 일을 벌인 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 7,
+      "questionKey": "kmdq_symptom_7",
+      "text": "새로운 계획이나 아이디어가 지나치게 많아진 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 8,
+      "questionKey": "kmdq_symptom_8",
+      "text": "평소보다 돈을 쓰거나 충동적인 결정을 많이 한 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 9,
+      "questionKey": "kmdq_symptom_9",
+      "text": "평소보다 자신이 특별하거나 더 유능하다고 느낀 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 10,
+      "questionKey": "kmdq_symptom_10",
+      "text": "평소보다 사람들과 더 많이 어울리거나 접근성이 커진 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 11,
+      "questionKey": "kmdq_symptom_11",
+      "text": "평소보다 성적 관심이나 행동이 늘어난 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 12,
+      "questionKey": "kmdq_symptom_12",
+      "text": "평소보다 짜증이 많아지고 다툼이 늘어난 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 13,
+      "questionKey": "kmdq_symptom_13",
+      "text": "평소와 다르게 매우 활기차거나 과하게 에너지가 넘친 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 14,
+      "questionKey": "kmdq_same_period",
+      "text": "위의 경험들이 같은 시기에 함께 나타난 적이 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 15,
+      "questionKey": "kmdq_impairment",
+      "text": "이 경험들이 일이나 대인관계에 얼마나 문제를 일으켰습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "NONE", "label": "문제 없음", "score": 0 },
+        { "value": "MINOR", "label": "약간의 문제", "score": 0 },
+        { "value": "MODERATE", "label": "중간 정도 문제", "score": 0 },
+        { "value": "SERIOUS", "label": "심각한 문제", "score": 0 }
+      ]
+    }
+  ],
+  "interpretationRules": [
+    { "min": 0, "max": 6, "code": "NEGATIVE", "label": "음성" },
+    { "min": 7, "max": 13, "code": "POSITIVE_SCREEN", "label": "양성 의심" }
+  ],
+  "alertRules": [
+    {
+      "code": "KMDQ_POSITIVE",
+      "type": "CAUTION",
+      "message": "양극성 장애 선별 양성 의심",
+      "minTotalScore": 7
+    }
+  ]
+}

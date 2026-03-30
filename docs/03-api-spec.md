@@ -276,6 +276,38 @@
 
 ---
 
+## 6.4 헬스 체크 API
+
+### 목적
+운영자가 인증 상태와 무관하게 서버 기동 상태를 확인한다.
+
+### 요청
+- Method: `GET`
+- Path: `/api/v1/health`
+- Auth: 불필요
+
+### 처리 규칙
+- 앱 기동 여부를 반환한다.
+- DB 연결 가능 여부를 함께 확인한다.
+- scale registry 로딩 여부를 함께 확인한다.
+- 전체 상태가 `UP` 이 아니면 HTTP `503` 으로 응답한다.
+
+### 성공 응답 예시
+```json
+{
+  "success": true,
+  "data": {
+    "status": "UP",
+    "appStatus": "UP",
+    "dbStatus": "UP",
+    "scaleRegistryStatus": "UP",
+    "loadedScaleCount": 8
+  }
+}
+```
+
+---
+
 ## 7. 회원가입 신청 및 승인 API
 
 ## 7.1 회원가입 신청
@@ -304,6 +336,7 @@
 - 동일 `loginId`가 이미 존재하면 신청 불가
 - 신청 성공 시 `users.status = PENDING`
 - 신청 원문은 `user_approval_requests`에 저장
+- 응답의 `requestId` 와 `userId` 는 서로 다른 식별자다.
 - 관리자 승인 전 로그인 불가
 - 로그 기록 대상이다
 
@@ -314,9 +347,8 @@
   "data": {
     "requestId": 10,
     "userId": 25,
-    "status": "PENDING"
-  },
-  "message": "가입 신청이 접수되었습니다. 관리자 승인 후 로그인할 수 있습니다."
+    "requestStatus": "PENDING"
+  }
 }
 ```
 
@@ -368,9 +400,12 @@
 ```
 
 ### 처리 규칙
+- 경로 변수는 반드시 `requestId` 기준이다.
+- `userId` 를 승인 경로에 보내면 `SIGNUP_REQUEST_ID_REQUIRED` 로 실패한다.
 - 신청 상태가 `PENDING` 일 때만 승인 가능
 - 승인 시 `users.status = ACTIVE`
 - `approvedAt`, `approvedBy` 저장
+- `user_approval_requests.request_status`, `processed_at`, `processed_by`, `process_note` 저장
 - 로그 기록 대상이다
 
 ### 성공 응답
@@ -406,8 +441,10 @@
 ```
 
 ### 처리 규칙
+- 경로 변수는 반드시 `requestId` 기준이다.
 - 신청 상태가 `PENDING` 일 때만 반려 가능
 - 반려 시 `users.status = REJECTED`
+- `user_approval_requests.request_status`, `processed_at`, `processed_by`, `process_note` 저장
 - 로그 기록 대상이다
 
 ---
@@ -518,6 +555,7 @@
   - 일반 사용자는 본인이 작성한 `MISREGISTERED` 대상자만 조회 가능
 - 연락처는 목록 응답에 포함하지 않는다.
 - 최근 검사일은 세션 집계값으로 반환한다.
+- 목록 응답은 page wrapper(`items`, `page`, `size`, `totalItems`, `totalPages`)를 사용한다.
 
 ### 성공 응답 예시
 ```json
@@ -1043,8 +1081,8 @@
 ### 처리 규칙
 - 출력 기준은 항상 세션 단위다.
 - 참고 메모는 응답에 포함하지 않는다.
-- 오입력 세션은 관리자 또는 작성자만 출력 데이터 조회 가능하도록 제한하는 것을 권장한다.
-- 출력 로그를 남긴다.
+- 오입력 세션은 관리자 또는 작성자만 출력 데이터 조회 가능하다.
+- 출력 조회 시 activity log 를 남긴다.
 
 ### 응답 항목
 - 기관명
@@ -1052,7 +1090,7 @@
 - 담당자명
 - 대상자 기본정보
 - 검사일시
-- 척도별 총점/판정
+- 척도별 총점/판정/경고
 - 세션 전체 요약
 
 ---
@@ -1190,7 +1228,13 @@
 - 척도명
 - 시행 건수
 - 경고 건수
+- `isActive`
 - 평균 점수(선택)
+
+### 응답 정책
+- 현재 운영 중인 활성 척도는 집계 0건이어도 항상 응답에 포함한다.
+- 과거 데이터가 존재하는 비활성 척도는 `isActive = false` 로 별도 노출한다.
+- 과거 데이터가 없는 비활성 척도는 응답에 포함하지 않는다.
 
 ---
 
@@ -1223,10 +1267,10 @@
 
 ---
 
-## 13.5 통계 엑셀 내보내기
+## 13.5 통계 CSV 내보내기
 
 ### 목적
-관리자가 통계 데이터를 엑셀 파일로 다운로드한다.
+관리자가 통계 데이터를 CSV 파일로 다운로드한다.
 
 ### 요청
 - Method: `GET`
@@ -1242,7 +1286,7 @@
 ### 처리 규칙
 - 응답은 파일 다운로드 형식으로 처리한다.
 - 기본적으로 오입력 세션은 제외한다.
-- 다운로드 실행 로그를 남기는 것을 권장한다.
+- 다운로드 실행 로그를 activity log 로 남긴다.
 
 ---
 
@@ -1299,6 +1343,7 @@
 ### 응답 항목
 - 백업 ID
 - 백업 유형
+- 백업 방식 (`DB_DUMP` / `SNAPSHOT`)
 - 상태
 - 파일명
 - 파일경로
@@ -1328,6 +1373,9 @@
 ```
 
 ### 처리 규칙
+- 실행 전 datasource 종류, backup 경로 writable 여부, dump command 사용 가능 여부를 preflight 로 점검한다.
+- MariaDB/MySQL 은 가능한 경우 `DB_DUMP` 를 우선 사용한다.
+- dump command 가 없으면 `SNAPSHOT` 으로 fallback 한다.
 - 백업 실행 결과를 `backup_histories` 에 기록한다.
 - 성공/실패 여부를 응답한다.
 - 로그 기록 대상이다.
@@ -1339,9 +1387,12 @@
   "data": {
     "backupId": 41,
     "backupType": "MANUAL",
+    "backupMethod": "DB_DUMP",
+    "datasourceType": "MARIADB",
+    "preflightSummary": "datasource=MARIADB, preferred=DB_DUMP, dumpCommand=mariadb-dump, dumpAvailable=true, fallback=-",
     "status": "SUCCESS",
-    "fileName": "backup-20260329-090500.zip",
-    "filePath": "D:/backup/backup-20260329-090500.zip"
+    "fileName": "backup-20260329-090500-db-dump.sql",
+    "filePath": "D:/backup/backup-20260329-090500-db-dump.sql"
   }
 }
 ```
@@ -1378,6 +1429,7 @@
 - `GET /api/v1/assessment-sessions/{sessionId}`
 - `POST /api/v1/assessment-sessions/{sessionId}/mark-misentered`
 - `GET /api/v1/assessment-sessions/{sessionId}/print-data`
+- 세션 상세 화면의 print view 는 `print-data` 응답을 사용한다.
 
 ## 15.7 검사기록 목록 화면
 - `GET /api/v1/assessment-records`
@@ -1399,6 +1451,9 @@
 - `GET /api/v1/admin/backups`
 - `POST /api/v1/admin/backups/run`
 
+## 15.10 운영 점검
+- `GET /api/v1/health`
+
 ---
 
 ## 16. 예외 처리 기준
@@ -1416,6 +1471,7 @@
 - `USER_PENDING_APPROVAL`
 - `USER_INACTIVE`
 - `LOGIN_ID_DUPLICATED`
+- `SIGNUP_REQUEST_ID_REQUIRED`
 - `CLIENT_DUPLICATE_WARNING`
 - `CLIENT_NOT_FOUND`
 - `CLIENT_ALREADY_MISREGISTERED`
@@ -1432,7 +1488,7 @@
 - 세션 오입력 처리: 작성자 또는 관리자만 가능
 - 오등록/오입력 포함 조회: 관리자 또는 작성자만 가능
 - 사용자 관리/승인/로그/백업: 관리자만 가능
-- 통계 엑셀 내보내기: 관리자만 가능
+- 통계 CSV 내보내기: 관리자만 가능
 
 ---
 

@@ -35,6 +35,10 @@
 - AD/SSO 같은 조직 공통 인증 체계 연동
 - OS 하드닝 상세
 - 기관 보안정책 전체 문서
+- 운영 배치 스크립트에 의한 서비스 시작/중지 자동화
+- 운영 배치 스크립트에 의한 웹서버 재시작 또는 정적 파일 반영 완료 보장
+- IIS/Nginx 설정 변경
+- 운영 배치 스크립트 실행만으로 `backup_histories` 적재 보장
 
 ---
 
@@ -147,7 +151,8 @@ D:/mental-health-system/
 │   └── access/
 ├── backups/
 │   ├── db/
-│   └── app-config/
+│   ├── app-config/
+│   └── release/
 ├── scripts/
 │   ├── run-backup.bat
 │   ├── deploy-backend.bat
@@ -168,6 +173,36 @@ D:/mental-health-system/
 - `logs/` 와 `backups/` 는 별도 보존 정책을 적용한다.
 - 운영 서버 사용자에게 필요한 경로만 권한을 부여한다.
 - jar와 로그 파일을 같은 폴더에 장기간 쌓아두지 않는다.
+
+### 운영 스크립트 반영 기준
+운영 문서에서 `scripts/` 는 아래 4개 스크립트만 배포/점검 보조 도구로 본다.
+
+- `scripts/health-check.bat`
+  - `/api/v1/health` 응답을 확인하는 점검 스크립트다.
+  - 기본 대상은 `http://127.0.0.1:8080/api/v1/health` 이며, 인자 1 또는 `BASE_URL`, `APP_BASE_URL` 로 대상을 바꿀 수 있다.
+- `scripts/run-backup.bat`
+  - 운영자가 직접 DB dump 파일을 생성할 때 사용하는 보조 스크립트다.
+  - `APP_BACKUP_ROOT_PATH`, `APP_DB_URL`, `APP_DB_USERNAME`, `APP_DB_PASSWORD` 가 필요하다.
+  - `.sql` 파일 생성까지가 범위이며, 애플리케이션 관리자 화면/API 호출은 포함하지 않는다.
+- `scripts/deploy-backend.bat`
+  - 새 backend jar 를 `app/backend/mental-health-app.jar` 위치에 배치하는 보조 스크립트다.
+  - `APP_HOME` 이 있으면 해당 경로를, 없으면 스크립트 기준 상위 경로를 앱 루트로 해석한다.
+  - 기존 jar 는 `backups/release/` 아래에 백업한다.
+- `scripts/deploy-frontend.bat`
+  - 새 frontend `dist` 를 `app/frontend/dist` 위치에 배치하는 보조 스크립트다.
+  - `APP_HOME` 이 있으면 해당 경로를, 없으면 스크립트 기준 상위 경로를 앱 루트로 해석한다.
+  - 기존 `dist` 는 `backups/release/` 아래에 백업하고, temp 디렉터리에 복사한 뒤 최종 교체한다.
+  - 별도 웹서버 반영과 재시작은 별도 운영 절차를 따른다.
+
+아래 작업은 이번 스크립트 범위에 포함되지 않는다.
+
+- 서비스 시작/중지
+- 백엔드 프로세스 재기동
+- 웹서버 재시작
+- IIS/Nginx 설정 변경
+- `backup_histories` 적재
+
+즉, 배포 절차에서 스크립트는 파일 배치와 상태 확인을 돕는 수준이며, 서비스 제어와 운영 검수 판단은 운영자가 별도 절차로 수행한다.
 
 ---
 
@@ -217,16 +252,33 @@ D:/mental-health-system/
 - 배포 시 실수로 local 설정이 올라가는 것을 방지하기 위해
 
 ## 7.2 운영 설정에 포함할 항목
-- server port
-- session timeout
-- datasource
-- JPA 옵션
-- logging path
-- backup path
-- scale json path
-- 운영자용 기본 메시지/옵션
-- 스케줄링 on/off
-- export 파일 저장 temp 경로
+### application-prod.yml 실제 설정 키
+- `server.port`
+- `server.servlet.session.timeout`
+- `server.forward-headers-strategy`
+- `spring.datasource.url`
+- `spring.datasource.username`
+- `spring.datasource.password`
+- `spring.datasource.driver-class-name`
+- `spring.jpa.hibernate.ddl-auto`
+- `spring.jpa.open-in-view`
+- `spring.jpa.properties.hibernate.format_sql`
+- `spring.jackson.time-zone`
+- `spring.jackson.serialization.write-dates-as-timestamps`
+- `logging.file.path`
+- `logging.level.root`
+- `logging.level.com.dasisuhgi.mentalhealth`
+- `app.organization.name`
+- `app.backup.root-path`
+- `app.backup.db-dump-command`
+- `app.security.trust-proxy-headers`
+- `app.seed.enabled`
+
+### 운영 관리 항목
+- scale JSON 파일 배치 위치
+- 운영 스크립트가 사용하는 release backup 위치
+- 운영 작업용 임시 디렉터리
+- 운영 스크립트 실행에 필요한 환경 변수 값과 실제 서버 경로 값
 
 ## 7.3 운영 비밀정보 관리 원칙
 - DB 비밀번호, 민감한 경로, 계정 정보는 Git에 직접 커밋하지 않는다.
@@ -246,18 +298,18 @@ D:/mental-health-system/
 
 ```yaml
 server:
-  port: 8080
+  port: ${APP_SERVER_PORT:8080}
   servlet:
     session:
-      timeout: 120m
+      timeout: ${APP_SESSION_TIMEOUT:120m}
+  forward-headers-strategy: ${APP_FORWARD_HEADERS_STRATEGY:none}
 
 spring:
   datasource:
-    url: jdbc:mariadb://10.0.0.20:3306/mental_health_prod
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-    driver-class-name: org.mariadb.jdbc.Driver
-
+    url: ${APP_DB_URL:jdbc:mariadb://DB_HOST_PLACEHOLDER:3306/DB_NAME_PLACEHOLDER}
+    username: ${APP_DB_USERNAME:DB_USERNAME_PLACEHOLDER}
+    password: ${APP_DB_PASSWORD:DB_PASSWORD_PLACEHOLDER}
+    driver-class-name: ${APP_DB_DRIVER:org.mariadb.jdbc.Driver}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -265,32 +317,39 @@ spring:
     properties:
       hibernate:
         format_sql: false
-
   jackson:
     time-zone: Asia/Seoul
+    serialization:
+      write-dates-as-timestamps: false
 
 logging:
   file:
-    path: D:/mental-health-system/logs/application
+    path: ${APP_LOG_FILE_PATH:LOG_PATH_PLACEHOLDER}
   level:
     root: INFO
     com.dasisuhgi.mentalhealth: INFO
 
 app:
+  organization:
+    name: ${APP_ORGANIZATION_NAME:다시서기 정신건강 평가관리 시스템}
   backup:
-    root-path: D:/mental-health-system/backups/db
-    enabled: true
-  scale:
-    resource-path: file:D:/mental-health-system/app/backend/scales
-  export:
-    temp-path: D:/mental-health-system/temp
+    root-path: ${APP_BACKUP_ROOT_PATH:BACKUP_ROOT_PATH_PLACEHOLDER}
+    db-dump-command: ${APP_DB_DUMP_COMMAND:${APP_BACKUP_DB_DUMP_COMMAND:mariadb-dump}}
+  security:
+    trust-proxy-headers: ${APP_TRUST_PROXY_HEADERS:false}
+  seed:
+    enabled: false
+
+# app.scale.resource-path: 현재 코드 미지원
+# app.export.temp-path: 현재 코드 미지원
 ```
 
 ### 운영 설정 원칙
 - 운영에서는 `ddl-auto=validate` 를 권장한다.
 - 운영 로그는 DEBUG 대신 INFO 중심으로 시작한다.
-- 척도 JSON 경로를 명시적으로 지정해 운영 파일을 추적 가능하게 한다.
-- temp 경로와 backup 경로를 분리한다.
+- reverse proxy 환경이면 `server.forward-headers-strategy` 와 `app.security.trust-proxy-headers` 값을 함께 점검한다.
+- `app.scale.resource-path`, `app.export.temp-path` 는 현재 코드 미지원이므로 `application-prod.yml` 실제 설정 키로 간주하지 않는다.
+- scale JSON 배치 위치와 운영 작업용 temp 경로는 운영 파일 관리 항목으로 별도 관리한다.
 
 ---
 
@@ -431,12 +490,15 @@ D:/mental-health-system/backups/
 ```text
 db-backup-20260329-230000.sql
 app-config-backup-20260329-230500.zip
-release-backup-20260329-231000.zip
+mental-health-app-20260329-231000.jar
+frontend-dist-20260329-231500/
 ```
 
 ## 12.5 백업 성공 검증 원칙
 - 파일 생성만으로 끝내지 않는다.
-- `backup_histories` 에 성공/실패 기록이 남는지 확인한다.
+- `scripts\run-backup.bat` 사용 시에는 `.sql` 파일 생성 여부, 파일 크기, 저장 경로를 확인한다.
+- 관리자 화면/API 기반 수동 백업을 사용한 경우에만 `backup_histories` 에 성공/실패 기록이 남는지 확인한다.
+- 관리자 화면/API 기반 수동 백업을 사용한 경우 가능하면 `backupMethod` 가 의도한 방식(`DB_DUMP` 또는 `SNAPSHOT`)인지 확인한다.
 - 주기적으로 복원 가능성 검증을 한다.
 
 ## 12.6 백업 실패 시 대응 기본 원칙
@@ -446,6 +508,25 @@ release-backup-20260329-231000.zip
 - DB dump 명령 실패 여부 확인
 - 같은 날 수동 백업 1회 재시도
 - 실패 지속 시 배포/변경 작업 중지
+
+## 12.7 현재 구현 기준 백업 방식
+### 12.7.1 `scripts\run-backup.bat` 기준
+- 운영자 직접 DB dump 파일 생성 보조 스크립트다.
+- `APP_BACKUP_ROOT_PATH`, `APP_DB_URL`, `APP_DB_USERNAME`, `APP_DB_PASSWORD` 값을 사용한다.
+- dump command 는 `APP_DB_DUMP_COMMAND` 또는 PATH 의 `mariadb-dump` / `mysqldump` 를 사용한다.
+- 성공 시 `.sql` dump 파일 생성까지가 범위다.
+- `backup_histories` 적재, 관리자 활동 로그 기록, `SNAPSHOT` fallback 은 수행하지 않는다.
+
+### 12.7.2 관리자 화면/API 기반 백업 기준
+- `BackupService` 를 통해 수동 백업을 실행한다.
+- MariaDB/MySQL: preflight 통과 + dump command 사용 가능 시 `DB_DUMP`
+- MariaDB/MySQL: dump command 미탐지 시 `SNAPSHOT` fallback
+- H2/기타: `SNAPSHOT`
+- API 응답과 `backup_histories` 에서 `backupMethod`, 상태, 파일 경로를 확인할 수 있다.
+
+## 12.8 복구 개요
+- `DB_DUMP`: 생성된 `.sql` 파일을 대상 DB 에 import 한다.
+- `SNAPSHOT`: 설정/척도 JSON/메타데이터 확인용이며 DB restore 파일은 아니다.
 
 ---
 
@@ -488,6 +569,8 @@ release-backup-20260329-231000.zip
 ## 14.2 백엔드 기준
 - [ ] `prod` 설정 파일 준비 완료
 - [ ] DB 접속 정보 점검 완료
+- [ ] reverse proxy 환경이면 `APP_TRUST_PROXY_HEADERS=true` 적용 여부 점검
+- [ ] `/api/v1/health` 가 DB/scale registry 포함 `UP` 응답
 - [ ] 운영 로그 경로 존재
 - [ ] 운영 백업 경로 존재
 - [ ] 운영 temp 경로 존재
@@ -500,7 +583,7 @@ release-backup-20260329-231000.zip
 - [ ] 민감정보 노출 기준 점검 완료
 
 ## 14.4 운영 준비 기준
-- [ ] 배포 전 수동 백업 완료
+- [ ] 배포 전 수동 백업 완료 (`scripts\run-backup.bat` 또는 관리자 수동 백업 기준)
 - [ ] 복구용 직전 버전 보관
 - [ ] 장애 연락 담당자 확인
 - [ ] 배포 시간대 확정
@@ -517,6 +600,22 @@ release-backup-20260329-231000.zip
 4. 배포 대상 파일 무결성 확인
 5. 배포 공지 또는 내부 공유
 
+예시 명령:
+
+```powershell
+$env:APP_BACKUP_ROOT_PATH = "<backup-root-path>"
+$env:APP_DB_URL = "<jdbc-url>"
+$env:APP_DB_USERNAME = "<db-username>"
+$env:APP_DB_PASSWORD = "<db-password>"
+$env:APP_DB_DUMP_COMMAND = "<dump-command-or-path>"
+scripts\run-backup.bat
+```
+
+주의:
+- `APP_DB_DUMP_COMMAND` 는 PATH 에 `mariadb-dump` 또는 `mysqldump` 가 잡혀 있으면 생략 가능하다.
+- 이 스크립트는 운영자용 직접 DB dump 파일 생성 보조만 수행한다.
+- `backup_histories` 적재 확인이 필요하면 관리자 화면/API 기반 수동 백업을 별도로 수행한다.
+
 ## 15.2 배포 중
 1. 사용자 사용 중지 안내
 2. 기존 앱 프로세스 중지
@@ -526,14 +625,37 @@ release-backup-20260329-231000.zip
 6. 앱 재기동
 7. 기동 로그 확인
 
+예시 명령:
+
+```powershell
+$env:APP_HOME = "<app-home>"
+scripts\deploy-backend.bat "<release-jar-path>"
+scripts\deploy-frontend.bat "<release-dist-path>"
+```
+
+주의:
+- `scripts\deploy-backend.bat` 는 backend jar 배치 보조만 수행하므로, 기존 프로세스 중지와 새 프로세스 시작은 운영자가 별도 수행해야 한다.
+- `scripts\deploy-frontend.bat` 는 frontend `dist` 배치 보조만 수행하므로, 웹서버 재시작이나 IIS/Nginx 설정 반영은 별도 운영 절차로 수행해야 한다.
+- 두 스크립트 모두 기존 배포본을 `backups/release/` 아래에 백업하지만, 서비스 정상화 여부까지 보장하지는 않는다.
+
 ## 15.3 배포 후
 1. 로그인 확인
-2. 대상자 목록 확인
-3. 대상자 상세 확인
-4. PHQ-9 샘플 세션 저장 확인
-5. 세션 상세/출력/통계 확인
-6. 관리자 백업 이력 조회 확인
-7. 로그 오류 여부 확인
+2. `scripts/health-check.bat` 또는 `GET /api/v1/health` 확인
+3. 대상자 목록 확인
+4. 대상자 상세 확인
+5. 8종 중 최소 2종 선택한 샘플 세션 저장 확인
+6. 세션 상세/print view/통계 확인
+7. CSV export 확인
+8. 관리자 승인/반려 및 사용자 상태/역할 변경 확인
+9. 관리자 로그/백업 이력 조회 확인
+10. 로그 오류 여부 확인
+
+예시 명령:
+
+```powershell
+scripts\health-check.bat
+scripts\health-check.bat "http://127.0.0.1:8080/api/v1"
+```
 
 ---
 
@@ -545,12 +667,17 @@ release-backup-20260329-231000.zip
 2. 대상자 목록 조회
 3. 대상자 상세 조회
 4. 척도 목록 조회
-5. 샘플 세션 저장
+5. 최소 2종 멀티 척도 샘플 세션 저장
 6. 세션 상세 조회
-7. 검사기록 목록 조회
-8. 통계 요약 조회
-9. 관리자 로그 조회
-10. 수동 백업 실행 또는 백업 이력 조회
+7. print view 조회
+8. 검사기록 목록 조회
+9. 통계 summary/scales/alerts 조회
+10. CSV export 조회
+11. 관리자 승인/반려 조회
+12. 관리자 사용자 상태/역할 변경
+13. 관리자 로그 조회
+14. 수동 백업 실행 또는 백업 이력 조회
+15. `/api/v1/health` 확인
 
 ### 통과 기준
 - 500 에러 없음
@@ -585,7 +712,7 @@ release-backup-20260329-231000.zip
 2. 영향 범위 확인
 3. 최근 배포 여부 확인
 4. application 로그 확인
-5. DB 연결 상태 확인
+5. `scripts\health-check.bat` 또는 `/api/v1/health` 로 앱/DB/scale registry 상태 확인
 6. 디스크 공간 확인
 7. 백업/로그 경로 접근 가능 여부 확인
 8. 즉시 롤백 필요 여부 판단
@@ -612,7 +739,9 @@ release-backup-20260329-231000.zip
 - 디스크 공간 확인
 - 백업 경로 존재/쓰기 권한 확인
 - DB dump 명령어 동작 확인
-- `backup_histories` 실패 사유 확인
+- `scripts\run-backup.bat` 사용 시 콘솔 출력과 종료 코드 확인
+- 관리자 화면/API 기반 수동 백업이면 preflight summary 확인
+- 관리자 화면/API 기반 수동 백업이면 `backup_histories` 실패 사유 확인
 
 ---
 
@@ -719,10 +848,11 @@ release-backup-20260329-231000.zip
 4. 척도 JSON 위치
 5. 로그 경로
 6. 백업 경로
-7. 수동 백업 실행 절차
-8. 배포 절차
-9. 롤백 절차
-10. 장애 시 확인 순서
+7. 운영 스크립트 4종 사용법 (`health-check.bat`, `run-backup.bat`, `deploy-backend.bat`, `deploy-frontend.bat`)
+8. 수동 백업 실행 절차
+9. 배포 절차
+10. 롤백 절차
+11. 장애 시 확인 순서
 
 ---
 
@@ -773,7 +903,7 @@ release-backup-20260329-231000.zip
 다음 추천 작업은 아래 중 하나다.
 
 1. 운영용 `application-prod.yml` 템플릿 파일 만들기
-2. `scripts/` 폴더용 배포/백업 배치 스크립트 초안 만들기
+2. `scripts/` 운영 스크립트와 운영 환경 값 정합성 점검
 3. DB 초기 스키마 SQL 초안 만들기
 4. 백엔드/프론트 프로젝트 뼈대 코드 생성 시작
 

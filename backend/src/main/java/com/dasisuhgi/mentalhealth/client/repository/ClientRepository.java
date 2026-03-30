@@ -7,6 +7,8 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ClientRepository extends JpaRepository<Client, Long> {
+    List<Client> findAllByOrderByCreatedAtDesc();
+
     List<Client> findAllByStatusNotOrderByCreatedAtDesc(ClientStatus status);
 
     List<Client> findAllByNameAndBirthDate(String name, LocalDate birthDate);

@@ -51,6 +51,17 @@ public class User {
     @Column(nullable = false, length = 20)
     private UserStatus status;
 
+    private LocalDateTime approvedAt;
+
+    private Long approvedById;
+
+    private LocalDateTime rejectedAt;
+
+    private Long rejectedById;
+
+    @Column(length = 255)
+    private String rejectionReason;
+
     private LocalDateTime lastLoginAt;
 
     @Column(nullable = false)

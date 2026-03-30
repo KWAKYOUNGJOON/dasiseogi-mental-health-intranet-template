@@ -52,6 +52,10 @@ public class AssessmentSession {
     @JoinColumn(name = "performed_by")
     private User performedBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "misentered_by")
+    private User misenteredBy;
+
     @Column(nullable = false)
     private int scaleCount;
 
@@ -64,6 +68,11 @@ public class AssessmentSession {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private AssessmentSessionStatus status;
+
+    private LocalDateTime misenteredAt;
+
+    @Column(length = 255)
+    private String misenteredReason;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;

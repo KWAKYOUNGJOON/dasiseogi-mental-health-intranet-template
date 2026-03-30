@@ -1,0 +1,214 @@
+{
+  "scaleCode": "MKPQ16",
+  "scaleName": "mKPQ-16",
+  "version": "1.0.0",
+  "displayOrder": 3,
+  "isActive": true,
+  "questionCount": 19,
+  "screeningThreshold": 7,
+  "screeningLabel": "정신병 위험군 추가 평가 권고",
+  "items": [
+    {
+      "questionNo": 1,
+      "questionKey": "mkpq16_q1",
+      "text": "다른 사람은 듣지 못하는 소리를 들은 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 2,
+      "questionKey": "mkpq16_q2",
+      "text": "다른 사람은 보지 못하는 것을 본 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 3,
+      "questionKey": "mkpq16_q3",
+      "text": "사람들이 나를 특별히 감시하거나 관찰한다고 느낀 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 4,
+      "questionKey": "mkpq16_q4",
+      "text": "우연한 일에도 특별한 의미가 숨어 있다고 느낀 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 5,
+      "questionKey": "mkpq16_q5",
+      "text": "평소보다 생각이 매우 혼란스럽거나 정리되지 않는 적이 있었다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 6,
+      "questionKey": "mkpq16_q6",
+      "text": "주변 사람들이 낯설거나 비현실적으로 느껴진 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 7,
+      "questionKey": "mkpq16_q7",
+      "text": "내 생각이 다른 사람에게 전달된다고 느낀 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 8,
+      "questionKey": "mkpq16_q8",
+      "text": "주변 일들이 비현실적이거나 꿈같이 느껴진 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 9,
+      "questionKey": "mkpq16_q9",
+      "text": "익숙한 장소가 갑자기 낯설게 느껴진 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 10,
+      "questionKey": "mkpq16_q10",
+      "text": "작은 소리나 자극에도 과하게 예민해진 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 11,
+      "questionKey": "mkpq16_q11",
+      "text": "사람들이 나에게 숨은 메시지를 보낸다고 느낀 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 12,
+      "questionKey": "mkpq16_q12",
+      "text": "내 몸이나 생각이 내가 통제하지 못하는 것처럼 느껴진 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 13,
+      "questionKey": "mkpq16_q13",
+      "text": "사람들의 표정이나 행동이 나를 겨냥한 것처럼 느껴진 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 14,
+      "questionKey": "mkpq16_q14",
+      "text": "머릿속 생각이 너무 강하거나 이상하게 들린 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 15,
+      "questionKey": "mkpq16_q15",
+      "text": "이상한 냄새나 감각을 느낀 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 16,
+      "questionKey": "mkpq16_q16",
+      "text": "주변 사람이 내 마음을 읽는다고 느낀 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 17,
+      "questionKey": "mkpq16_q17",
+      "text": "사람들이 일부러 나를 피하거나 해치려 한다고 느낀 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 18,
+      "questionKey": "mkpq16_q18",
+      "text": "현실과 상상이 섞이는 듯한 경험을 한 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 19,
+      "questionKey": "mkpq16_q19",
+      "text": "이상한 경험 때문에 스스로도 걱정이 된 적이 있다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "N", "label": "아니오", "score": 0 },
+        { "value": "Y", "label": "예", "score": 1 }
+      ]
+    }
+  ],
+  "interpretationRules": [
+    { "min": 0, "max": 6, "code": "NEGATIVE", "label": "음성" },
+    { "min": 7, "max": 19, "code": "POSITIVE_SCREEN", "label": "양성 의심" }
+  ],
+  "alertRules": [
+    {
+      "code": "MKPQ16_POSITIVE",
+      "type": "CAUTION",
+      "message": "정신병 위험군 선별 양성 의심",
+      "minTotalScore": 7
+    }
+  ]
+}

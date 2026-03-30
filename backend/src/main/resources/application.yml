@@ -28,7 +28,12 @@ logging:
     com.dasisuhgi.mentalhealth: INFO
 
 app:
+  organization:
+    name: 다시서기 정신건강 평가관리 시스템
   backup:
     root-path: ./local-backups
+    db-dump-command:
+  security:
+    trust-proxy-headers: false
   seed:
     enabled: true

@@ -1,0 +1,116 @@
+{
+  "scaleCode": "GAD7",
+  "scaleName": "GAD-7",
+  "version": "1.0.0",
+  "displayOrder": 2,
+  "isActive": true,
+  "questionCount": 7,
+  "screeningThreshold": 10,
+  "screeningLabel": "추가 평가 권고",
+  "items": [
+    {
+      "questionNo": 1,
+      "questionKey": "gad7_q1",
+      "text": "초조하거나 불안하거나 조마조마하게 느꼈다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 아니다", "score": 0 },
+        { "value": "1", "label": "며칠 동안", "score": 1 },
+        { "value": "2", "label": "1주일 이상", "score": 2 },
+        { "value": "3", "label": "거의 매일", "score": 3 }
+      ]
+    },
+    {
+      "questionNo": 2,
+      "questionKey": "gad7_q2",
+      "text": "걱정을 멈추거나 조절하기 어려웠다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 아니다", "score": 0 },
+        { "value": "1", "label": "며칠 동안", "score": 1 },
+        { "value": "2", "label": "1주일 이상", "score": 2 },
+        { "value": "3", "label": "거의 매일", "score": 3 }
+      ]
+    },
+    {
+      "questionNo": 3,
+      "questionKey": "gad7_q3",
+      "text": "여러 가지를 지나치게 걱정했다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 아니다", "score": 0 },
+        { "value": "1", "label": "며칠 동안", "score": 1 },
+        { "value": "2", "label": "1주일 이상", "score": 2 },
+        { "value": "3", "label": "거의 매일", "score": 3 }
+      ]
+    },
+    {
+      "questionNo": 4,
+      "questionKey": "gad7_q4",
+      "text": "편하게 쉬기 어려웠다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 아니다", "score": 0 },
+        { "value": "1", "label": "며칠 동안", "score": 1 },
+        { "value": "2", "label": "1주일 이상", "score": 2 },
+        { "value": "3", "label": "거의 매일", "score": 3 }
+      ]
+    },
+    {
+      "questionNo": 5,
+      "questionKey": "gad7_q5",
+      "text": "너무 안절부절못해서 가만히 있기 어려웠다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 아니다", "score": 0 },
+        { "value": "1", "label": "며칠 동안", "score": 1 },
+        { "value": "2", "label": "1주일 이상", "score": 2 },
+        { "value": "3", "label": "거의 매일", "score": 3 }
+      ]
+    },
+    {
+      "questionNo": 6,
+      "questionKey": "gad7_q6",
+      "text": "쉽게 짜증이 나거나 예민해졌다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 아니다", "score": 0 },
+        { "value": "1", "label": "며칠 동안", "score": 1 },
+        { "value": "2", "label": "1주일 이상", "score": 2 },
+        { "value": "3", "label": "거의 매일", "score": 3 }
+      ]
+    },
+    {
+      "questionNo": 7,
+      "questionKey": "gad7_q7",
+      "text": "마치 무서운 일이 생길 것처럼 두려웠다.",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 아니다", "score": 0 },
+        { "value": "1", "label": "며칠 동안", "score": 1 },
+        { "value": "2", "label": "1주일 이상", "score": 2 },
+        { "value": "3", "label": "거의 매일", "score": 3 }
+      ]
+    }
+  ],
+  "interpretationRules": [
+    { "min": 0, "max": 4, "code": "MINIMAL", "label": "최소" },
+    { "min": 5, "max": 9, "code": "MILD", "label": "경도" },
+    { "min": 10, "max": 14, "code": "MODERATE", "label": "중등도" },
+    { "min": 15, "max": 21, "code": "SEVERE", "label": "중증" }
+  ],
+  "alertRules": [
+    {
+      "code": "GAD7_TOTAL_10",
+      "type": "CAUTION",
+      "message": "불안 증상 추가 평가 권고",
+      "minTotalScore": 10
+    },
+    {
+      "code": "GAD7_TOTAL_15",
+      "type": "HIGH_RISK",
+      "message": "불안 증상 고도 수준",
+      "minTotalScore": 15
+    }
+  ]
+}

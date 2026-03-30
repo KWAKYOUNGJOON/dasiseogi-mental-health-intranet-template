@@ -3,6 +3,9 @@ package com.dasisuhgi.mentalhealth.auth.service;
 import com.dasisuhgi.mentalhealth.auth.dto.AuthUserResponse;
 import com.dasisuhgi.mentalhealth.auth.dto.LoginRequest;
 import com.dasisuhgi.mentalhealth.auth.dto.LoginResponse;
+import com.dasisuhgi.mentalhealth.audit.entity.ActivityActionType;
+import com.dasisuhgi.mentalhealth.audit.entity.ActivityTargetType;
+import com.dasisuhgi.mentalhealth.audit.service.ActivityLogService;
 import com.dasisuhgi.mentalhealth.common.error.AppException;
 import com.dasisuhgi.mentalhealth.common.session.SessionConstants;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
@@ -21,10 +24,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final ActivityLogService activityLogService;
 
-    public AuthService(UserRepository userRepository, BCryptPasswordEncoder passwordEncoder) {
+    public AuthService(UserRepository userRepository, BCryptPasswordEncoder passwordEncoder, ActivityLogService activityLogService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.activityLogService = activityLogService;
     }
 
     @Transactional
@@ -47,6 +52,14 @@ public class AuthService {
 
         user.setLastLoginAt(LocalDateTime.now());
         session.setAttribute(SessionConstants.USER, SessionUser.from(user));
+        activityLogService.log(
+                user,
+                ActivityActionType.LOGIN,
+                ActivityTargetType.USER,
+                user.getId(),
+                user.getLoginId(),
+                "로그인 성공"
+        );
         return new LoginResponse(toResponse(user), 120);
     }
 

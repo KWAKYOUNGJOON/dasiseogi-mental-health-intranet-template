@@ -1,252 +1,255 @@
 # 다시서기 정신건강 평가관리 시스템
 
-기관 내부망에서 운영되는 **정신건강 척도 자동 채점 및 통합 기록 관리 시스템**입니다.
+기관 내부망에서 운영하는 정신건강 척도 자동 채점 및 기록 관리 시스템입니다.
 
-본 프로젝트는 다시서기종합지원센터 정신건강팀의 실무 흐름에 맞춰, 정신건강 척도 시행부터 자동 채점, 기록 저장, 조회, 출력, 통계 확인까지 전 과정을 하나의 웹 시스템에서 처리할 수 있도록 설계되었습니다.
+현재 저장소는 설계 문서 기반에서 **1단계 최소 구현 scaffold**까지 진행된 상태입니다.
+이번 단계에서 실제로 닫은 흐름은 아래입니다.
 
----
+`로그인 → 대상자 목록 → 대상자 등록 → 대상자 상세 → 검사 시작 → 척도 선택 → 다중 척도 입력 → 세션 저장 → 세션 상세`
 
-## 1. 프로젝트 개요
+## 현재 구현 범위
+- `backend/`: Spring Boot 3.5, Java 21, Gradle 기반 최소 API 서버
+- `frontend/`: React + TypeScript + Vite 기반 최소 업무 UI
+- 세션 기반 로그인
+- 대상자 목록 / 등록 / 상세
+- 척도 레지스트리 + 8종 척도 JSON 리소스 로딩
+- 다중 척도 서버 재계산 기반 세션 저장
+- 세션 상세 조회
+- 세션 출력용 `print-data` API + 인쇄 화면
+- 대상자 오등록 처리 / 세션 오입력 처리
+- 검사기록 목록 최소 화면
+- statistics CSV export
+- `/api/v1/health` 헬스 엔드포인트 + `scripts/health-check.bat`
+- 관리자 승인 대기 / 사용자 관리 / 활동 로그 / 백업 관리 최소 화면
+- `user_approval_requests` 기반 가입 신청 원문/처리 이력 분리 저장
+- 활동 로그 적재 + IP 주소 저장
+- 수동 백업 이력 저장 + 환경별 `DB_DUMP` / `SNAPSHOT` 실행
+- local profile 실행
+- seed 계정 / seed 대상자 자동 생성
 
-기존 현장에서는 종이 기반 또는 수기 방식으로 정신건강 척도 검사를 시행하고, 채점 결과를 다시 별도 문서나 파일에 옮겨 적는 방식이 반복되고 있었습니다. 이 과정에서 반복적인 수기 입력, 채점 오류, 기록 누락, 데이터 분산, 통계 집계의 어려움 같은 문제가 발생했습니다.
+## 구조 원칙
+- 척도 정의 원본은 `backend/src/main/resources/scales` 기준입니다.
+- 프론트에는 척도 정의 복사본을 두지 않습니다.
+- 현재 실제 저장 가능한 척도는 `PHQ-9`, `GAD-7`, `mKPQ-16`, `K-MDQ`, `PSS-10`, `ISI-K`, `AUDIT-K`, `IES-R` 8종입니다.
+- 세션 저장은 단일 트랜잭션으로 처리합니다.
+- 삭제 API는 만들지 않고 상태값 방식으로 확장하도록 설계했습니다.
+- `clientNo`, `sessionNo` 는 `count()+1` 이 아니라 별도 식별번호 시퀀스 테이블 기반으로 생성합니다.
 
-본 프로젝트는 이러한 문제를 해결하기 위해, 기관 내부망에서 다수 사용자가 함께 사용할 수 있는 **정신건강 평가관리 시스템**을 구축하는 것을 목표로 합니다.
-
----
-
-## 2. 주요 목표
-
-- 정신건강 척도 시행 과정의 업무 단순화
-- 수기 채점 오류 감소 및 기록 정확성 향상
-- 대상자별 검사 이력의 통합 관리
-- 팀 단위 열람 및 협업 가능 구조 확보
-- 통계 및 보고 업무 지원
-- 내부망 환경에 적합한 안정적 운영 체계 확보
-
----
-
-## 3. 주요 사용자
-
-- 다시서기종합지원센터 정신건강팀 사회복지사
-- 관리자 권한을 가진 운영 담당자
-
----
-
-## 4. 운영 환경
-
-- 기관 내부망 기반 웹 시스템
-- 데스크톱 PC 중심 사용 환경
-- 다수 사용자 동시 접속 가능
-- 실무자가 직접 대상자 응답을 입력하는 업무형 시스템
-
----
-
-## 5. 지원 척도
-
-본 시스템은 아래 8종 정신건강 척도를 통합 지원합니다.
-
-- PHQ-9
-- GAD-7
-- mKPQ-16
-- K-MDQ
-- PSS-10
-- ISI-K
-- AUDIT-K
-- IES-R
-
----
-
-## 6. 핵심 기능
-
-### 6.1 대상자 관리
-- 대상자 기본정보와 검사기록 분리 관리
-- 사례번호 자동 생성
-- 이름 + 생년월일 기반 검색
-- 대상자 등록, 상세 조회, 기본정보 수정
-- 최근 검사기록 확인
-
-### 6.2 검사 수행
-- 대상자 선택 후 검사 시작
-- 여러 척도 복수 선택 가능
-- 선택한 척도를 순차적으로 입력
-- 문항 응답 즉시 총점 자동 계산
-- 척도별 판정 자동 표시
-- 고위험/주의 응답 즉시 경고 표시
-
-### 6.3 기록 관리
-- 검사 결과는 세션 단위 저장
-- 세션 전체 요약 제공
-- 검사기록 목록 조회
-- 대상자별 이력 확인
-- 삭제 대신 오입력 처리 방식 적용
-
-### 6.4 출력 및 문서화
-- 공식 문서형 출력물 제공
-- 대상자 기본정보, 척도별 점수/판정, 세션 요약 포함
-- 참고 메모는 화면에서만 확인하고 출력물에는 제외
-
-### 6.5 통계 및 보고
-- 시스템 내 통계 화면 제공
-- 이번 주 기준 기본 현황 조회
-- 척도별 비교
-- 경고 기록 모아보기
-- 관리자 전용 엑셀 내보내기
-
-### 6.6 운영 관리
-- 회원가입 신청 후 관리자 승인
-- 관리자 / 일반 사용자 권한 분리
-- 주요 기능 로그 기록
-- 자동 백업 및 수동 백업 지원
-
----
-
-## 7. 권한 정책
-
-### 일반 사용자
-- 대상자 열람
-- 대상자 등록
-- 검사 수행
-- 검사기록 열람
-- 통계 열람
-
-### 관리자
-- 일반 사용자 기능 전체
-- 회원가입 승인
-- 사용자 관리
-- 로그 확인
-- 백업 관리
-
-### 공통 정책
-- 1인 1계정
-- 팀 전체 열람 가능
-- 수정 권한은 작성자와 관리자만 가능
-- 오입력 기록은 기본 목록에서 숨기고, 작성자 또는 관리자만 확인 가능
-
----
-
-## 8. 기본 사용자 흐름
-
-`로그인 → 대상자 목록 → 대상자 상세 → 검사 시작 → 척도 선택 → 척도 입력 → 세션 요약 → 세션 상세`
-
-주요 화면 설계는 [`docs/01-screen-structure.md`](docs/01-screen-structure.md)를 기준으로 합니다.
-
----
-
-## 9. 문서 구조
-
-현재 저장소는 **설계 문서 중심 구조**를 기준으로 정리합니다.
-
+## 디렉터리
 ```text
-mental-health-system/
-├── docs/
-│   ├── 00-project-overview.md
-│   ├── 01-screen-structure.md
-│   ├── 02-db-design.md
-│   ├── 03-api-spec.md
-│   ├── 04-scale-json.md
-│   ├── 05-backend-architecture.md
-│   ├── 06-frontend-architecture.md
-│   ├── 07-validation-rules.md
-│   ├── 08-error-handling.md
-│   ├── 09-test-scenarios.md
-│   ├── 10-dev-setup.md
-│   └── 11-deployment.md
-└── README.md
-```
-
-### 문서 설명
-- [`docs/00-project-overview.md`](docs/00-project-overview.md)
-  - 프로젝트 목적, 배경, 운영 환경, 핵심 요구사항 정리
-- [`docs/01-screen-structure.md`](docs/01-screen-structure.md)
-  - 화면 목록, 메뉴 구조, 사용자 흐름, 권한 노출 기준, 화면 상세 설계
-- [`docs/02-db-design.md`](docs/02-db-design.md)
-  - 데이터베이스 구조 설계
-- [`docs/03-api-spec.md`](docs/03-api-spec.md)
-  - API 명세
-- [`docs/04-scale-json.md`](docs/04-scale-json.md)
-  - 척도 정의, 채점 규칙, 경고 규칙, 결과 스냅샷 구조
-- [`docs/05-backend-architecture.md`](docs/05-backend-architecture.md)
-  - 백엔드 구조 설계
-- [`docs/06-frontend-architecture.md`](docs/06-frontend-architecture.md)
-  - 프론트엔드 구조 설계
-- [`docs/07-validation-rules.md`](docs/07-validation-rules.md)
-  - 입력/업무/권한 검증 규칙
-- [`docs/08-error-handling.md`](docs/08-error-handling.md)
-  - 공통 에러 처리 기준
-- [`docs/09-test-scenarios.md`](docs/09-test-scenarios.md)
-  - 테스트 시나리오
-- [`docs/10-dev-setup.md`](docs/10-dev-setup.md)
-  - 로컬 개발환경 설정 가이드
-- [`docs/11-deployment.md`](docs/11-deployment.md)
-  - 배포 및 운영 가이드
-
----
-
-## 10. 권장 문서 읽기 순서
-
-1. [`docs/00-project-overview.md`](docs/00-project-overview.md)
-2. [`docs/01-screen-structure.md`](docs/01-screen-structure.md)
-3. [`docs/02-db-design.md`](docs/02-db-design.md)
-4. [`docs/03-api-spec.md`](docs/03-api-spec.md)
-5. [`docs/04-scale-json.md`](docs/04-scale-json.md)
-6. [`docs/05-backend-architecture.md`](docs/05-backend-architecture.md)
-7. [`docs/06-frontend-architecture.md`](docs/06-frontend-architecture.md)
-8. [`docs/07-validation-rules.md`](docs/07-validation-rules.md)
-9. [`docs/08-error-handling.md`](docs/08-error-handling.md)
-10. [`docs/09-test-scenarios.md`](docs/09-test-scenarios.md)
-11. [`docs/10-dev-setup.md`](docs/10-dev-setup.md)
-12. [`docs/11-deployment.md`](docs/11-deployment.md)
-
----
-
-## 11. 현재 상태
-
-- 핵심 설계 문서 작성 완료
-- 시스템 구조, 데이터 모델, API, 척도 규칙, 검증/에러 처리 기준 정리 완료
-- 현재 저장소는 **구현 착수 직전의 설계 기준 문서 세트**를 중심으로 구성됨
-
----
-
-## 12. 다음 작업 우선순위
-
-1. `backend/` 프로젝트 뼈대 생성
-2. `frontend/` 프로젝트 뼈대 생성
-3. 척도 JSON 파일 실제 리소스 형태로 정리
-4. DB 초기 스키마 또는 마이그레이션 구조 준비
-5. 세션 저장 기능부터 핵심 흐름 구현 시작
-
----
-
-## 13. 향후 권장 디렉터리 확장 구조
-
-구현 단계에서는 아래 구조로 확장하는 것을 권장합니다.
-
-```text
-mental-health-system/
+.
 ├── backend/
 ├── frontend/
 ├── docs/
 ├── scripts/
-├── local-backups/
-└── README.md
+└── local-backups/
 ```
 
----
+## 로컬 실행
 
-## 14. 개발 기준 요약
+### 1. 백엔드
+기본 실행:
 
-이 프로젝트는 단순 소개용 시스템이 아니라, 정신건강팀 사회복지사가 실제로 사용하는 **실무형 내부 업무 시스템**을 목표로 합니다.
+```powershell
+cd backend
+.\gradlew.bat bootRun
+```
 
-따라서 개발 시 아래 원칙을 유지해야 합니다.
+`local` 프로필 실행:
 
-- 빠른 대상자 검색과 검사 시작이 가능해야 한다.
-- 입력 실수를 줄일 수 있도록 흐름이 단순해야 한다.
-- 기록은 세션 중심으로 저장되되, 조회는 실무 친화적으로 제공해야 한다.
-- 권한 정책과 개인정보 노출 범위를 명확히 구분해야 한다.
-- 출력, 통계, 로그, 백업까지 운영 관점 기능을 함께 고려해야 한다.
+```powershell
+cd backend
+.\gradlew.bat bootRun --args='--spring.profiles.active=local'
+```
 
----
+현재 `application-local.yml` 은 아래 우선순위로 동작합니다.
 
-## 15. 한 줄 정의
+1. `APP_DB_URL`, `APP_DB_USERNAME`, `APP_DB_PASSWORD`, `APP_DB_DRIVER` 환경변수가 있으면 해당 DB 사용
+2. 없으면 H2 파일 DB로 fallback
 
-**기관 내부망에서 운영되는 정신건강 척도 자동 채점 및 통합 기록 관리 시스템**
+즉, MariaDB/MySQL 기준으로 바로 바꿀 수 있으면서도, 설정이 없으면 로컬에서 바로 켜집니다.
+
+주의:
+- H2 fallback은 로컬 편의용입니다.
+- 설계 기준 DB는 MariaDB/MySQL 이므로, 문자열 정렬/시간 처리/DDL 차이 때문에 H2 통과만으로 운영 정합성을 보장하지 않습니다.
+- 핵심 저장/조회 흐름은 가능하면 MariaDB 환경에서도 한 번 더 검증해야 합니다.
+
+예시:
+
+```powershell
+$env:APP_DB_URL='jdbc:mariadb://localhost:3306/mental_health_local'
+$env:APP_DB_USERNAME='mental_user'
+$env:APP_DB_PASSWORD='mental_pass'
+$env:APP_DB_DRIVER='org.mariadb.jdbc.Driver'
+cd backend
+.\gradlew.bat bootRun --args='--spring.profiles.active=local'
+```
+
+### 2. 프론트
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Vite dev server는 `http://127.0.0.1:5173` 에서 실행되고, `/api` 요청은 `http://localhost:8080` 으로 프록시됩니다.
+
+## seed 데이터
+
+앱 기동 시 `app.seed.enabled=true` 이면 아래 데이터가 자동 생성됩니다.
+
+### 계정
+- `admina / Test1234!`
+- `usera / Test1234!`
+- `userb / Test1234!`
+- `pendinguser / Test1234!`
+- `inactiveuser / Test1234!`
+- `rejecteduser / Test1234!`
+
+### 대상자
+- 정상 대상자 2명
+- `MISREGISTERED` 대상자 1명
+
+## 빌드 확인
+
+백엔드 테스트:
+
+```powershell
+cd backend
+.\gradlew.bat test
+```
+
+MariaDB/MySQL 호환성 검증은 기본 `test` 에서 분리되어 있습니다.
+Testcontainers 기반 선택 실행:
+
+```powershell
+cd backend
+.\gradlew.bat mariaDbTest
+```
+
+현재 `mariaDbTest` 에서는 아래 조회 경로를 실제 MariaDB 컨테이너 기준으로 검증합니다.
+- `assessment-records` projection / filter / pageable
+- `statistics/summary`
+- `statistics/scales`
+- `statistics/alerts`
+
+주의:
+- Docker가 실행 중이어야 실제 컨테이너 검증이 수행됩니다.
+- Docker가 없는 환경에서는 `MariaDbCompatibilityTest` 가 자동 skip 됩니다.
+- 기본 `test` 는 H2 기반 빠른 회귀만 수행하므로 일상 개발 속도를 유지합니다.
+- `mariaDbTest` 는 SQL dialect, 집계, pageable, enum/날짜 처리 차이를 실제 운영 DB 계열에서 다시 확인하는 용도입니다.
+- H2와 MariaDB 테스트를 분리 유지하는 이유는, 빠른 로컬 회귀와 실제 운영 DB 호환성 검증을 동시에 만족시키기 위해서입니다.
+
+프론트 프로덕션 빌드:
+
+```powershell
+cd frontend
+npm run build
+```
+
+## 수동 백업 범위
+
+현재 수동 백업은 환경별로 아래처럼 동작합니다.
+
+- MariaDB/MySQL
+  - 실행 전 datasource 종류, 백업 경로 writable 여부, dump command 사용 가능 여부를 preflight로 확인합니다.
+  - `mariadb-dump` 또는 `mysqldump` 사용 가능하면 실제 DB dump를 우선 시도합니다.
+  - dump 명령을 찾지 못하면 snapshot ZIP으로 fallback 합니다.
+- H2 / 기타 로컬 환경
+  - 실행 전 backup root writable 여부를 확인합니다.
+  - snapshot ZIP 방식으로 백업합니다.
+
+snapshot ZIP 포함 항목:
+- `application.yml`
+- `application-prod.yml`
+- `backend/src/main/resources/scales/**/*.json`
+- 사용자/대상자/세션 개수와 실행자 정보를 담은 `metadata/summary.json`
+
+현재 미포함 항목:
+- restore 자동화
+- 업로드 파일/첨부파일
+- 외부 스토리지 데이터
+
+백업 파일은 기본적으로 `local-backups/` 아래에 생성됩니다.
+
+복구 개요:
+- `DB_DUMP`: 생성된 `.sql` 파일을 MariaDB/MySQL에 직접 import 합니다.
+- `SNAPSHOT`: 설정/척도 JSON/메타데이터 확인용 스냅샷이며 DB 복구 파일은 아닙니다.
+
+## 운영 템플릿
+
+- 운영 설정 템플릿: `backend/src/main/resources/application-prod.yml`
+- 백엔드 배포 초안: `scripts/deploy-backend.bat`
+- 프론트 배포 초안: `scripts/deploy-frontend.bat`
+- 수동 백업 실행 초안: `scripts/run-backup.bat`
+- 기본 헬스체크 초안: `scripts/health-check.bat`
+
+권장 순서:
+1. `application-prod.yml` 또는 동등한 외부 설정 파일에 운영 값을 채웁니다.
+   - `APP_TRUST_PROXY_HEADERS=true` 는 신뢰 가능한 리버스 프록시 뒤에서만 켭니다.
+2. `scripts/deploy-backend.bat` 로 백엔드 기동 템플릿을 확인합니다.
+3. `scripts/deploy-frontend.bat` 로 프론트 빌드를 생성합니다.
+4. 배포 직전 `scripts/run-backup.bat` 로 수동 백업을 실행합니다.
+5. 배포 직후 `scripts/health-check.bat` 또는 `GET /api/v1/health` 로 앱/DB/scale registry 상태를 확인합니다.
+
+## 운영 하드닝 메모
+
+- 관리자 승인/반려 API 경로 변수는 항상 `requestId` 기준입니다.
+- `userId` 를 `/api/v1/admin/signup-requests/{requestId}/approve|reject` 에 보내면 `SIGNUP_REQUEST_ID_REQUIRED` 로 실패합니다.
+- 활동 로그 IP는 기본적으로 `remoteAddr` 를 사용합니다.
+- `X-Forwarded-For`, `X-Real-IP` 신뢰는 `app.security.trust-proxy-headers=true` 일 때만 활성화합니다.
+
+## 배포 전 수동 스모크 체크리스트
+
+- 로그인 가능 확인
+- 대상자 등록 가능 확인
+- 8종 중 최소 2종 선택으로 멀티 척도 세션 저장 확인
+- 세션 상세 조회 확인
+- print view 열기와 브라우저 인쇄 확인
+- `statistics/summary`, `statistics/scales`, `statistics/alerts` 조회 확인
+- statistics CSV export 확인
+- 관리자 승인/반려 확인
+- 관리자 사용자 역할/상태 변경 확인
+- 관리자 활동 로그 조회 확인
+- 수동 백업 실행 확인
+- `GET /api/v1/health` 응답이 `UP` 인지 확인
+
+## 이번 단계에서 만든 핵심 파일
+
+### 백엔드
+- `backend/src/main/resources/application-local.yml`
+- `backend/src/main/resources/scales/common/scale-registry.json`
+- `backend/src/main/resources/scales/phq9.json`
+- `backend/src/main/java/com/dasisuhgi/mentalhealth/auth/...`
+- `backend/src/main/java/com/dasisuhgi/mentalhealth/client/...`
+- `backend/src/main/java/com/dasisuhgi/mentalhealth/assessment/...`
+- `backend/src/main/java/com/dasisuhgi/mentalhealth/scale/...`
+- `backend/src/main/java/com/dasisuhgi/mentalhealth/common/config/LocalDataInitializer.java`
+
+### 프론트
+- `frontend/src/app/router/AppRouter.tsx`
+- `frontend/src/app/providers/AuthProvider.tsx`
+- `frontend/src/pages/auth/LoginPage.tsx`
+- `frontend/src/pages/clients/ClientListPage.tsx`
+- `frontend/src/pages/clients/ClientCreatePage.tsx`
+- `frontend/src/pages/clients/ClientDetailPage.tsx`
+- `frontend/src/pages/assessment/AssessmentScaleSelectPage.tsx`
+- `frontend/src/pages/assessment/AssessmentInputPage.tsx`
+- `frontend/src/pages/assessment/AssessmentSummaryPage.tsx`
+- `frontend/src/pages/assessment/AssessmentSessionDetailPage.tsx`
+
+## 다음 단계 권장
+- 활동 로그 상세 필터와 다운로드 보강
+- 통계 차트/시각화 고도화
+- 운영 알림과 배치 자동화 보강
+
+## 설계 문서
+- 프로젝트 개요: [docs/00-project-overview.md](/d:/dasiseogi-mental-health-intranet-template/docs/00-project-overview.md)
+- 화면 구조: [docs/01-screen-structure.md](/d:/dasiseogi-mental-health-intranet-template/docs/01-screen-structure.md)
+- DB 설계: [docs/02-db-design.md](/d:/dasiseogi-mental-health-intranet-template/docs/02-db-design.md)
+- API 명세: [docs/03-api-spec.md](/d:/dasiseogi-mental-health-intranet-template/docs/03-api-spec.md)
+- 척도 규칙: [docs/04-scale-json.md](/d:/dasiseogi-mental-health-intranet-template/docs/04-scale-json.md)
+- 배포 판정 문서: [docs/12-release-readiness.md](/d:/dasiseogi-mental-health-intranet-template/docs/12-release-readiness.md)
+- 배포 직전 실행 문서: [docs/13-pre-deploy-runbook.md](/d:/dasiseogi-mental-health-intranet-template/docs/13-pre-deploy-runbook.md)
+- 배포 결과 기록 양식: [docs/14-deploy-result-template.md](/d:/dasiseogi-mental-health-intranet-template/docs/14-deploy-result-template.md)

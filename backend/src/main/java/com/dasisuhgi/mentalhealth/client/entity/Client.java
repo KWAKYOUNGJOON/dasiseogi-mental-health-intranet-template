@@ -54,9 +54,18 @@ public class Client {
     @JoinColumn(name = "created_by")
     private User createdBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "misregistered_by")
+    private User misregisteredBy;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ClientStatus status;
+
+    private LocalDateTime misregisteredAt;
+
+    @Column(length = 255)
+    private String misregisteredReason;
 
     @Column(nullable = false)
     private LocalDateTime registeredAt;

@@ -1,0 +1,317 @@
+{
+  "scaleCode": "IESR",
+  "scaleName": "IES-R",
+  "version": "1.0.0",
+  "displayOrder": 8,
+  "isActive": true,
+  "questionCount": 22,
+  "screeningThreshold": 18,
+  "screeningLabel": "외상후스트레스 추가 평가 권고",
+  "items": [
+    {
+      "questionNo": 1,
+      "questionKey": "iesr_q1",
+      "text": "특정 사건이 떠올라 불편했던 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 2,
+      "questionKey": "iesr_q2",
+      "text": "사건과 관련된 꿈이나 이미지로 불편했던 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 3,
+      "questionKey": "iesr_q3",
+      "text": "사건을 떠올리게 하는 것이 감정을 크게 흔든 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 4,
+      "questionKey": "iesr_q4",
+      "text": "사건을 떠올리게 하는 것을 피하려고 한 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 5,
+      "questionKey": "iesr_q5",
+      "text": "사건에 대해 강한 감정 반응이 있었던 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 6,
+      "questionKey": "iesr_q6",
+      "text": "사건을 생각하지 않으려 애쓴 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 7,
+      "questionKey": "iesr_q7",
+      "text": "사건이 실제로 다시 일어나는 듯 느꼈던 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 8,
+      "questionKey": "iesr_q8",
+      "text": "사건과 관련된 감각을 피한 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 9,
+      "questionKey": "iesr_q9",
+      "text": "사건과 관련된 기억이 갑자기 떠오른 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 10,
+      "questionKey": "iesr_q10",
+      "text": "쉽게 놀라거나 경계가 높아진 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 11,
+      "questionKey": "iesr_q11",
+      "text": "사건에 대한 기억을 지우려 한 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 12,
+      "questionKey": "iesr_q12",
+      "text": "사건과 관련된 감정을 무디게 느낀 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 13,
+      "questionKey": "iesr_q13",
+      "text": "수면이 방해받은 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 14,
+      "questionKey": "iesr_q14",
+      "text": "예민하거나 짜증이 늘어난 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 15,
+      "questionKey": "iesr_q15",
+      "text": "사건과 관련된 생각을 밀어내기 어려웠던 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 16,
+      "questionKey": "iesr_q16",
+      "text": "사건이 끝나지 않은 것처럼 느낀 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 17,
+      "questionKey": "iesr_q17",
+      "text": "사건이 떠오르지 않게 감정을 차단한 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 18,
+      "questionKey": "iesr_q18",
+      "text": "집중이 어려웠던 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 19,
+      "questionKey": "iesr_q19",
+      "text": "사건을 떠올리게 하는 자극에 신체 반응이 있었던 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 20,
+      "questionKey": "iesr_q20",
+      "text": "사건을 떠올리게 하는 상황을 피한 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 21,
+      "questionKey": "iesr_q21",
+      "text": "사건이 떠오르면 강한 감정이 올라왔던 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 22,
+      "questionKey": "iesr_q22",
+      "text": "긴장이 풀리지 않고 경계가 유지된 정도",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없음", "score": 0 },
+        { "value": "1", "label": "약간", "score": 1 },
+        { "value": "2", "label": "보통", "score": 2 },
+        { "value": "3", "label": "상당히", "score": 3 },
+        { "value": "4", "label": "매우 심함", "score": 4 }
+      ]
+    }
+  ],
+  "interpretationRules": [
+    { "min": 0, "max": 17, "code": "NORMAL_RANGE", "label": "정상 범위" },
+    { "min": 18, "max": 24, "code": "AT_RISK", "label": "주의 필요" },
+    { "min": 25, "max": 88, "code": "HIGH_RISK", "label": "고위험 의심" }
+  ],
+  "alertRules": [
+    {
+      "code": "IESR_TOTAL_18",
+      "type": "CAUTION",
+      "message": "외상후스트레스 주의 구간",
+      "minTotalScore": 18
+    },
+    {
+      "code": "IESR_TOTAL_25",
+      "type": "HIGH_RISK",
+      "message": "외상후스트레스 고위험 의심",
+      "minTotalScore": 25
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+backend/.gradle/
+backend/build/
+backend/data/
+backend/backend/data/
+backend/logs/
+
+frontend/node_modules/
+frontend/dist/
+
+tmp/
+local-backups/
+logs/
+*.log

@@ -92,11 +92,20 @@ public class ScaleService {
                                 item.questionNo(),
                                 item.questionKey(),
                                 item.text(),
+                                item.reverseScored(),
                                 item.options().stream()
                                         .map(option -> new ScaleOptionResponse(option.value(), option.label(), option.score()))
                                         .toList()
                         ))
                         .toList()
         );
+    }
+
+    public boolean isRegistryLoaded() {
+        return !registryItems.isEmpty() && !definitions.isEmpty();
+    }
+
+    public int loadedDefinitionCount() {
+        return definitions.size();
     }
 }

@@ -12,6 +12,7 @@
       "questionNo": 1,
       "questionKey": "phq9_q1",
       "text": "흥미나 즐거움이 줄어들었다.",
+      "reverseScored": false,
       "options": [
         { "value": "0", "label": "전혀 아니다", "score": 0 },
         { "value": "1", "label": "며칠 동안", "score": 1 },
@@ -23,6 +24,7 @@
       "questionNo": 2,
       "questionKey": "phq9_q2",
       "text": "기분이 가라앉거나 우울하거나 희망이 없었다.",
+      "reverseScored": false,
       "options": [
         { "value": "0", "label": "전혀 아니다", "score": 0 },
         { "value": "1", "label": "며칠 동안", "score": 1 },
@@ -34,6 +36,7 @@
       "questionNo": 3,
       "questionKey": "phq9_q3",
       "text": "잠들기 어렵거나 자주 깨거나 너무 많이 잤다.",
+      "reverseScored": false,
       "options": [
         { "value": "0", "label": "전혀 아니다", "score": 0 },
         { "value": "1", "label": "며칠 동안", "score": 1 },
@@ -45,6 +48,7 @@
       "questionNo": 4,
       "questionKey": "phq9_q4",
       "text": "피곤하거나 기운이 없었다.",
+      "reverseScored": false,
       "options": [
         { "value": "0", "label": "전혀 아니다", "score": 0 },
         { "value": "1", "label": "며칠 동안", "score": 1 },
@@ -56,6 +60,7 @@
       "questionNo": 5,
       "questionKey": "phq9_q5",
       "text": "입맛이 없거나 과식했다.",
+      "reverseScored": false,
       "options": [
         { "value": "0", "label": "전혀 아니다", "score": 0 },
         { "value": "1", "label": "며칠 동안", "score": 1 },
@@ -67,6 +72,7 @@
       "questionNo": 6,
       "questionKey": "phq9_q6",
       "text": "자신이 실패자라고 느끼거나 가족을 실망시켰다고 느꼈다.",
+      "reverseScored": false,
       "options": [
         { "value": "0", "label": "전혀 아니다", "score": 0 },
         { "value": "1", "label": "며칠 동안", "score": 1 },
@@ -78,6 +84,7 @@
       "questionNo": 7,
       "questionKey": "phq9_q7",
       "text": "집중하기가 어려웠다.",
+      "reverseScored": false,
       "options": [
         { "value": "0", "label": "전혀 아니다", "score": 0 },
         { "value": "1", "label": "며칠 동안", "score": 1 },
@@ -89,6 +96,7 @@
       "questionNo": 8,
       "questionKey": "phq9_q8",
       "text": "평소보다 너무 느리거나 너무 안절부절못했다.",
+      "reverseScored": false,
       "options": [
         { "value": "0", "label": "전혀 아니다", "score": 0 },
         { "value": "1", "label": "며칠 동안", "score": 1 },
@@ -100,6 +108,7 @@
       "questionNo": 9,
       "questionKey": "phq9_q9",
       "text": "자신을 해치거나 차라리 죽는 편이 낫겠다는 생각이 들었다.",
+      "reverseScored": false,
       "options": [
         { "value": "0", "label": "전혀 아니다", "score": 0 },
         { "value": "1", "label": "며칠 동안", "score": 1 },

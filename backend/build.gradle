@@ -33,9 +33,26 @@ dependencies {
 	runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.testcontainers:junit-jupiter'
+	testImplementation 'org.testcontainers:mariadb'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+	useJUnitPlatform {
+		excludeTags 'mariadb'
+	}
+}
+
+tasks.register('mariaDbTest', Test) {
+	group = 'verification'
+	description = 'Runs MariaDB compatibility tests backed by Testcontainers.'
+	useJUnitPlatform {
+		includeTags 'mariadb'
+	}
+	shouldRunAfter tasks.named('test')
+	if (System.getProperty('os.name', '').toLowerCase().contains('windows')) {
+		// Docker Desktop 29+ can fail Docker API negotiation under Testcontainers 1.x on Windows.
+		systemProperty 'api.version', System.getProperty('api.version', '1.44')
+	}
 }

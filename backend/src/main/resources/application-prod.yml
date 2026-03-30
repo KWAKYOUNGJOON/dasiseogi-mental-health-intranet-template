@@ -1,0 +1,45 @@
+server:
+  port: ${APP_SERVER_PORT:8080}
+  servlet:
+    session:
+      timeout: ${APP_SESSION_TIMEOUT:120m}
+  forward-headers-strategy: ${APP_FORWARD_HEADERS_STRATEGY:none}
+
+spring:
+  datasource:
+    url: ${APP_DB_URL:jdbc:mariadb://DB_HOST_PLACEHOLDER:3306/DB_NAME_PLACEHOLDER}
+    username: ${APP_DB_USERNAME:DB_USERNAME_PLACEHOLDER}
+    password: ${APP_DB_PASSWORD:DB_PASSWORD_PLACEHOLDER}
+    driver-class-name: ${APP_DB_DRIVER:org.mariadb.jdbc.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+  jackson:
+    time-zone: Asia/Seoul
+    serialization:
+      write-dates-as-timestamps: false
+
+logging:
+  file:
+    path: ${APP_LOG_FILE_PATH:LOG_PATH_PLACEHOLDER}
+  level:
+    root: INFO
+    com.dasisuhgi.mentalhealth: INFO
+
+app:
+  organization:
+    name: ${APP_ORGANIZATION_NAME:다시서기 정신건강 평가관리 시스템}
+  backup:
+    root-path: ${APP_BACKUP_ROOT_PATH:BACKUP_ROOT_PATH_PLACEHOLDER}
+    db-dump-command: ${APP_DB_DUMP_COMMAND:${APP_BACKUP_DB_DUMP_COMMAND:mariadb-dump}}
+  security:
+    trust-proxy-headers: ${APP_TRUST_PROXY_HEADERS:false}
+  seed:
+    enabled: false
+
+# app.scale.resource-path: 현재 코드 미지원
+# app.export.temp-path: 현재 코드 미지원

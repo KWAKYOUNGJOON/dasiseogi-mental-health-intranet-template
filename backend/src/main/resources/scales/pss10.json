@@ -1,0 +1,146 @@
+{
+  "scaleCode": "PSS10",
+  "scaleName": "PSS-10",
+  "version": "1.0.0",
+  "displayOrder": 5,
+  "isActive": true,
+  "questionCount": 10,
+  "screeningThreshold": null,
+  "screeningLabel": null,
+  "items": [
+    {
+      "questionNo": 1,
+      "questionKey": "pss10_q1",
+      "text": "최근 한 달 동안 예상치 못한 일 때문에 당황한 적이 얼마나 자주 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "거의 없었다", "score": 1 },
+        { "value": "2", "label": "가끔 있었다", "score": 2 },
+        { "value": "3", "label": "꽤 자주 있었다", "score": 3 },
+        { "value": "4", "label": "매우 자주 있었다", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 2,
+      "questionKey": "pss10_q2",
+      "text": "최근 한 달 동안 중요한 일들을 통제할 수 없다고 느낀 적이 얼마나 자주 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "거의 없었다", "score": 1 },
+        { "value": "2", "label": "가끔 있었다", "score": 2 },
+        { "value": "3", "label": "꽤 자주 있었다", "score": 3 },
+        { "value": "4", "label": "매우 자주 있었다", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 3,
+      "questionKey": "pss10_q3",
+      "text": "최근 한 달 동안 긴장되거나 스트레스를 심하게 받은 적이 얼마나 자주 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "거의 없었다", "score": 1 },
+        { "value": "2", "label": "가끔 있었다", "score": 2 },
+        { "value": "3", "label": "꽤 자주 있었다", "score": 3 },
+        { "value": "4", "label": "매우 자주 있었다", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 4,
+      "questionKey": "pss10_q4",
+      "text": "최근 한 달 동안 짜증나는 일들을 성공적으로 처리하고 있다고 느낀 적이 얼마나 자주 있었습니까?",
+      "reverseScored": true,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "거의 없었다", "score": 1 },
+        { "value": "2", "label": "가끔 있었다", "score": 2 },
+        { "value": "3", "label": "꽤 자주 있었다", "score": 3 },
+        { "value": "4", "label": "매우 자주 있었다", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 5,
+      "questionKey": "pss10_q5",
+      "text": "최근 한 달 동안 삶에서 일어나는 중요한 변화들을 효과적으로 대처하고 있다고 느낀 적이 얼마나 자주 있었습니까?",
+      "reverseScored": true,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "거의 없었다", "score": 1 },
+        { "value": "2", "label": "가끔 있었다", "score": 2 },
+        { "value": "3", "label": "꽤 자주 있었다", "score": 3 },
+        { "value": "4", "label": "매우 자주 있었다", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 6,
+      "questionKey": "pss10_q6",
+      "text": "최근 한 달 동안 해야 할 일들을 감당할 수 없다고 느낀 적이 얼마나 자주 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "거의 없었다", "score": 1 },
+        { "value": "2", "label": "가끔 있었다", "score": 2 },
+        { "value": "3", "label": "꽤 자주 있었다", "score": 3 },
+        { "value": "4", "label": "매우 자주 있었다", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 7,
+      "questionKey": "pss10_q7",
+      "text": "최근 한 달 동안 자신의 방식대로 일이 진행되고 있다고 느낀 적이 얼마나 자주 있었습니까?",
+      "reverseScored": true,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "거의 없었다", "score": 1 },
+        { "value": "2", "label": "가끔 있었다", "score": 2 },
+        { "value": "3", "label": "꽤 자주 있었다", "score": 3 },
+        { "value": "4", "label": "매우 자주 있었다", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 8,
+      "questionKey": "pss10_q8",
+      "text": "최근 한 달 동안 여러 가지 일을 잘 해내고 있다고 느낀 적이 얼마나 자주 있었습니까?",
+      "reverseScored": true,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "거의 없었다", "score": 1 },
+        { "value": "2", "label": "가끔 있었다", "score": 2 },
+        { "value": "3", "label": "꽤 자주 있었다", "score": 3 },
+        { "value": "4", "label": "매우 자주 있었다", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 9,
+      "questionKey": "pss10_q9",
+      "text": "최근 한 달 동안 통제할 수 없는 일들 때문에 화가 난 적이 얼마나 자주 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "거의 없었다", "score": 1 },
+        { "value": "2", "label": "가끔 있었다", "score": 2 },
+        { "value": "3", "label": "꽤 자주 있었다", "score": 3 },
+        { "value": "4", "label": "매우 자주 있었다", "score": 4 }
+      ]
+    },
+    {
+      "questionNo": 10,
+      "questionKey": "pss10_q10",
+      "text": "최근 한 달 동안 어려움이 너무 많이 쌓여 극복할 수 없다고 느낀 적이 얼마나 자주 있었습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "0", "label": "전혀 없었다", "score": 0 },
+        { "value": "1", "label": "거의 없었다", "score": 1 },
+        { "value": "2", "label": "가끔 있었다", "score": 2 },
+        { "value": "3", "label": "꽤 자주 있었다", "score": 3 },
+        { "value": "4", "label": "매우 자주 있었다", "score": 4 }
+      ]
+    }
+  ],
+  "interpretationRules": [
+    { "min": 0, "max": 40, "code": "NO_OFFICIAL_CUTOFF", "label": "공식 절단점 없음" }
+  ],
+  "alertRules": []
+}

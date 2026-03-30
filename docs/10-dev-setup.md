@@ -73,6 +73,7 @@ mental-health-system/
 │   ├── src/main/resources/
 │   │   ├── application.yml
 │   │   ├── application-local.yml
+│   │   ├── schema.sql
 │   │   └── scales/
 │   │       ├── common/
 │   │       ├── phq9.json
@@ -101,8 +102,14 @@ mental-health-system/
 │   ├── 07-validation-rules.md
 │   ├── 08-error-handling.md
 │   ├── 09-test-scenarios.md
-│   └── 10-dev-setup.md
+│   ├── 10-dev-setup.md
+│   ├── 11-deployment.md
+│   ├── 12-release-readiness.md
+│   ├── 13-pre-deploy-runbook.md
+│   ├── 14-deploy-result-template.md
+│   └── 15-go-live-checklist.md
 ├── scripts/
+│   ├── health-check.bat
 │   ├── init-db.sql
 │   ├── seed-local.sql
 │   └── reset-local-db.sql
@@ -298,11 +305,12 @@ FLUSH PRIVILEGES;
 - JPA `ddl-auto=update` 로 빠르게 개발 시작
 
 ### 2단계
-- 테이블 구조 안정화 후 `schema.sql` 또는 Flyway/Liquibase 로 전환
+- 테이블 구조 안정화 후 `backend/src/main/resources/schema.sql` 을 초기 스키마 고정본으로 관리
+- 필요 시 이후 단계에서 Flyway/Liquibase 로 확장 검토
 
 ### 현재 추천
 - 지금 문서 단계에서는 **1단계로 시작**하는 것이 가장 빠르다.
-- 단, 엔터티가 안정되면 DB 구조를 마이그레이션 도구 기반으로 고정해야 한다.
+- 단, 현재는 `schema.sql` 이 이미 존재하므로 엔터티/매핑 변경 후에는 MariaDB schema validation 테스트로 정합성을 함께 확인한다.
 
 ---
 
@@ -494,6 +502,29 @@ SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
 
 ---
 
+## 12.4 schema.sql / schema validation 확인
+
+현재 프로젝트에는 초기 스키마 고정본 `backend/src/main/resources/schema.sql` 이 포함되어 있다.
+
+로컬 또는 검증 환경에서 현재 코드와 스키마 정합성을 확인할 때는 아래 명령을 사용한다.
+
+```powershell
+cd backend
+.\gradlew.bat mariaDbTest --tests com.dasisuhgi.mentalhealth.SchemaValidationMariaDbTest
+```
+
+### 확인 의미
+- Testcontainers MariaDB 에 `schema.sql` 을 적용한다.
+- 애플리케이션을 `spring.jpa.hibernate.ddl-auto=validate` 로 기동한다.
+- 현재 persistence unit 기준으로 스키마가 validate 가능한지 확인한다.
+
+### 사용 시점
+- 주요 엔터티/컬럼/연관관계 변경 후
+- `schema.sql` 수정 후
+- 로컬 H2 기준으로는 이상 없지만 MariaDB 호환성 확인이 필요할 때
+
+---
+
 ## 13. 프론트엔드 실행 절차
 
 ## 13.1 첫 실행 전 체크
@@ -618,7 +649,14 @@ backend/logs/
 
 ### 원칙
 - 로컬 수동 백업 테스트가 실제 파일 생성까지 확인 가능해야 한다.
+- H2 로컬 실행에서는 기본적으로 `SNAPSHOT` 백업이 생성된다.
+- MariaDB/MySQL 로컬 실행에서는 dump command 가 있으면 `DB_DUMP` 를 우선 시도한다.
 - 백업 성공/실패가 `backup_histories` 에 반영되는지 함께 확인한다.
+
+### 프록시 IP 기본값
+- 로컬 개발 기본값은 `app.security.trust-proxy-headers=false` 이다.
+- 따라서 activity log IP 는 기본적으로 `remoteAddr` 기준으로 저장된다.
+- 로컬 프록시 테스트가 꼭 필요할 때만 설정을 켠다.
 
 ---
 
@@ -676,6 +714,9 @@ logs/
 - [ ] 로그인 가능
 - [ ] 대상자 목록 조회 가능
 - [ ] scale registry 로딩 성공
+- [ ] `GET /api/v1/health` 가 `UP` 응답 반환
+- [ ] 필요 시 `SchemaValidationMariaDbTest` 로 `schema.sql` + MariaDB validate 확인 가능
+- [ ] 필요 시 `scripts/health-check.bat` 로 동일 상태 확인 가능
 - [ ] 관리자/일반 사용자 시드 계정 존재
 - [ ] local-backups 폴더 writable
 - [ ] 기본 로그 파일 생성 확인

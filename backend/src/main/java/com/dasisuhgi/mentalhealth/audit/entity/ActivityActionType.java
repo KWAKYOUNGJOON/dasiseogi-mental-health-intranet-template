@@ -1,0 +1,18 @@
+package com.dasisuhgi.mentalhealth.audit.entity;
+
+public enum ActivityActionType {
+    LOGIN,
+    SIGNUP_REQUEST,
+    SIGNUP_APPROVE,
+    SIGNUP_REJECT,
+    USER_ROLE_CHANGE,
+    USER_STATUS_CHANGE,
+    CLIENT_CREATE,
+    CLIENT_UPDATE,
+    CLIENT_MARK_MISREGISTERED,
+    SESSION_CREATE,
+    SESSION_MARK_MISENTERED,
+    PRINT_SESSION,
+    STATISTICS_EXPORT,
+    BACKUP_RUN
+}

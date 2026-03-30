@@ -6,6 +6,7 @@ public record ScaleQuestionResponse(
         int questionNo,
         String questionKey,
         String questionText,
+        boolean reverseScored,
         List<ScaleOptionResponse> options
 ) {
 }

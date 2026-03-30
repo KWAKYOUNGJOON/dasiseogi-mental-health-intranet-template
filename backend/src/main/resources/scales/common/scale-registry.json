@@ -12,50 +12,57 @@
       "scaleCode": "GAD7",
       "scaleName": "GAD-7",
       "displayOrder": 2,
-      "isActive": false,
-      "implemented": false
+      "isActive": true,
+      "implemented": true,
+      "definitionFile": "classpath:scales/gad7.json"
     },
     {
       "scaleCode": "MKPQ16",
       "scaleName": "mKPQ-16",
       "displayOrder": 3,
-      "isActive": false,
-      "implemented": false
+      "isActive": true,
+      "implemented": true,
+      "definitionFile": "classpath:scales/mkpq16.json"
     },
     {
       "scaleCode": "KMDQ",
       "scaleName": "K-MDQ",
       "displayOrder": 4,
-      "isActive": false,
-      "implemented": false
+      "isActive": true,
+      "implemented": true,
+      "definitionFile": "classpath:scales/kmdq.json"
     },
     {
       "scaleCode": "PSS10",
       "scaleName": "PSS-10",
       "displayOrder": 5,
-      "isActive": false,
-      "implemented": false
+      "isActive": true,
+      "implemented": true,
+      "definitionFile": "classpath:scales/pss10.json"
     },
     {
       "scaleCode": "ISIK",
       "scaleName": "ISI-K",
       "displayOrder": 6,
-      "isActive": false,
-      "implemented": false
+      "isActive": true,
+      "implemented": true,
+      "definitionFile": "classpath:scales/isik.json"
     },
     {
       "scaleCode": "AUDITK",
       "scaleName": "AUDIT-K",
       "displayOrder": 7,
-      "isActive": false,
-      "implemented": false
+      "isActive": true,
+      "implemented": true,
+      "definitionFile": "classpath:scales/auditk.json"
     },
     {
       "scaleCode": "IESR",
       "scaleName": "IES-R",
       "displayOrder": 8,
-      "isActive": false,
-      "implemented": false
+      "isActive": true,
+      "implemented": true,
+      "definitionFile": "classpath:scales/iesr.json"
     }
   ]
 }
