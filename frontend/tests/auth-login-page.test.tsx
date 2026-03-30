@@ -132,6 +132,52 @@ describe('auth login page', () => {
     expect(screen.getByText('가입 신청이 접수되었습니다. 관리자 승인 후 로그인할 수 있습니다.')).toBeTruthy()
   })
 
+  it('blocks login requests and shows required field errors when inputs are empty', async () => {
+    const user = userEvent.setup()
+
+    renderLoginPage()
+
+    const loginIdInput = screen.getByLabelText('아이디')
+    const passwordInput = screen.getByLabelText('비밀번호')
+
+    await user.clear(loginIdInput)
+    await user.clear(passwordInput)
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(mockLogin).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert').textContent).toBe('입력값을 다시 확인해주세요.')
+    expect(screen.getByText('아이디를 입력해주세요.')).toBeTruthy()
+    expect(screen.getByText('비밀번호를 입력해주세요.')).toBeTruthy()
+  })
+
+  it('updates the validation message as the user fixes each required field', async () => {
+    const user = userEvent.setup()
+
+    renderLoginPage()
+
+    const loginIdInput = screen.getByLabelText('아이디')
+    const passwordInput = screen.getByLabelText('비밀번호')
+
+    await user.clear(loginIdInput)
+    await user.clear(passwordInput)
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    await user.type(loginIdInput, 'usera')
+
+    await waitFor(() => {
+      expect(screen.queryByText('아이디를 입력해주세요.')).toBeNull()
+    })
+    expect(screen.getByText('비밀번호를 입력해주세요.')).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toBe('입력값을 다시 확인해주세요.')
+
+    await user.type(passwordInput, 'Test1234!')
+
+    await waitFor(() => {
+      expect(screen.queryByText('비밀번호를 입력해주세요.')).toBeNull()
+    })
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('keeps the existing login submit behavior and prevents duplicate submits', async () => {
     const deferredLogin = createDeferredPromise<void>()
     const user = userEvent.setup()
