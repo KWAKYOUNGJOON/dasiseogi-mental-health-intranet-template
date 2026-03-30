@@ -91,7 +91,7 @@ if ($unmerged.Count -gt 0) {
     throw "Unmerged files are present. Resolve conflicts before auto-publishing."
 }
 
-$statusBeforeWorklog = Get-StatusLines
+$statusBeforeWorklog = @(Get-StatusLines)
 if ($statusBeforeWorklog.Count -eq 0) {
     Write-Step "No publishable changes detected."
     exit 0
@@ -105,7 +105,7 @@ if (-not $DryRun -and -not $SkipWorklogUpdate -and (Test-Path -LiteralPath $upda
     }
 }
 
-$statusLines = Get-StatusLines
+$statusLines = @(Get-StatusLines)
 if ($statusLines.Count -eq 0) {
     Write-Step "No publishable changes remain after worklog update."
     exit 0
@@ -125,14 +125,14 @@ if ($DryRun) {
 Write-Step "Staging publishable changes"
 $null = Invoke-Git -Arguments @("add", "-A")
 
-$stagedPaths = Get-StagedPaths
+$stagedPaths = @(Get-StagedPaths)
 if ($stagedPaths.Count -eq 0) {
     Write-Step "No staged changes found after git add."
     exit 0
 }
 
 if ([string]::IsNullOrWhiteSpace($CommitMessage)) {
-    $areas = Get-TopAreas -Paths $stagedPaths
+    $areas = @(Get-TopAreas -Paths $stagedPaths)
     $suffix = if ($areas.Count -gt 0) { " [" + ($areas -join ", ") + "]" } else { "" }
     $CommitMessage = "chore(auto-sync): $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')$suffix"
 }
