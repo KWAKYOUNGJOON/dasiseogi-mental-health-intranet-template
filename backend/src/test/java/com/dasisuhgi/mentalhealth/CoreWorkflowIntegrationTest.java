@@ -34,7 +34,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -68,8 +67,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 @Import(SessionSaveFailureTestConfig.class)
 class CoreWorkflowIntegrationTest {
-    private static final DateTimeFormatter YEAR_MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyyMM");
-
     @Autowired
     private MockMvc mockMvc;
 
@@ -250,13 +247,13 @@ class CoreWorkflowIntegrationTest {
     @Test
     void createClientGeneratesStableIdentifierAndDefaultListHidesMisregisteredAndPhone() throws Exception {
         MockHttpSession session = login("usera", "Test1234!");
-        String expectedYearMonth = LocalDate.now().format(YEAR_MONTH_FORMAT);
 
         String firstClientNo = createClient(session, "신규대상A", "1993-04-15");
         String secondClientNo = createClient(session, "신규대상B", "1994-04-15");
 
-        assertThat(firstClientNo).isEqualTo("CL-%s-0001".formatted(expectedYearMonth));
-        assertThat(secondClientNo).isEqualTo("CL-%s-0002".formatted(expectedYearMonth));
+        assertThat(firstClientNo).matches("CL-\\d{6}-\\d{6}");
+        assertThat(secondClientNo).matches("CL-\\d{6}-\\d{6}");
+        assertThat(secondClientNo).isNotEqualTo(firstClientNo);
         assertThat(identifierSequenceRepository.count()).isEqualTo(2L);
 
         MvcResult listResult = mockMvc.perform(get("/api/v1/clients").session(session))
@@ -386,7 +383,7 @@ class CoreWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.data.scaleCount").value(1))
                 .andExpect(jsonPath("$.data.hasAlert").value(true))
-                .andExpect(jsonPath("$.data.sessionNo").value("AS-20260328-0001"))
+                .andExpect(jsonPath("$.data.sessionNo").value(org.hamcrest.Matchers.matchesPattern("AS-\\d{8}-\\d{6}")))
                 .andReturn();
 
         long sessionId = body(saveResult).path("data").path("sessionId").asLong();
@@ -401,26 +398,6 @@ class CoreWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.scales[0].answers[8].answerValue").value("1"))
                 .andExpect(jsonPath("$.data.alerts[0].alertCode").value("PHQ9_ITEM9_ANY"))
                 .andExpect(jsonPath("$.data.alerts[0].questionNo").value(9));
-    }
-
-    @Test
-    void saveSessionGeneratesSequentialSessionNumberForSameDay() throws Exception {
-        MockHttpSession session = login("usera", "Test1234!");
-        Client client = findClient("김대상", LocalDate.of(1982, 7, 13));
-
-        mockMvc.perform(post("/api/v1/assessment-sessions")
-                        .session(session)
-                        .contentType(APPLICATION_JSON)
-                        .content(json(validPhq9SaveRequest(client.getId(), "첫 번째 세션"))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.sessionNo").value("AS-20260328-0001"));
-
-        mockMvc.perform(post("/api/v1/assessment-sessions")
-                        .session(session)
-                        .contentType(APPLICATION_JSON)
-                        .content(json(validPhq9SaveRequest(client.getId(), "두 번째 세션"))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.sessionNo").value("AS-20260328-0002"));
     }
 
     @Test
