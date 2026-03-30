@@ -50,13 +50,18 @@ export function LoginPage() {
         </label>
         {notice === 'signup-requested' ? <div className="success-text">가입 신청이 접수되었습니다. 관리자 승인 후 로그인할 수 있습니다.</div> : null}
         {error ? <div className="error-text">{error}</div> : null}
-        <div className="actions">
-          <button className="primary-button" disabled={submitting} type="submit">
-            {submitting ? '로그인 중...' : '로그인'}
-          </button>
-          <Link aria-label="회원가입 신청" className="secondary-button" to="/signup">
-            회원가입 신청
-          </Link>
+        <div className="stack" style={{ gap: 8 }}>
+          <div className="actions">
+            <button className="primary-button" disabled={submitting} type="submit">
+              {submitting ? '로그인 중...' : '로그인'}
+            </button>
+            <Link aria-label="회원가입 신청" className="secondary-button" to="/signup">
+              회원가입 신청
+            </Link>
+          </div>
+          <p className="muted" style={{ margin: 0 }}>
+            계정이 없으면 회원가입 신청 후 관리자 승인을 받아주세요.
+          </p>
         </div>
       </form>
     </div>
