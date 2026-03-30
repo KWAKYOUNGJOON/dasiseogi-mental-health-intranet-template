@@ -138,6 +138,48 @@ button {
   flex: 1;
 }
 
+.management-filter-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(240px, 2fr) repeat(3, minmax(140px, 1fr)) auto;
+  align-items: end;
+}
+
+.management-action-panel {
+  display: grid;
+  gap: 8px;
+  min-width: 180px;
+  padding: 12px;
+  border: 1px solid #d8e1ea;
+  border-radius: 12px;
+}
+
+.role-action-panel {
+  background: #f4f9fd;
+  border-color: #c7dced;
+}
+
+.status-action-panel {
+  background: #fdf7f1;
+  border-color: #ead8c9;
+}
+
+.management-action-label {
+  color: #334a5e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.management-dialog-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #dde6ee;
+  border-radius: 10px;
+  background: #f8fbfd;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -171,6 +213,20 @@ button {
   border: 1px solid #c9d6e2;
   border-radius: 10px;
   background: #fff;
+}
+
+.field .input-error {
+  border-color: #b44444;
+}
+
+.field-error {
+  color: #b44444;
+  font-size: 13px;
+}
+
+.field-hint {
+  color: #5f7487;
+  font-size: 13px;
 }
 
 .actions {
@@ -213,6 +269,14 @@ button {
 
 .success-text {
   color: #1d6a53;
+}
+
+.success-panel {
+  padding: 12px 14px;
+  border: 1px solid #b8dfcf;
+  border-radius: 12px;
+  color: #1d6a53;
+  background: #eef8f3;
 }
 
 .center-screen {
@@ -301,6 +365,10 @@ button {
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .management-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -316,8 +384,13 @@ button {
     padding: 20px;
   }
 
+  .management-filter-grid,
   .grid-2,
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .management-action-panel {
+    min-width: 0;
   }
 }

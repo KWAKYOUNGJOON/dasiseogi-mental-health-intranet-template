@@ -1,7 +1,9 @@
+import { isAxiosError } from 'axios'
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../app/providers/AuthProvider'
+import type { ApiResponse } from '../../shared/types/api'
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -20,8 +22,12 @@ export function LoginPage() {
     try {
       await login(loginId, password)
       navigate('/clients')
-    } catch (requestError: any) {
-      setError(requestError?.response?.data?.message ?? '로그인에 실패했습니다.')
+    } catch (requestError) {
+      if (isAxiosError<ApiResponse<unknown>>(requestError)) {
+        setError(requestError.response?.data?.message ?? '로그인에 실패했습니다.')
+      } else {
+        setError('로그인에 실패했습니다.')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -48,7 +54,7 @@ export function LoginPage() {
           <button className="primary-button" disabled={submitting} type="submit">
             {submitting ? '로그인 중...' : '로그인'}
           </button>
-          <Link className="secondary-button" to="/signup">
+          <Link aria-label="회원가입 신청" className="secondary-button" to="/signup">
             회원가입 신청
           </Link>
         </div>

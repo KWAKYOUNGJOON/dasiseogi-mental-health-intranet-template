@@ -6,6 +6,7 @@ interface ConfirmDialogProps {
   description?: string
   confirmText?: string
   cancelText?: string
+  confirmVariant?: 'primary' | 'secondary' | 'danger'
   confirmDisabled?: boolean
   processing?: boolean
   onConfirm: () => void
@@ -19,6 +20,7 @@ export function ConfirmDialog({
   description,
   confirmText = '확인',
   cancelText = '취소',
+  confirmVariant = 'danger',
   confirmDisabled = false,
   processing = false,
   onConfirm,
@@ -28,6 +30,13 @@ export function ConfirmDialog({
   if (!open) {
     return null
   }
+
+  const confirmButtonClassName =
+    confirmVariant === 'primary'
+      ? 'primary-button'
+      : confirmVariant === 'secondary'
+        ? 'secondary-button'
+        : 'danger-button'
 
   return (
     <div className="dialog-backdrop" role="dialog" aria-modal="true">
@@ -41,7 +50,7 @@ export function ConfirmDialog({
           <button className="secondary-button" disabled={processing} onClick={onCancel}>
             {cancelText}
           </button>
-          <button className="danger-button" disabled={confirmDisabled || processing} onClick={onConfirm}>
+          <button className={confirmButtonClassName} disabled={confirmDisabled || processing} onClick={onConfirm}>
             {processing ? '처리 중...' : confirmText}
           </button>
         </div>

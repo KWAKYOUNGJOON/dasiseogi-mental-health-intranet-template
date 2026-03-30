@@ -17,23 +17,8 @@ export interface LoginResponse {
   sessionTimeoutMinutes: number
 }
 
-export interface CreateSignupRequestPayload {
-  name: string
-  loginId: string
-  password: string
-  phone?: string
-  positionName?: string
-  teamName?: string
-  requestMemo?: string
-}
-
 export async function login(loginId: string, password: string) {
   const response = await http.post<ApiResponse<LoginResponse>>('/auth/login', { loginId, password })
-  return response.data.data
-}
-
-export async function createSignupRequest(payload: CreateSignupRequestPayload) {
-  const response = await http.post<ApiResponse<{ requestId: number; userId: number; requestStatus: string }>>('/signup-requests', payload)
   return response.data.data
 }
 
