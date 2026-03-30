@@ -12,10 +12,10 @@ export function ScaleQuestionForm({
   return (
     <div className="stack">
       {scale.questions.map((question) => (
-        <div className="question-block" key={question.questionNo}>
-          <strong>
+        <fieldset className="question-block field" key={question.questionNo} style={{ margin: 0 }}>
+          <legend style={{ fontWeight: 700, padding: 0 }}>
             {question.questionNo}. {question.questionText}
-          </strong>
+          </legend>
           <div className="option-list">
             {question.options.map((option) => (
               <label className="option-item" key={option.value}>
@@ -24,12 +24,13 @@ export function ScaleQuestionForm({
                   name={`${scale.scaleCode}-${question.questionNo}`}
                   onChange={() => onSelect(question.questionNo, option.value)}
                   type="radio"
+                  value={option.value}
                 />
                 <span>{option.label}</span>
               </label>
             ))}
           </div>
-        </div>
+        </fieldset>
       ))}
     </div>
   )

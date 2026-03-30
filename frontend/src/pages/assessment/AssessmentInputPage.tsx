@@ -1,13 +1,26 @@
+import { isAxiosError } from 'axios'
 import { useEffect, useMemo, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { fetchScaleDetail, type ScaleDetail } from '../../features/assessment/api/assessmentApi'
+import { AssessmentProgressHeader } from '../../features/assessment/components/AssessmentProgressHeader'
 import { ScaleQuestionForm } from '../../features/assessment/components/ScaleQuestionForm'
 import { useAssessmentDraftStore } from '../../features/assessment/store/assessmentDraftStore'
 import { PageHeader } from '../../shared/components/PageHeader'
+import type { ApiResponse } from '../../shared/types/api'
+
+function getErrorMessage(error: unknown, fallbackMessage: string) {
+  if (!isAxiosError<ApiResponse<unknown>>(error)) {
+    return fallbackMessage
+  }
+
+  return error.response?.data?.message ?? fallbackMessage
+}
 
 export function AssessmentInputPage() {
   const { clientId } = useParams()
   const navigate = useNavigate()
+  const parsedClientId = Number(clientId)
+  const hasValidClientId = Number.isInteger(parsedClientId) && parsedClientId > 0
   const {
     clientId: draftClientId,
     selectedScaleCodes,
@@ -15,35 +28,101 @@ export function AssessmentInputPage() {
     answersByScale,
     setAnswer,
     nextScale,
+    previousScale,
   } = useAssessmentDraftStore()
   const [scale, setScale] = useState<ScaleDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const currentScaleCode = selectedScaleCodes[currentScaleIndex]
-  const currentAnswers = answersByScale[currentScaleCode] ?? {}
+  const currentAnswers = useMemo(
+    () => (currentScaleCode ? answersByScale[currentScaleCode] ?? {} : {}),
+    [answersByScale, currentScaleCode],
+  )
+  const hasValidDraft = hasValidClientId && draftClientId === parsedClientId && selectedScaleCodes.length > 0 && Boolean(currentScaleCode)
 
   useEffect(() => {
-    if (!currentScaleCode) return
-    void fetchScaleDetail(currentScaleCode).then(setScale)
-  }, [currentScaleCode])
+    if (!hasValidDraft || !currentScaleCode) return
 
-  const answeredCount = useMemo(() => Object.keys(currentAnswers).length, [currentAnswers])
+    let cancelled = false
 
-  if (!clientId || draftClientId !== Number(clientId) || !currentScaleCode) {
-    return <Navigate replace to={`/assessments/start/${clientId ?? ''}/scales`} />
+    async function loadScale() {
+      setScale(null)
+      setError(null)
+      try {
+        const data = await fetchScaleDetail(currentScaleCode)
+        if (cancelled) return
+        setScale(data)
+      } catch (requestError: unknown) {
+        if (cancelled) return
+        setError(getErrorMessage(requestError, '척도 정보를 불러오지 못했습니다.'))
+      }
+    }
+
+    void loadScale()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentScaleCode, hasValidDraft])
+
+  const answeredCount = useMemo(() => {
+    if (!scale) {
+      return 0
+    }
+
+    return scale.questions.filter((question) => Boolean(currentAnswers[question.questionNo])).length
+  }, [currentAnswers, scale])
+  const isFirstScale = currentScaleIndex === 0
+  const isLastScale = currentScaleIndex === selectedScaleCodes.length - 1
+  const canMoveNext = Boolean(scale) && answeredCount === (scale?.questionCount ?? 0)
+
+  if (!hasValidClientId) {
+    return (
+      <div className="stack">
+        <PageHeader description="선택한 척도를 순서대로 입력합니다." title="척도 입력" />
+        <div className="card stack">
+          <div className="error-text">대상자 정보를 확인할 수 없습니다.</div>
+          <div className="actions">
+            <Link className="secondary-button" to="/clients">
+              대상자 목록으로 이동
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  function handleContinue() {
-    if (!scale) return
-    if (answeredCount !== scale.questionCount) {
-      setError('모든 문항에 응답해야 다음 단계로 이동할 수 있습니다.')
+  if (!hasValidDraft || !currentScaleCode) {
+    return (
+      <div className="stack">
+        <PageHeader description="선택한 척도를 순서대로 입력합니다." title="척도 입력" />
+        <div className="card stack">
+          <div className="error-text">선택된 척도 정보가 없습니다. 척도 선택부터 다시 시작해주세요.</div>
+          <div className="actions">
+            <Link className="secondary-button" to={`/assessments/start/${parsedClientId}`}>
+              척도 선택으로 돌아가기
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function handlePrevious() {
+    if (isFirstScale) return
+    previousScale()
+  }
+
+  function handleNext() {
+    if (!scale || !canMoveNext) {
       return
     }
-    setError(null)
-    if (currentScaleIndex === selectedScaleCodes.length - 1) {
+
+    if (isLastScale) {
       navigate(`/assessments/start/${clientId}/summary`)
       return
     }
+
     nextScale()
   }
 
@@ -53,22 +132,28 @@ export function AssessmentInputPage() {
         description={`${currentScaleIndex + 1} / ${selectedScaleCodes.length} 단계`}
         title={scale ? `${scale.scaleName} 입력` : '척도 입력'}
       />
-      <div className="card">
-        <p className="muted">응답 완료: {answeredCount} / {scale?.questionCount ?? 0}</p>
-      </div>
+      <AssessmentProgressHeader currentScaleCode={currentScaleCode} scaleCodes={selectedScaleCodes} />
+      {error ? <div className="error-text">{error}</div> : null}
       {scale ? (
-        <ScaleQuestionForm
-          answers={currentAnswers}
-          onSelect={(questionNo, value) => setAnswer(currentScaleCode, questionNo, value)}
-          scale={scale}
-        />
-      ) : (
+        <>
+          <div className="card">
+            <p className="muted">응답 완료: {answeredCount} / {scale.questionCount}</p>
+          </div>
+          <ScaleQuestionForm
+            answers={currentAnswers}
+            onSelect={(questionNo, value) => setAnswer(currentScaleCode, questionNo, value)}
+            scale={scale}
+          />
+        </>
+      ) : error ? null : (
         <div>척도 정보를 불러오는 중...</div>
       )}
-      {error ? <div className="error-text">{error}</div> : null}
-      <div className="actions">
-        <button className="primary-button" onClick={handleContinue}>
-          {currentScaleIndex === selectedScaleCodes.length - 1 ? '요약으로 이동' : '다음 척도'}
+      <div className="actions" style={{ justifyContent: 'space-between' }}>
+        <button className="secondary-button" disabled={isFirstScale} onClick={handlePrevious}>
+          이전
+        </button>
+        <button className="primary-button" disabled={!canMoveNext} onClick={handleNext}>
+          다음
         </button>
       </div>
     </div>
