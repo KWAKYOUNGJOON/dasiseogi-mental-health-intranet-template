@@ -124,6 +124,30 @@ cd backend
   - [ ] 실패
 - 메모: 서버 계산/판정 기준, 세션 단위 저장, 삭제 대신 상태값 처리, 권한 분리 기준이 검증 환경에서 확인된 범위만 기록한다.
 
+### 3.5 Docker Compose 검증 결과
+
+- 검증 범위:
+  - [ ] `docker compose config`
+  - [ ] `docker compose ps`
+  - [ ] `docker compose logs backend --tail=100`
+  - [ ] `docker compose logs frontend --tail=100`
+  - [ ] `docker compose restart`
+  - [ ] 재시작 후 `docker compose ps`
+  - [ ] `http://127.0.0.1:8080/api/v1/health`
+  - [ ] `http://127.0.0.1:4173/api/v1/health`
+- `APP_DB_URL_DOCKER` 확인 결과: `미기록`
+- `schema.sql` 사전 적용 여부: `미기록`
+- 초기 관리자 계정 준비 방식: `미기록`
+- backend 상태: `미기록`
+- frontend 상태: `미기록`
+- 재시작 후 backend 상태: `미기록`
+- 재시작 후 frontend 상태: `미기록`
+- backend health 결과: `미기록`
+- frontend health 결과: `미기록`
+- 비고:
+  - `.env` 변경 후 단순 `docker compose restart` 만으로는 환경값이 다시 읽히지 않는다.
+  - `.env` 또는 이미지가 바뀐 경우 `docker compose up -d --force-recreate` 여부를 함께 기록한다.
+
 ---
 
 ## 4. 실제 운영 배포 결과
@@ -160,6 +184,20 @@ cd backend
 - `/api/v1/health` 재확인: `미실행`
 - 메모: 실제 운영 배포를 수행하지 않았다면 관련 항목은 `미실행` 또는 `미기록` 으로 유지한다. 실제 운영 배포를 수행했다면 운영 환경에서 확인한 결과만 기록한다.
 
+### 4.4 Docker 운영 체크 결과
+
+- `.env` 작성 및 보관 위치 확인: `미실행`
+- 외부 MariaDB 생성 확인: `미실행`
+- `schema.sql` 적용 확인: `미실행`
+- 초기 관리자 계정 준비 확인: `미실행`
+- `docker compose up -d` 실행 결과: `미실행`
+- `docker compose ps` 확인 결과: `미실행`
+- `docker compose restart` 확인 결과: `미실행`
+- 재부팅 후 재기동 확인 결과: `미실행`
+- 로그/임시파일/백업 host path 확인: `미실행`
+- 장애 시 1차 확인 명령 실행 여부: `미실행`
+- 메모: Docker 운영 배포를 수행했다면 host path, 재부팅 후 자동 재기동, health endpoint 재확인 결과까지 함께 적는다.
+
 ---
 
 ## 5. 롤백/중지 판단 결과
@@ -175,6 +213,6 @@ cd backend
 
 - 즉시 수정 필요 항목: `없음`
 - 차기 배포 전 보강 항목: `미기록`
-- 문서 업데이트 필요 항목: `실제 운영 배포 수행 시 실제 운영 배포 결과 갱신`
+- 문서 업데이트 필요 항목: `실제 운영 배포 수행 시 Docker 운영 체크 결과와 실제 운영 배포 결과 갱신`
 - 담당자: `미기록`
 - 완료 목표일: `미기록`

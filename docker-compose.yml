@@ -1,5 +1,6 @@
 services:
   backend:
+    restart: unless-stopped
     build:
       context: ./backend
     image: dasiseogi-backend:local
@@ -10,6 +11,10 @@ services:
       APP_DB_USERNAME: ${APP_DB_USERNAME:-}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:-}
       APP_DB_DRIVER: ${APP_DB_DRIVER:-}
+      APP_SESSION_TIMEOUT: ${APP_SESSION_TIMEOUT:-120m}
+      APP_FORWARD_HEADERS_STRATEGY: ${APP_FORWARD_HEADERS_STRATEGY:-none}
+      APP_TRUST_PROXY_HEADERS: ${APP_TRUST_PROXY_HEADERS:-false}
+      APP_DB_DUMP_COMMAND: ${APP_DB_DUMP_COMMAND:-}
       APP_LOG_FILE_PATH: /data/logs
       APP_EXPORT_TEMP_PATH: /data/tmp/exports
       APP_BACKUP_ROOT_PATH: /data/backups
@@ -33,6 +38,7 @@ services:
       - "8080:8080"
 
   frontend:
+    restart: unless-stopped
     build:
       context: ./frontend
     image: dasiseogi-frontend:local

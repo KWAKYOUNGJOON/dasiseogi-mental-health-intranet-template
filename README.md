@@ -48,33 +48,51 @@
 ## Docker Quick Start
 
 외부 MariaDB를 기준으로 Docker를 빠르게 실행하는 절차입니다.
+운영 투입 전 상세 절차는 `docs/18-docker-compose-deployment.md` 를 기준으로 본다.
+
+운영 Docker 첫 설치 전제:
+1. 외부 MariaDB 에 `backend/src/main/resources/schema.sql` 을 먼저 적용한다.
+2. 초기 관리자 계정 1건 이상을 준비한다.
+3. 루트 `.env` 를 만든 뒤 `docker compose config` 로 값이 실제로 풀렸는지 확인한다.
 
 ```powershell
 Copy-Item .env.docker.example .env
 ```
 
-루트 `.env` 에 아래 값을 직접 입력합니다. `.env` 는 커밋하지 않습니다.
+루트 `.env` 에 아래 값을 직접 입력한다. `.env` 는 커밋하지 않는다.
 
 ```dotenv
-APP_DB_URL=jdbc:mariadb://DB_HOST_PLACEHOLDER:3306/DB_NAME_PLACEHOLDER?useUnicode=true&characterEncoding=utf8
 APP_DB_URL_DOCKER=jdbc:mariadb://host.docker.internal:3306/DB_NAME_PLACEHOLDER?useUnicode=true&characterEncoding=utf8
 APP_DB_USERNAME=DB_USERNAME_PLACEHOLDER
 APP_DB_PASSWORD=DB_PASSWORD_PLACEHOLDER
+APP_DB_DRIVER=org.mariadb.jdbc.Driver
+APP_SESSION_TIMEOUT=120m
+APP_FORWARD_HEADERS_STRATEGY=none
+APP_TRUST_PROXY_HEADERS=false
+BACKEND_LOGS_HOST_PATH=./logs
+BACKEND_TMP_HOST_PATH=./tmp
+BACKEND_BACKUPS_HOST_PATH=./local-backups
 ```
 
-- `APP_DB_URL` 은 호스트에서 앱을 직접 실행할 때 참고하는 예시다.
 - `APP_DB_URL_DOCKER` 는 컨테이너에서 호스트 DB에 접속할 때 참고하는 예시다.
 - `host.docker.internal` 은 컨테이너에서 호스트 머신의 DB 주소를 참조하기 위한 이름이다.
+- `BACKEND_LOGS_HOST_PATH`, `BACKEND_TMP_HOST_PATH`, `BACKEND_BACKUPS_HOST_PATH` 는 호스트에서 로그/임시 export/백업 파일이 남는 위치다.
+- 현재 공식 backend Docker 이미지에는 `mariadb-dump` 가 기본 포함되지 않으므로, DB dump 는 DB 서버 또는 운영 호스트에서 별도 수행하거나 파생 이미지로 보완한다.
 
 ```powershell
-docker compose build
+docker compose config
 docker compose up -d
+docker compose ps
 ```
 
 확인 URL:
 - `http://127.0.0.1:8080/api/v1/health`
 - `http://127.0.0.1:4173/`
 - `http://127.0.0.1:4173/api/v1/health`
+
+주의:
+- `.env` 값을 바꾼 뒤에는 `docker compose restart` 가 아니라 `docker compose up -d --force-recreate` 로 다시 반영한다.
+- 현재 `docker-compose.yml` 은 `restart: unless-stopped` 기준이므로, Docker daemon 또는 서버 재부팅 뒤 자동 재기동을 기대할 수 있다.
 
 종료:
 
@@ -298,3 +316,4 @@ snapshot ZIP 포함 항목:
 - 배포 직전 실행 문서: [`docs/13-pre-deploy-runbook.md`](./docs/13-pre-deploy-runbook.md)
 - 배포 결과 기록 양식: [`docs/14-deploy-result-template.md`](./docs/14-deploy-result-template.md)
 - Go-live 체크리스트: [`docs/15-go-live-checklist.md`](./docs/15-go-live-checklist.md)
+- Docker Compose 운영 배포 마무리 체크: [`docs/18-docker-compose-deployment.md`](./docs/18-docker-compose-deployment.md)
