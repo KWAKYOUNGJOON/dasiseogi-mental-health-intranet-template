@@ -2,95 +2,107 @@
 
 ## 1. 목적
 
-- 이 문서는 `backend/src/main/resources/application-prod.yml`, `docs/11-deployment.md`, `docs/12-release-readiness.md`, `docs/13-pre-deploy-runbook.md` 를 대조해 실제 운영 전에 반드시 채워야 하는 값만 추린 체크리스트다.
-- 이 문서는 실제 운영값, 담당자, 확인 방법 템플릿만 관리한다.
-- 실제 실행 순서, 스모크 테스트, 통과 여부 판정은 [docs/15-go-live-checklist.md](./15-go-live-checklist.md) 를 기준으로 본다.
-- 범위는 `운영값 확정` 이며 Docker, `docker-compose`, 실제 배포 실행, 운영 서버 접속은 포함하지 않는다.
-- 아직 모르는 값은 추측하지 않고 `미정`, `운영팀 입력`, `현장 확인 필요` 로 남긴다.
+- 이 문서는 실제 운영 반영 전에 반드시 확보해야 하는 입력값과 담당자만 정리하는 저장소 기준 체크리스트다.
+- 실제 배포 실행, 실제 DB 적용, 실제 로그인 확인 결과는 이 문서에 기록하지 않는다.
+- 실제 운영 반영 절차는 [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md), 최초 관리자 준비는 [docs/19-production-bootstrap.md](./19-production-bootstrap.md) 를 기준으로 본다.
+- 실제 값 입력은 이 문서 원본이 아니라 [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 를 복사한 로컬 작업본 또는 내부 운영 문서에서 진행한다.
 
 ---
 
-## 2. 사용 원칙
+## 2. 작성 원칙
 
-- 실제 비밀값은 Git 문서에 직접 확정 기록하지 말고, 환경 변수 또는 운영 전용 별도 보관 위치를 기준으로 관리한다.
-- `현재 상태` 는 현재 저장소 문서와 템플릿 기준 상태를 적는다.
-- `운영 시 입력할 값` 은 실제 운영 준비 시점에만 채운다.
-- `실제 값 입력 담당자`, `확인 담당자`, `확인 일시` 는 항목별로 남긴다.
-- 이 문서에는 배포 실행 순서를 다시 적지 않고, 값 입력 완료 여부와 확인 책임만 남긴다.
+- 저장소 원본에는 실제 비밀번호, 실제 운영 계정명, 실제 운영 서버 주소를 적지 않는다.
+- 실제 비밀값은 운영 비밀 저장소, 사내 암호 금고, 보안 티켓 등 저장소 밖 위치에만 기록한다.
+- 실제 운영 `.env` 는 대상 서버 작업본으로만 만들고 커밋하지 않는다.
+- `scripts/sql/initial-admin-promote.template.sql` 도 원본 그대로 유지하고, 실제 값은 복사한 로컬 작업본에만 넣는다.
+- 아직 확보되지 않은 값은 추측하지 않고 `미정` 으로 둔다.
+- `완료 확인` 은 아래 3가지가 모두 정해졌을 때만 체크한다.
+  - 누가 제공하는지
+  - 어디에 기록하는지
+  - 누가 검수하는지
 
 ---
 
-## 3. 공통 기록란
+## 3. 기록 위치 기준
 
-| 항목 | 값 |
+| 구분 | 기록 원칙 | 예시 |
+|---|---|---|
+| 실제 비밀값 | 저장소 밖 보안 저장소에만 기록 | DB 비밀번호, 초기 관리자 임시 비밀번호 |
+| 실제 운영 주소/계정/담당자 | 저장소 밖 로컬 작업본 또는 내부 운영 문서에 기록 | [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 복사본, 내부 위키, 운영 티켓 |
+| 실제 런타임 환경값 | 대상 서버 작업본에만 기록 | 루트 `.env`, Windows Service/NSSM/WinSW 환경변수 |
+| 초기 관리자 승격 SQL | 템플릿을 복사한 로컬 작업본에만 기록 | `initial-admin-promote.sql` 로컬 사본 |
+| 실제 반영 결과 | 실제 운영 반영 후 결과 문서에만 기록 | `docs/deploy-results/YYYY-MM-DD.md` |
+
+---
+
+## 4. 공통 메타데이터
+
+| 항목 | 현재 값 |
 |---|---|
-| 대상 환경 | 미정 |
-| 실제 값 입력 담당자 | 미정 |
-| 확인 담당자 | 미정 |
-| 확인 일시 | 미정 |
-| 비고 | 미정 |
+| 대상 환경 이름 | 미정 |
+| 운영 입력값 수집 담당자 | 미정 |
+| 실제 운영 반영 담당자 | 미정 |
+| 실제 운영 검수자 | 미정 |
+| 입력값 최종 검토 일시 | 미정 |
+| 입력값 작업본 위치 | 미정 |
 
 ---
 
-## 4. 운영값 체크리스트
+## 5. 운영 입력값 작성형 체크리스트
 
-### 4.1 DB 접속 및 드라이버
-
-| 설정 키 | 설명 | 현재 상태 | 운영 시 입력할 값 | 확인 방법 | 실제 값 입력 담당자 | 확인 담당자 | 확인 일시 |
+| 분류 | 값 이름 | 연결 설정 또는 기준 문서 | 설명 | 누가 제공해야 하는지 | 어디에 기록할지 | 필수 여부 | 완료 확인 |
 |---|---|---|---|---|---|---|---|
-| `APP_DB_URL` | 운영 DB JDBC URL. 운영 DB host, port, DB명, 문자셋/타임존 일관성 확인 대상이다. | `jdbc:mariadb://DB_HOST_PLACEHOLDER:3306/DB_NAME_PLACEHOLDER` placeholder 상태 | 미정, 운영팀 입력 | `application-prod.yml` 또는 운영 환경 변수에 실제 값 반영 후 `/api/v1/health` 의 `dbStatus=UP` 확인, 배포 전 백업 명령 대상 DB 와 일치하는지 대조 | 미정 | 미정 | 미정 |
-| `APP_DB_USERNAME` | 운영 앱 전용 DB 계정. root 직접 사용 금지 원칙 점검 대상이다. | `DB_USERNAME_PLACEHOLDER` placeholder 상태 | 미정, 운영팀 입력 | 운영 DB 계정으로 앱 기동과 수동 백업 사전 점검 수행, 최소 권한 계정인지 확인 | 미정 | 미정 | 미정 |
-| `APP_DB_PASSWORD` | 운영 앱 전용 DB 계정 비밀번호. 문서에는 직접 값 대신 보관 위치만 남긴다. | `DB_PASSWORD_PLACEHOLDER` placeholder 상태 | 미정, 운영팀 입력 | 실제 값은 외부 비밀값 저장 위치에만 반영, 앱 기동과 수동 백업 점검으로 간접 확인 | 미정 | 미정 | 미정 |
-| `APP_DB_DRIVER` | 운영 DB 계열과 일치하는 JDBC 드라이버 클래스명. 기본 템플릿은 MariaDB 기준이다. | 기본값 `org.mariadb.jdbc.Driver` | 미정, 운영 DB 계열 기준 확인 필요 | 운영 DB 계열 결정 후 실제 URL 과 함께 기동 확인, `/api/v1/health` 와 기동 로그에서 datasource 오류 없음 확인 | 미정 | 미정 | 미정 |
-
-### 4.2 서버, 세션, 쿠키, 프록시
-
-| 설정 키 | 설명 | 현재 상태 | 운영 시 입력할 값 | 확인 방법 | 실제 값 입력 담당자 | 확인 담당자 | 확인 일시 |
-|---|---|---|---|---|---|---|---|
-| `APP_SERVER_PORT` | 운영 backend 실제 포트. health check URL, 프록시 upstream, 접근 통제 기준과 같이 맞춰야 한다. | 기본값 `8080` | 미정, 운영팀 입력 | 프록시 upstream 또는 직접 접속 포트와 일치하는지 확인, `scripts\health-check.bat` 대상 URL 재대조 | 미정 | 미정 | 미정 |
-| `APP_SESSION_TIMEOUT` | 세션 기반 인증 유지 시간. 운영 업무 시간과 보안 정책을 함께 고려해야 한다. | 기본값 `120m` | 미정, 운영팀 입력 | 운영 정책 결정 후 로그인 유지 시간 점검, 세션 만료 후 재로그인 흐름 확인 | 미정 | 미정 | 미정 |
-| `APP_FORWARD_HEADERS_STRATEGY` | reverse proxy 사용 시 전달 헤더 해석 방식. proxy 미사용이면 기본값 유지 대상이다. | 기본값 `none`, 구체 운영값 미정 | 미정, 현장 프록시 구성 기준 입력 | reverse proxy 사용 여부 확인 후 실제 프록시 전달 헤더와 맞춰 설정, 로그인 후 redirect URL 과 활동 로그 IP 기록 이상 여부 확인 | 미정 | 미정 | 미정 |
-| `APP_TRUST_PROXY_HEADERS` | `X-Forwarded-*` 같은 proxy header 신뢰 여부. 잘못 켜면 spoofed IP 기록 위험이 있다. | 기본값 `false` | 미정. 신뢰 가능한 내부 reverse proxy 뒤면 `true` 검토, 아니면 `false` 유지 | reverse proxy 존재 여부 확인, 활동 로그 IP 가 기대값과 일치하는지 확인, 직접 노출 환경이면 `false` 유지 | 미정 | 미정 | 미정 |
-| `세션 쿠키 전달 정책(프록시/웹서버)` | 세션/쿠키 기반 인증이 프록시나 웹서버 설정 때문에 깨지지 않도록 쿠키 전달, 재작성, 보안 속성을 점검한다. `application-prod.yml` 에 별도 키는 없고 현장 설정 확인 항목이다. | 문서상 세션/쿠키 기반 흐름 유지 원칙만 존재, 실제 현장 쿠키 처리 방식 미정 | 미정, 운영팀 입력 | 브라우저 로그인 후 `Set-Cookie` 확인, 페이지 이동/새로고침 후 세션 유지 여부 확인, 프록시가 쿠키를 제거하거나 잘못 재작성하지 않는지 확인 | 미정 | 미정 | 미정 |
-
-### 4.3 로그, 백업, 임시 경로
-
-| 설정 키 | 설명 | 현재 상태 | 운영 시 입력할 값 | 확인 방법 | 실제 값 입력 담당자 | 확인 담당자 | 확인 일시 |
-|---|---|---|---|---|---|---|---|
-| `APP_LOG_FILE_PATH` | 애플리케이션 로그 저장 경로. 권장 기준은 `<app-home>/logs/application` 이다. | `LOG_PATH_PLACEHOLDER` placeholder 상태 | 미정, 운영팀 입력 | 대상 경로 존재 여부와 쓰기 권한 확인, 앱 기동 후 로그 파일 생성 여부 확인 | 미정 | 미정 | 미정 |
-| `프록시/웹서버 access log 경로` | 접근 로그를 앱 로그와 분리할 경우 기록 위치. 문서 권장 구조는 `<app-home>/logs/access` 이다. 애플리케이션 설정 키가 아니라 운영 경로 결정 항목이다. | 문서 권장 경로만 존재, 실제 운영 경로 미정 | 미정, 운영팀 입력 | 프록시 또는 웹서버 운영 표준 경로 확인, 앱 로그 경로와 분리되는지 확인 | 미정 | 미정 | 미정 |
-| `APP_BACKUP_ROOT_PATH` | 백업 루트 경로. 문서 권장 구조는 `<app-home>/backups` 이고 하위에 `db`, `app-config`, `release` 를 둔다. | `BACKUP_ROOT_PATH_PLACEHOLDER` placeholder 상태 | 미정, 운영팀 입력 | 대상 경로 존재 여부와 쓰기 권한 확인, 배포 전 `scripts\run-backup.bat` 또는 관리자 수동 백업 전 대조 | 미정 | 미정 | 미정 |
-| `APP_DB_DUMP_COMMAND` 또는 `APP_BACKUP_DB_DUMP_COMMAND` | DB dump 실행 명령 또는 절대 경로. PATH 에 `mariadb-dump` 또는 `mysqldump` 가 없으면 명시가 필요하다. | 기본 fallback `mariadb-dump`, 실제 운영 경로 미정 | 미정, 운영팀 입력 | 운영 서버에서 명령 실행 가능 여부 확인, 수동 백업 preflight 또는 `scripts\run-backup.bat` 로 실제 탐지 여부 확인 | 미정 | 미정 | 미정 |
-| `APP_EXPORT_TEMP_PATH` | CSV export 임시 파일 경로. writable 경로여야 한다. | 기본값 `./tmp/exports` | 미정, 운영팀 입력 | 대상 경로 존재 여부와 쓰기 권한 확인, 관리자 CSV export 실행 시 파일 생성/다운로드 정상 여부 확인 | 미정 | 미정 | 미정 |
-
-### 4.4 Health 노출, 관리자 준비, 척도 로딩
-
-| 설정 키 | 설명 | 현재 상태 | 운영 시 입력할 값 | 확인 방법 | 실제 값 입력 담당자 | 확인 담당자 | 확인 일시 |
-|---|---|---|---|---|---|---|---|
-| `/api/v1/health` 노출 범위 | health endpoint 는 인증 없이 노출되므로 내부망 또는 허용된 운영 점검 경로로만 열어야 한다. | 문서상 내부망 또는 프록시 ACL 제한 필요, 실제 허용 범위 미정 | 미정, 운영팀 입력 | 허용해야 하는 IP 대역 또는 운영 점검 주체만 정리, 비허용 구간에서 접근 차단되는지 확인 | 미정 | 미정 | 미정 |
-| `/api/v1/health` 프록시/방화벽 ACL | reverse proxy, 웹서버, 방화벽 중 어디에서 차단할지 결정해야 한다. | 결정 기준만 존재, 실제 ACL 위치 미정 | 미정, 운영팀 입력 | 프록시 설정 또는 ACL 문서 기준으로 허용/차단 규칙 확인, 운영 점검 경로 외 차단 테스트 수행 | 미정 | 미정 | 미정 |
-| `초기 관리자 계정 준비` | `app.seed.enabled` 가 `false` 이므로 운영 시작 전 별도 관리자 계정 준비가 필요하다. | 문서상 관리자 계정 준비 필요만 명시, 실제 계정/전달 방식 미정 | 미정, 운영팀 입력 | 초기 관리자 로그인 후 승인 대기, 사용자 관리, 로그, 백업 메뉴 접근 가능 여부 확인 | 미정 | 미정 | 미정 |
-| `가입 승인 절차 / 최초 승인 담당자` | 1인 1계정, 가입 신청 후 관리자 승인 구조이므로 최초 승인 가능 주체와 대체 담당자를 미리 정해야 한다. | 문서상 승인 기능 존재, 실제 운영 담당자와 절차 미정 | 미정, 운영팀 입력 | 일반 사용자 1건 신청 후 관리자 승인 또는 반려 1회 테스트, 담당자 부재 시 대체 승인자 있는지 확인 | 미정 | 미정 | 미정 |
-| `APP_SCALE_RESOURCE_PATH` | 척도 JSON 로딩 경로. 기본은 `classpath:scales`, 배포 문서는 외부 filesystem 경로 사용을 권장한다. | 기본값 `classpath:scales`, 실제 운영 경로 미정 | 미정, 운영팀 입력 | 실제 경로에 운영 척도 JSON 세트가 존재하는지 확인, 앱 기동 후 scale registry 로딩 성공 로그 확인 | 미정 | 미정 | 미정 |
-| `운영 척도 JSON 세트` | 운영에 사용할 척도 JSON 확정본과 배치 위치. 문서 기준 대상은 8종 척도 세트다. | 문서상 파일 목록만 존재, 실제 운영 배치본 확정 여부 미기재 | 미정, 운영팀 입력 | 운영 배치본 파일 목록과 백업 위치 확인, 변경 이력과 함께 보관되는지 확인 | 미정 | 미정 | 미정 |
-| `scale registry 로딩 확인` | health 응답과 기동 로그에서 척도 로딩 상태를 확인한다. 문서 기준 기대값은 `loadedScaleCount=8` 이다. | 확인 절차만 존재, 실제 운영 결과 미확인 | 미정 아님, 운영 반영 후 결과 확인 필요 | `/api/v1/health` 에서 `scaleRegistryStatus=UP`, `loadedScaleCount=8` 확인, 척도 상세 API 또는 샘플 세션 저장으로 추가 확인 | 미정 | 미정 | 미정 |
+| 운영 접근 | 실제 운영 호스트 | [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md) | 앱이 실제로 올라갈 대상 서버 호스트명 또는 내부 IP | 인프라 담당자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| 운영 접근 | 실제 운영 URL | [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md) | 사회복지사 사용자가 접속할 실제 운영 URL | 인프라 담당자 또는 웹서버 담당자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| 운영 접근 | backend 직접 확인 주소 또는 포트 | `APP_SERVER_PORT`, `/api/v1/health` | health 확인, reverse proxy upstream 확인에 사용할 backend 포트 또는 직접 접속 URL | 인프라 담당자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| 운영 접근 | reverse proxy 사용 여부 | `APP_FORWARD_HEADERS_STRATEGY`, `APP_TRUST_PROXY_HEADERS` | proxy 뒤 운영인지, 앱이 직접 노출되는지 여부 | 인프라 담당자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| 운영 접근 | health endpoint 허용 범위 | [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md), [docs/15-go-live-checklist.md](./15-go-live-checklist.md) | `/api/v1/health` 를 누가 어디서 호출할 수 있는지와 ACL 적용 위치 | 인프라 담당자 또는 보안 담당자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| DB | 실제 운영 DB host | `APP_DB_URL_DOCKER`, `APP_DB_URL` | 실제 운영 DB 서버 주소 | DB 관리자 | 로컬 작업본, 비밀 저장소 참조 문서 | 필수 | [ ] |
+| DB | 실제 운영 DB port | `APP_DB_URL_DOCKER`, `APP_DB_URL` | 실제 운영 DB 포트 | DB 관리자 | 로컬 작업본, 비밀 저장소 참조 문서 | 필수 | [ ] |
+| DB | 실제 운영 DB name | `APP_DB_URL_DOCKER`, `APP_DB_URL` | 실제 운영 DB 이름 | DB 관리자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| DB | 실제 운영 DB 관리자 계정 | [docs/19-production-bootstrap.md](./19-production-bootstrap.md) | `schema.sql` 적용과 초기 관리자 승격 SQL 실행에 사용할 관리자 계정 | DB 관리자 | 비밀 저장소, 로컬 작업본 참조란 | 필수 | [ ] |
+| DB | 실제 운영 앱 DB 계정 | `APP_DB_USERNAME` | backend 런타임이 사용할 앱 전용 DB 계정 | DB 관리자 | 비밀 저장소, 루트 `.env` 작업본 | 필수 | [ ] |
+| DB | 실제 운영 앱 DB 비밀번호 보관 위치 | `APP_DB_PASSWORD` | 비밀번호 자체가 아니라 어디에 저장했는지와 누가 관리하는지 | DB 관리자 또는 비밀 관리 담당자 | 비밀 저장소, 로컬 작업본 참조란 | 필수 | [ ] |
+| DB | DB 계열과 JDBC 드라이버 확정 | `APP_DB_DRIVER` | 기본은 MariaDB 이지만 실제 운영 DB 계열과 일치해야 한다 | DB 관리자 | 로컬 작업본, 루트 `.env` 작업본 | 필수 | [ ] |
+| 런타임 | 실제 운영 `.env` 작성 위치 | `.env.docker.example` | 루트 `.env` 를 어느 서버 경로에서 만들지 | 실제 운영 반영 담당자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| 런타임 | 실제 운영 `.env` 관리 방식 | `.env.docker.example`, [docs/examples/production-runtime.env.example](./examples/production-runtime.env.example) | Docker Compose 루트 `.env` 인지, Windows Service 환경변수인지, 비밀값 변경 시 누가 갱신하는지 | 실제 운영 반영 담당자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| 런타임 | 로그 경로 | `BACKEND_LOGS_HOST_PATH`, `APP_LOG_FILE_PATH` | backend 파일 로그가 남을 실제 경로 | 인프라 담당자 | 루트 `.env` 작업본 또는 서비스 환경설정 | 필수 | [ ] |
+| 런타임 | export 임시 경로 | `BACKEND_TMP_HOST_PATH`, `APP_EXPORT_TEMP_PATH` | CSV export 임시 파일이 생성될 실제 writable 경로 | 인프라 담당자 | 루트 `.env` 작업본 또는 서비스 환경설정 | 필수 | [ ] |
+| 런타임 | 백업 루트 경로 | `BACKEND_BACKUPS_HOST_PATH`, `APP_BACKUP_ROOT_PATH` | 백업 파일이 생성될 실제 경로 | 인프라 담당자 | 루트 `.env` 작업본 또는 서비스 환경설정 | 필수 | [ ] |
+| 런타임 | 척도 JSON 경로 또는 배치 방식 | `APP_SCALE_RESOURCE_PATH` | `classpath:scales` 유지인지, 외부 filesystem 경로인지 | 애플리케이션 운영 담당자 | 로컬 작업본, 서비스 환경설정 | 필수 | [ ] |
+| 런타임 | `APP_FORWARD_HEADERS_STRATEGY` 결정값 | `APP_FORWARD_HEADERS_STRATEGY` | reverse proxy 구조에 맞는 전달 헤더 전략 | 인프라 담당자 | 루트 `.env` 작업본 또는 서비스 환경설정 | 필수 | [ ] |
+| 런타임 | `APP_TRUST_PROXY_HEADERS` 결정값 | `APP_TRUST_PROXY_HEADERS` | 신뢰 가능한 proxy 뒤면 `true`, 아니면 `false` | 인프라 담당자 | 루트 `.env` 작업본 또는 서비스 환경설정 | 필수 | [ ] |
+| DB 적용 도구 | `mysql` CLI 또는 동등 수단 | [docs/19-production-bootstrap.md](./19-production-bootstrap.md) | `schema.sql`, 초기 관리자 승격 SQL 을 실제로 적용할 수단 | DB 관리자 또는 실제 운영 반영 담당자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| DB 적용 도구 | DB 적용 실행 위치 | [docs/19-production-bootstrap.md](./19-production-bootstrap.md) | DB 서버, 운영 서버, DBA 점프 서버, 관리 콘솔 등 실제 적용 위치 | DB 관리자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| 초기 관리자 | 초기 관리자 준비 방식 확정 | [docs/19-production-bootstrap.md](./19-production-bootstrap.md), `scripts/sql/initial-admin-promote.template.sql` | `회원가입 신청 -> DB 수동 승격 -> 최초 로그인 확인` 절차를 그대로 쓸지 확인 | 서비스 운영 책임자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| 초기 관리자 | 초기 관리자 회원가입 신청 수행자 | [docs/19-production-bootstrap.md](./19-production-bootstrap.md) | 최초 1회 회원가입 신청을 누가 생성할지 | 서비스 운영 책임자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| 초기 관리자 | 초기 관리자 승격 SQL 실행자 | `scripts/sql/initial-admin-promote.template.sql` | 복사한 로컬 SQL 작업본에 실제 값을 넣고 실행할 담당자 | DB 관리자 또는 실제 운영 반영 담당자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| 초기 관리자 | 초기 관리자 로그인 검수자 | [docs/19-production-bootstrap.md](./19-production-bootstrap.md) | 최초 로그인과 관리자 메뉴 노출을 최종 확인할 사람 | 실제 운영 검수자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| 책임 | 실제 운영 반영 담당자 | [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md) | `docker compose`, `.env`, 서버 반영을 실제로 수행할 담당자 | 서비스 운영 책임자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
+| 책임 | 실제 운영 검수자 | [docs/15-go-live-checklist.md](./15-go-live-checklist.md) | 반영 후 URL, 로그인, health, 관리자 기능을 검수할 담당자 | 서비스 운영 책임자 | 로컬 작업본, 내부 운영 문서 | 필수 | [ ] |
 
 ---
 
-## 5. 값 입력 완료 확인
+## 6. 마감 체크
 
-- 아래 항목은 4장 표가 채워졌는지 보는 마감 체크다. 실제 실행 순서와 통과 여부 체크는 [docs/15-go-live-checklist.md](./15-go-live-checklist.md) 를 따른다.
-- [ ] `DB 접속 정보`, `로그 경로`, `백업 경로`, `dump command`, `scale 경로` 의 placeholder 제거 여부와 담당자 기입이 완료되었다.
-- [ ] `APP_TRUST_PROXY_HEADERS`, `APP_FORWARD_HEADERS_STRATEGY`, `health ACL` 의 실제 입력값과 결정 근거가 문서 또는 운영 설정에 남아 있다.
-- [ ] 초기 관리자 계정 준비와 가입 승인 절차 담당자 기록이 완료되었다.
-- [ ] `/api/v1/health` 접근 허용 범위와 ACL 적용 위치 기록이 완료되었다.
-- [ ] `loadedScaleCount=8` 확인 방법, 수행 시점, 담당자 기록이 완료되었다.
+- [ ] 5장 표에서 필수 항목의 `완료 확인` 이 모두 체크되었다.
+- [ ] 실제 운영 `.env` 작성 위치와 관리 방식이 결정되었다.
+- [ ] 실제 운영 DB host/port/name, DB 관리자 계정, 앱 계정의 제공 주체가 정해졌다.
+- [ ] `mysql` CLI 또는 동등한 DB 적용 수단과 실행 위치가 정해졌다.
+- [ ] 초기 관리자 준비 방식과 수행자, 검수자가 정해졌다.
+- [ ] 실제 운영 반영 담당자와 실제 운영 검수자가 정해졌다.
+
+위 6개가 모두 충족되면 이번 단계의 판정은 `운영 입력값 수집 패키지 정리 완료` 다.
+단, 실제 운영 반영과 실제 운영 로그인 확인은 아직 미실행 상태로 남는다.
 
 ---
 
-## 6. 근거 문서
+## 7. 관련 문서
 
-- [backend/src/main/resources/application-prod.yml](../backend/src/main/resources/application-prod.yml)
-- [docs/11-deployment.md](./11-deployment.md)
-- [docs/12-release-readiness.md](./12-release-readiness.md)
-- [docs/13-pre-deploy-runbook.md](./13-pre-deploy-runbook.md)
+- [docs/15-go-live-checklist.md](./15-go-live-checklist.md)
+- [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md)
+- [docs/19-production-bootstrap.md](./19-production-bootstrap.md)
+- [docs/20-production-input-sheet.md](./20-production-input-sheet.md)
+- [.env.docker.example](../.env.docker.example)
+- [docs/examples/production-runtime.env.example](./examples/production-runtime.env.example)
+- [scripts/sql/initial-admin-promote.template.sql](../scripts/sql/initial-admin-promote.template.sql)
