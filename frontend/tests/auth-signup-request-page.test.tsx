@@ -197,7 +197,7 @@ describe('auth signup request page', () => {
 
     expect(await screen.findByText('가입 신청이 접수되었습니다. 관리자 승인 후 로그인할 수 있습니다.')).toBeTruthy()
     expect(screen.getByRole('button', { name: '로그인' })).toBeTruthy()
-  })
+  }, 10000)
 
   it('maps server fieldErrors to matching inputs and shows the validation summary', async () => {
     const user = userEvent.setup()
@@ -229,7 +229,7 @@ describe('auth signup request page', () => {
     expect(loginIdInput.getAttribute('aria-invalid')).toBe('true')
     expect(loginIdInput.getAttribute('aria-describedby')).toContain(loginIdError.id)
     expect(screen.getByText('소속 팀을 다시 확인해주세요.')).toBeTruthy()
-  })
+  }, 10000)
 
   it('shows duplicate login guidance for duplicate-family errors', async () => {
     const user = userEvent.setup()

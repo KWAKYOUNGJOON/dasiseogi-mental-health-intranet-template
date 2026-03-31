@@ -10,6 +10,7 @@ import type { ApiResponse } from '../src/shared/types/api'
 interface MockAuthValue {
   user: AuthUser | null
   initialized: boolean
+  status?: 'loading' | 'authenticated' | 'unauthenticated' | 'auth-check-error'
   login: (loginId: string, password: string) => Promise<void>
   logout: () => Promise<void>
   refresh: () => Promise<void>
@@ -61,6 +62,7 @@ function createGuestAuthValue(overrides?: Partial<MockAuthValue>): MockAuthValue
   return {
     user: null,
     initialized: true,
+    status: 'unauthenticated',
     login: mockLogin,
     logout: mockLogout,
     refresh: mockRefresh,
@@ -130,6 +132,23 @@ describe('auth login page', () => {
     renderLoginPage(['/login?notice=signup-requested'])
 
     expect(screen.getByText('가입 신청이 접수되었습니다. 관리자 승인 후 로그인할 수 있습니다.')).toBeTruthy()
+  })
+
+  it('keeps the session-expired notice separate from login failure messages', async () => {
+    const user = userEvent.setup()
+
+    mockLogin.mockRejectedValue(new Error('network'))
+
+    renderLoginPage(['/login?notice=session-expired'])
+
+    expect(screen.getByText('세션이 만료되었습니다. 다시 로그인해주세요.')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toBe('로그인에 실패했습니다.')
+    })
+    expect(screen.getByText('세션이 만료되었습니다. 다시 로그인해주세요.')).toBeTruthy()
   })
 
   it('blocks login requests and shows required field errors when inputs are empty', async () => {

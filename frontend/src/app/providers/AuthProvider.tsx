@@ -7,11 +7,22 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { fetchMe, login as loginApi, logout as logoutApi, type AuthUser } from '../../features/auth/api/authApi'
+import { SESSION_EXPIRED_NOTICE } from '../../features/auth/api/loginApi'
+import { fetchMeOrNull, login as loginApi, logout as logoutApi, type AuthUser } from '../../features/auth/api/authApi'
+import {
+  beginAuthenticatedSession,
+  endAuthenticatedSession,
+  subscribeToSessionExpiration,
+} from '../../shared/api/interceptors'
+
+export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'auth-check-error'
+export type AuthRedirectNotice = typeof SESSION_EXPIRED_NOTICE
 
 interface AuthContextValue {
+  authNotice: AuthRedirectNotice | null
   user: AuthUser | null
   initialized: boolean
+  status: AuthStatus
   login: (loginId: string, password: string) => Promise<void>
   logout: () => Promise<void>
   refresh: () => Promise<void>
@@ -21,37 +32,65 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [initialized, setInitialized] = useState(false)
+  const [status, setStatus] = useState<AuthStatus>('loading')
+  const [authNotice, setAuthNotice] = useState<AuthRedirectNotice | null>(null)
+  const initialized = status !== 'loading'
+
+  const applyAuthState = useCallback((nextUser: AuthUser | null) => {
+    setUser(nextUser)
+    setStatus(nextUser ? 'authenticated' : 'unauthenticated')
+    setAuthNotice(null)
+
+    if (nextUser) {
+      beginAuthenticatedSession()
+      return
+    }
+
+    endAuthenticatedSession()
+  }, [])
+
+  const applyAuthCheckError = useCallback(() => {
+    setStatus('auth-check-error')
+    setAuthNotice(null)
+    endAuthenticatedSession()
+  }, [])
 
   const refresh = useCallback(async () => {
     try {
-      const me = await fetchMe()
-      setUser(me)
+      const me = await fetchMeOrNull()
+      applyAuthState(me)
     } catch {
-      setUser(null)
-    } finally {
-      setInitialized(true)
+      applyAuthCheckError()
     }
-  }, [])
+  }, [applyAuthCheckError, applyAuthState])
 
   useEffect(() => {
+    endAuthenticatedSession()
     void refresh()
   }, [refresh])
 
+  const applySessionExpired = useCallback(() => {
+    setUser(null)
+    setStatus('unauthenticated')
+    setAuthNotice(SESSION_EXPIRED_NOTICE)
+    endAuthenticatedSession()
+  }, [])
+
+  useEffect(() => subscribeToSessionExpiration(applySessionExpired), [applySessionExpired])
+
   const login = useCallback(async (loginId: string, password: string) => {
     const response = await loginApi(loginId, password)
-    setUser(response.user)
-    setInitialized(true)
-  }, [])
+    applyAuthState(response.user)
+  }, [applyAuthState])
 
   const logout = useCallback(async () => {
     await logoutApi()
-    setUser(null)
-  }, [])
+    applyAuthState(null)
+  }, [applyAuthState])
 
   const value = useMemo(
-    () => ({ user, initialized, login, logout, refresh }),
-    [initialized, login, logout, refresh, user],
+    () => ({ authNotice, user, initialized, status, login, logout, refresh }),
+    [authNotice, initialized, login, logout, refresh, status, user],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

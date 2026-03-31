@@ -1,5 +1,5 @@
-import type { ReactElement } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { useState, type ReactElement } from 'react'
+import { Navigate, Route, Routes, type To } from 'react-router-dom'
 import { AssessmentInputPage } from '../../pages/assessment/AssessmentInputPage'
 import { AssessmentRecordListPage } from '../../pages/assessment/AssessmentRecordListPage'
 import { AssessmentSessionPrintPage } from '../../pages/assessment/AssessmentSessionPrintPage'
@@ -18,40 +18,103 @@ import { ClientEditPage } from '../../pages/clients/ClientEditPage'
 import { ClientListPage } from '../../pages/clients/ClientListPage'
 import { StatisticsPage } from '../../pages/statistics/StatisticsPage'
 import { AppLayout } from '../layouts/AppLayout'
-import { useAuth } from '../providers/AuthProvider'
+import { useAuth, type AuthRedirectNotice } from '../providers/AuthProvider'
+
+const AUTH_CHECK_ERROR_MESSAGE = '처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+
+function getLoginRedirect(authNotice: AuthRedirectNotice | null): To {
+  if (!authNotice) {
+    return '/login'
+  }
+
+  return {
+    pathname: '/login',
+    search: `?notice=${authNotice}`,
+  }
+}
+
+function AuthLoadingScreen() {
+  return <div className="center-screen">초기화 중...</div>
+}
+
+function AuthCheckErrorScreen() {
+  const { refresh } = useAuth()
+  const [retrying, setRetrying] = useState(false)
+
+  async function handleRetry() {
+    if (retrying) {
+      return
+    }
+
+    setRetrying(true)
+
+    try {
+      await refresh()
+    } finally {
+      setRetrying(false)
+    }
+  }
+
+  return (
+    <main className="center-screen">
+      <section className="card login-card stack">
+        <div>
+          <h1 style={{ marginBottom: 8 }}>인증 확인 실패</h1>
+          <p className="error-text" role="alert">
+            {AUTH_CHECK_ERROR_MESSAGE}
+          </p>
+        </div>
+        <div className="actions">
+          <button className="secondary-button" disabled={retrying} onClick={() => void handleRetry()} type="button">
+            {retrying ? '다시 시도 중...' : '다시 시도'}
+          </button>
+        </div>
+      </section>
+    </main>
+  )
+}
 
 function ProtectedLayout() {
-  const { initialized, user } = useAuth()
+  const { authNotice, initialized, status, user } = useAuth()
 
-  if (!initialized) {
-    return <div className="center-screen">초기화 중...</div>
+  if (!initialized || status === 'loading') {
+    return <AuthLoadingScreen />
+  }
+  if (status === 'auth-check-error') {
+    return <AuthCheckErrorScreen />
   }
   if (!user) {
-    return <Navigate to="/login" replace />
+    return <Navigate to={getLoginRedirect(authNotice)} replace />
   }
   return <AppLayout />
 }
 
 function ProtectedOnly({ children }: { children: ReactElement }) {
-  const { initialized, user } = useAuth()
+  const { authNotice, initialized, status, user } = useAuth()
 
-  if (!initialized) {
-    return <div className="center-screen">초기화 중...</div>
+  if (!initialized || status === 'loading') {
+    return <AuthLoadingScreen />
+  }
+  if (status === 'auth-check-error') {
+    return <AuthCheckErrorScreen />
   }
   if (!user) {
-    return <Navigate to="/login" replace />
+    return <Navigate to={getLoginRedirect(authNotice)} replace />
   }
   return children
 }
 
 function AdminOnly({ children }: { children: ReactElement }) {
-  const { initialized, user } = useAuth()
+  const { authNotice, initialized, status, user } = useAuth()
 
-  if (!initialized) {
-    return <div className="center-screen">초기화 중...</div>
+  if (!initialized || status === 'loading') {
+    return <AuthLoadingScreen />
+  }
+  if (status === 'auth-check-error') {
+    return <AuthCheckErrorScreen />
   }
   if (!user) {
-    return <Navigate to="/login" replace />
+    return <Navigate to={getLoginRedirect(authNotice)} replace />
   }
   if (user.role !== 'ADMIN') {
     return <Navigate to="/clients" replace />
@@ -60,10 +123,13 @@ function AdminOnly({ children }: { children: ReactElement }) {
 }
 
 function GuestOnly({ children }: { children: ReactElement }) {
-  const { initialized, user } = useAuth()
+  const { initialized, status, user } = useAuth()
 
-  if (!initialized) {
-    return <div className="center-screen">초기화 중...</div>
+  if (!initialized || status === 'loading') {
+    return <AuthLoadingScreen />
+  }
+  if (status === 'auth-check-error') {
+    return <AuthCheckErrorScreen />
   }
   if (user) {
     return <Navigate to="/clients" replace />

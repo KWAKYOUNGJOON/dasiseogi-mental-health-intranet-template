@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios'
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
 
@@ -25,6 +26,18 @@ export async function login(loginId: string, password: string) {
 export async function fetchMe() {
   const response = await http.get<ApiResponse<AuthUser>>('/auth/me')
   return response.data.data
+}
+
+export async function fetchMeOrNull() {
+  try {
+    return await fetchMe()
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 401) {
+      return null
+    }
+
+    throw error
+  }
 }
 
 export async function logout() {

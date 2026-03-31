@@ -5,6 +5,8 @@ import {
   DEFAULT_LOGIN_FORM_VALUES,
   SIGNUP_REQUEST_NOTICE,
   SIGNUP_REQUEST_NOTICE_MESSAGE,
+  SESSION_EXPIRED_NOTICE,
+  SESSION_EXPIRED_NOTICE_MESSAGE,
   resolveLoginErrorMessage,
   type LoginFormValues,
 } from '../api/loginApi'
@@ -137,6 +139,11 @@ export function LoginForm() {
         ) : null}
       </label>
       {notice === SIGNUP_REQUEST_NOTICE ? <div className="success-text">{SIGNUP_REQUEST_NOTICE_MESSAGE}</div> : null}
+      {notice === SESSION_EXPIRED_NOTICE ? (
+        <div aria-live="polite" className="error-text">
+          {SESSION_EXPIRED_NOTICE_MESSAGE}
+        </div>
+      ) : null}
       {formMessage ? (
         <div className="error-text" role="alert">
           {formMessage}
