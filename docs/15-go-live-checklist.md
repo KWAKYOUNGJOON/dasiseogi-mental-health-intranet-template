@@ -3,6 +3,9 @@
 ## 1. 전제
 
 - 현재 판정은 `READY` 이다.
+- 이 문서는 실제 운영 직전 실행 순서와 통과 여부 체크에 집중한다.
+- 운영 DB 접속 정보, 경로, 프록시 값, 담당자, 확인 방법 템플릿은 [docs/16-prod-config-checklist.md](./16-prod-config-checklist.md) 에서 관리한다.
+- 운영 직전에는 먼저 [docs/16-prod-config-checklist.md](./16-prod-config-checklist.md) 에서 실제 값 입력 필요 항목과 담당자 기입 상태를 확인한 뒤, 본 문서 순서대로 실행 결과와 통과 여부를 체크한다.
 - 오늘 목표였던 아래 2개 readiness blocker 는 검증 환경 기준으로 해소되었다.
   - MariaDB/MySQL 실검증 완료
   - 검증 환경에서 운영 절차 기준 `DB_DUMP` 실제 성공 확인
@@ -35,6 +38,8 @@
 ---
 
 ## 3. 검증 환경 실행 체크리스트
+
+- 참고: 아래 체크리스트에서 사용하는 실제 운영값, 경로, 계정, 프록시 결정값은 이 문서에 다시 채우지 않고 [docs/16-prod-config-checklist.md](./16-prod-config-checklist.md) 의 해당 항목을 기준으로 대조한다.
 
 ### [x] 1. MariaDB/MySQL 실검증 실행
 - 해야 할 일: 운영과 같은 DB 계열의 스테이징 또는 검증 환경에서 `cd backend` 후 `.\gradlew.bat mariaDbTest` 를 실행하고 `backend/build/test-results/mariaDbTest/TEST-com.dasisuhgi.mentalhealth.MariaDbCompatibilityTest.xml` 을 확인한다.
