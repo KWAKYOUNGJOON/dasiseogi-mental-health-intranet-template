@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS assessment_sessions (
     performed_by BIGINT NOT NULL,
     scale_count INT NOT NULL DEFAULT 0,
     has_alert BOOLEAN NOT NULL DEFAULT FALSE,
-    memo TEXT NULL,
+    memo LONGTEXT NULL,
     status VARCHAR(20) NOT NULL,
     misentered_at DATETIME NULL,
     misentered_by BIGINT NULL,

@@ -7,7 +7,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -17,6 +16,8 @@ import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Setter
@@ -50,7 +51,7 @@ public class SessionScale {
     @Column(nullable = false)
     private boolean hasAlert;
 
-    @Lob
+    @JdbcTypeCode(SqlTypes.LONG32VARCHAR)
     @Column(nullable = false)
     private String rawResultSnapshot;
 
