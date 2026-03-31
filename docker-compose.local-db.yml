@@ -1,7 +1,6 @@
 services:
   backend:
     environment:
-      SPRING_PROFILES_ACTIVE: local
       APP_DB_URL_DOCKER: jdbc:mariadb://db:3306/${LOCAL_DB_NAME:-mental_health_local}?useUnicode=true&characterEncoding=utf8
       APP_DB_USERNAME: ${LOCAL_DB_USERNAME:-mental_user}
       APP_DB_PASSWORD: ${LOCAL_DB_PASSWORD:-mental_pass}
@@ -23,6 +22,7 @@ services:
       - --collation-server=utf8mb4_unicode_ci
     volumes:
       - local_db_data:/var/lib/mysql
+      - ./backend/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
