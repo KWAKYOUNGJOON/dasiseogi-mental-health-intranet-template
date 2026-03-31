@@ -1,0 +1,36 @@
+services:
+  backend:
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      APP_DB_URL_DOCKER: jdbc:mariadb://db:3306/${LOCAL_DB_NAME:-mental_health_local}?useUnicode=true&characterEncoding=utf8
+      APP_DB_USERNAME: ${LOCAL_DB_USERNAME:-mental_user}
+      APP_DB_PASSWORD: ${LOCAL_DB_PASSWORD:-mental_pass}
+      APP_DB_DRIVER: ${APP_DB_DRIVER:-org.mariadb.jdbc.Driver}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${LOCAL_DB_NAME:-mental_health_local}
+      MARIADB_USER: ${LOCAL_DB_USERNAME:-mental_user}
+      MARIADB_PASSWORD: ${LOCAL_DB_PASSWORD:-mental_pass}
+      MARIADB_ROOT_PASSWORD: ${LOCAL_DB_ROOT_PASSWORD:-mental_root_pass}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - local_db_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mariadb-admin ping -h 127.0.0.1 -uroot -p$$MARIADB_ROOT_PASSWORD --silent || exit 1
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+
+volumes:
+  local_db_data:

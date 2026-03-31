@@ -94,6 +94,24 @@ docker compose ps
 - `.env` 값을 바꾼 뒤에는 `docker compose restart` 가 아니라 `docker compose up -d --force-recreate` 로 다시 반영한다.
 - 현재 `docker-compose.yml` 은 `restart: unless-stopped` 기준이므로, Docker daemon 또는 서버 재부팅 뒤 자동 재기동을 기대할 수 있다.
 
+### 선택형 local DB Compose 경로
+
+외부 MariaDB 경로는 그대로 두고, local MariaDB 를 같은 Compose 프로젝트에 함께 붙여 검증하려면 override 파일을 추가한다.
+
+필요하면 `.env.docker.local-db.example` 값을 루트 `.env` 에 추가한다. 값을 따로 추가하지 않으면 local DB 기본값이 사용된다.
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.local-db.yml config
+docker compose -f docker-compose.yml -f docker-compose.local-db.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.local-db.yml ps
+```
+
+- 이 경로에서는 backend 가 `db` 서비스명으로 local MariaDB 에 연결된다.
+- local DB 데이터는 Compose volume `local_db_data` 에 유지된다.
+- local DB override 는 backend 에 `local` 프로필을 주입하므로, 외부 DB 운영 경로를 강제 변경하지 않는다.
+- 기존 standalone `mental-health-local-db` 컨테이너의 데이터나 설정을 자동 이전하지 않는다.
+- local DB 서비스는 기본적으로 host port 를 publish 하지 않으므로, 기존 standalone DB 와의 host port 충돌을 자동으로 맞추거나 해소하지 않는다.
+
 종료:
 
 ```powershell
