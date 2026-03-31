@@ -45,6 +45,43 @@
 └── local-backups/
 ```
 
+## Docker Quick Start
+
+외부 MariaDB를 기준으로 Docker를 빠르게 실행하는 절차입니다.
+
+```powershell
+Copy-Item .env.docker.example .env
+```
+
+루트 `.env` 에 아래 값을 직접 입력합니다. `.env` 는 커밋하지 않습니다.
+
+```dotenv
+APP_DB_URL=jdbc:mariadb://DB_HOST_PLACEHOLDER:3306/DB_NAME_PLACEHOLDER?useUnicode=true&characterEncoding=utf8
+APP_DB_URL_DOCKER=jdbc:mariadb://host.docker.internal:3306/DB_NAME_PLACEHOLDER?useUnicode=true&characterEncoding=utf8
+APP_DB_USERNAME=DB_USERNAME_PLACEHOLDER
+APP_DB_PASSWORD=DB_PASSWORD_PLACEHOLDER
+```
+
+- `APP_DB_URL` 은 호스트에서 앱을 직접 실행할 때 참고하는 예시다.
+- `APP_DB_URL_DOCKER` 는 컨테이너에서 호스트 DB에 접속할 때 참고하는 예시다.
+- `host.docker.internal` 은 컨테이너에서 호스트 머신의 DB 주소를 참조하기 위한 이름이다.
+
+```powershell
+docker compose build
+docker compose up -d
+```
+
+확인 URL:
+- `http://127.0.0.1:8080/api/v1/health`
+- `http://127.0.0.1:4173/`
+- `http://127.0.0.1:4173/api/v1/health`
+
+종료:
+
+```powershell
+docker compose down
+```
+
 ## 로컬 실행
 
 ### 1. 백엔드
