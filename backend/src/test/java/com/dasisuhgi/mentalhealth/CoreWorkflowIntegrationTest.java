@@ -251,8 +251,8 @@ class CoreWorkflowIntegrationTest {
         String firstClientNo = createClient(session, "신규대상A", "1993-04-15");
         String secondClientNo = createClient(session, "신규대상B", "1994-04-15");
 
-        assertThat(firstClientNo).matches("CL-\\d{6}-\\d{6}");
-        assertThat(secondClientNo).matches("CL-\\d{6}-\\d{6}");
+        assertThat(firstClientNo).matches("CL-\\d{6}-\\d{4}");
+        assertThat(secondClientNo).matches("CL-\\d{6}-\\d{4}");
         assertThat(secondClientNo).isNotEqualTo(firstClientNo);
         assertThat(identifierSequenceRepository.count()).isEqualTo(2L);
 
@@ -383,7 +383,7 @@ class CoreWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.data.scaleCount").value(1))
                 .andExpect(jsonPath("$.data.hasAlert").value(true))
-                .andExpect(jsonPath("$.data.sessionNo").value(org.hamcrest.Matchers.matchesPattern("AS-\\d{8}-\\d{6}")))
+                .andExpect(jsonPath("$.data.sessionNo").value(org.hamcrest.Matchers.matchesPattern("AS-\\d{8}-\\d{4}")))
                 .andReturn();
 
         long sessionId = body(saveResult).path("data").path("sessionId").asLong();

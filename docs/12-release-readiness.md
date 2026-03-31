@@ -6,7 +6,7 @@
 - 의미: 현재 증빙 범위 기준 `배포 가능` 이자 `release readiness 확보` 판정이며, 실제 운영 배포 완료를 뜻하지 않는다. 실제 운영 반영 여부, 배포 시작/완료 시각, 배포 결과는 `docs/deploy-results/YYYY-MM-DD.md` 의 `실제 운영 배포 결과` 에 별도 기록한다.
 
 ### 판정 요약
-- 핵심 업무 흐름과 관리자 기능은 구현되어 있고, 현재 코드베이스 기준 `backend test`, `frontend build` 는 통과한다.
+- 핵심 업무 흐름과 관리자 기능은 구현되어 있고, `2026-03-31` 기준 `CoreWorkflowIntegrationTest` 기대값 최소 수정 후 `backend` `.\gradlew.bat test` 는 `BUILD SUCCESSFUL` (`67 tests completed`, 실패 없음), `frontend` `npm run build` 는 `tsc -b && vite build` 통과로 확인되었다.
 - 세션 저장은 [`AssessmentService`](../backend/src/main/java/com/dasisuhgi/mentalhealth/assessment/service/AssessmentService.java) 의 단일 트랜잭션 구조로 유지되고, 오등록/오입력 숨김 정책과 print/export 권한도 코드에 반영되어 있다.
 - health endpoint, 활동 로그, 수동 백업, 관리자 승인/사용자 관리, 문서/스크립트 템플릿도 현재 저장소에 존재한다.
 - `2026-03-30 00:41 KST` 기준 `.\gradlew.bat mariaDbTest --rerun-tasks` 가 `BUILD SUCCESSFUL`, `MariaDbCompatibilityTest` `tests=4`, `skipped=0` 으로 재확인되었다.
@@ -67,9 +67,9 @@
 
 아래 `[x]` 표시는 현재 readiness 증빙 범위에서 이미 확보된 항목을 뜻하며, 실제 운영 반영 완료 여부를 뜻하지 않는다. 실제 운영 배포 결과는 `docs/deploy-results/YYYY-MM-DD.md` 에 별도 기록한다.
 
-- [ ] `backend`: `.\gradlew.bat test` 성공
+- [x] `backend`: `.\gradlew.bat test` 성공
 - [x] `backend`: `.\gradlew.bat mariaDbTest` 실제 실행 또는 동등한 MariaDB/MySQL 스모크 확인
-- [ ] `frontend`: `npm run build` 성공
+- [x] `frontend`: `npm run build` 성공
 - [ ] 운영용 `application-prod.yml` 또는 외부 설정값 준비 완료
 - [ ] 운영 DB 접속 정보와 세션 타임아웃 값 점검
 - [ ] 운영 백업 경로 존재 및 writable 확인
