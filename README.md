@@ -108,10 +108,11 @@ docker compose -f docker-compose.yml -f docker-compose.local-db.yml ps
 
 - 이 경로에서는 backend 가 `db` 서비스명으로 local MariaDB 에 연결된다.
 - local DB 데이터는 Compose volume `local_db_data` 에 유지된다.
-- local DB override 는 backend profile 을 강제로 `local` 로 바꾸지 않는다. backend 는 현재 `docker-entrypoint.sh` 규칙대로 유효한 DB 설정이 있으면 기본 `prod` 로 기동한다.
+- local DB override 는 backend 를 `local` profile 로 기동한다.
 - empty volume 기준 최초 기동 시에는 `backend/src/main/resources/schema.sql` 이 `db` 컨테이너의 init 스크립트로 적용된다.
 - `local_db_data` volume 이 이미 존재하면 init 스크립트는 다시 실행되지 않는다.
-- 이 경로도 seed 계정 자동 생성이나 초기 관리자 자동 bootstrap 을 추가하지 않으므로, 초기 관리자 계정은 별도 준비가 필요할 수 있다.
+- empty volume 기준 최초 기동 시에는 `app.seed.enabled=true` 도 함께 적용되어 seed 계정과 기본 대상자가 자동 생성된다.
+- 기존 `local_db_data` volume 에 이미 데이터가 있으면 seed 는 다시 넣지 않는다. 계정이 비어 있는 오래된 volume 을 다시 쓰는 경우에는 `docker compose -f docker-compose.yml -f docker-compose.local-db.yml down -v` 후 재기동하거나, 별도로 사용자 데이터를 복구해야 한다.
 - 기존 standalone `mental-health-local-db` 컨테이너의 데이터나 설정을 자동 이전하지 않는다.
 - local DB 서비스는 기본적으로 host port 를 publish 하지 않으므로, 기존 standalone DB 와의 host port 충돌을 자동으로 맞추거나 해소하지 않는다.
 

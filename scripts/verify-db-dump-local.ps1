@@ -52,6 +52,14 @@ function Write-Step {
     Write-Host "[verify-db-dump] $Message"
 }
 
+function Get-NativeCommandExitCode {
+    $exitCodeVar = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+    if ($null -eq $exitCodeVar) {
+        return 0
+    }
+    return [int]$exitCodeVar.Value
+}
+
 function Ensure-Directory {
     param([string]$Path)
     if (-not (Test-Path -LiteralPath $Path)) {
@@ -114,14 +122,18 @@ function Invoke-MariaDbCommand {
         "--port=$DbPort",
         "--user=root",
         "--password=$RootPassword",
-        "--ssl=0"
+        "--ssl=0",
+        "--batch",
+        "--raw",
+        "--skip-column-names"
     )
     if ($Database) {
         $arguments += "--database=$Database"
     }
     $arguments += @("-e", $Sql)
     $output = & $mariaDbExe @arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $exitCode = Get-NativeCommandExitCode
+    if ($exitCode -ne 0) {
         throw "MariaDB command failed: $($output -join [Environment]::NewLine)"
     }
     return $output
@@ -168,7 +180,8 @@ function Ensure-MariaDbInitialized {
 
     Write-Step "Initializing MariaDB data directory"
     $init = & $installDbExe "--datadir=$dataDir" "--password=$RootPassword" "--port=$DbPort" "--allow-remote-root-access" "--silent" 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $exitCode = Get-NativeCommandExitCode
+    if ($exitCode -ne 0) {
         throw "mariadb-install-db failed: $($init -join [Environment]::NewLine)"
     }
 }
@@ -248,12 +261,12 @@ function Start-BackendIfNeeded {
 
     Write-Step "Starting backend on port $AppPort against $jdbcUrl"
     $launcher = @"
-\$env:APP_DB_URL = '$jdbcUrl'
-\$env:APP_DB_USERNAME = '$DatabaseUser'
-\$env:APP_DB_PASSWORD = '$DatabasePassword'
-\$env:APP_DB_DRIVER = 'org.mariadb.jdbc.Driver'
-\$env:APP_DB_DUMP_COMMAND = '$mariaDbDumpExe'
-\$env:APP_BACKUP_ROOT_PATH = '$backupRoot'
+`$env:APP_DB_URL = '$jdbcUrl'
+`$env:APP_DB_USERNAME = '$DatabaseUser'
+`$env:APP_DB_PASSWORD = '$DatabasePassword'
+`$env:APP_DB_DRIVER = 'org.mariadb.jdbc.Driver'
+`$env:APP_DB_DUMP_COMMAND = '$mariaDbDumpExe'
+`$env:APP_BACKUP_ROOT_PATH = '$backupRoot'
 Set-Location '$backendDir'
 .\gradlew.bat bootRun --args='--spring.profiles.active=local --server.port=$AppPort'
 "@
@@ -306,14 +319,12 @@ function Invoke-BackupVerification {
         throw "Backup file is empty: $($backup.data.filePath)"
     }
 
-    $sql = "SELECT id, backup_method, status, file_name, file_path, started_at, completed_at, executed_by_name_snapshot FROM backup_histories ORDER BY id DESC LIMIT 1;"
-    $latestHistory = Invoke-MariaDbCommand -Sql $sql -Database $DatabaseName | Select-Object -Last 1
-    $historyFields = $latestHistory -split "`t"
-    if ($historyFields.Length -lt 8) {
-        throw "Unable to parse latest backup history row: $latestHistory"
+    if (-not $history.data.items -or $history.data.items.Count -lt 1) {
+        throw "Backup history API returned no items."
     }
-    if ($historyFields[1] -ne "DB_DUMP" -or $historyFields[2] -ne "SUCCESS") {
-        throw "Latest backup history row does not show DB_DUMP SUCCESS: $latestHistory"
+    $latestHistory = $history.data.items[0]
+    if ($latestHistory.backupMethod -ne "DB_DUMP" -or $latestHistory.status -ne "SUCCESS") {
+        throw "Latest backup history API item does not show DB_DUMP SUCCESS: $($latestHistory | ConvertTo-Json -Compress)"
     }
 
     return [pscustomobject]@{
@@ -326,13 +337,13 @@ function Invoke-BackupVerification {
         filePath = $backup.data.filePath
         fileSizeBytes = $file.Length
         preflightSummary = $backup.data.preflightSummary
-        latestHistoryId = $historyFields[0]
-        latestHistoryMethod = $historyFields[1]
-        latestHistoryStatus = $historyFields[2]
-        latestHistoryFileName = $historyFields[3]
-        latestHistoryStartedAt = $historyFields[5]
-        latestHistoryCompletedAt = $historyFields[6]
-        latestHistoryExecutedBy = $historyFields[7]
+        latestHistoryId = $latestHistory.backupId
+        latestHistoryMethod = $latestHistory.backupMethod
+        latestHistoryStatus = $latestHistory.status
+        latestHistoryFileName = $latestHistory.fileName
+        latestHistoryStartedAt = $latestHistory.startedAt
+        latestHistoryCompletedAt = $latestHistory.completedAt
+        latestHistoryExecutedBy = $latestHistory.executedByName
         appPort = $AppPort
         dbPort = $DbPort
         dumpCommand = $mariaDbDumpExe
