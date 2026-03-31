@@ -1,69 +1,218 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { fetchAssessmentRecords, type AssessmentRecordPage } from '../../features/assessment/api/assessmentApi'
 import { PageHeader } from '../../shared/components/PageHeader'
 
 const DEFAULT_SIZE = 20
 
+interface RecordFilters {
+  dateFrom: string
+  dateTo: string
+  clientName: string
+  scaleCode: string
+  includeMisentered: boolean
+}
+
+function createFilters(searchParams: URLSearchParams): RecordFilters {
+  return {
+    dateFrom: searchParams.get('dateFrom') ?? '',
+    dateTo: searchParams.get('dateTo') ?? '',
+    clientName: searchParams.get('clientName') ?? '',
+    scaleCode: searchParams.get('scaleCode') ?? '',
+    includeMisentered: searchParams.get('includeMisentered') === 'true',
+  }
+}
+
+function parsePage(searchParams: URLSearchParams) {
+  const rawPage = Number(searchParams.get('page') ?? '1')
+
+  return Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1
+}
+
+function createRecordSearchParams(filters: RecordFilters, page: number) {
+  const params = new URLSearchParams()
+
+  if (filters.dateFrom) {
+    params.set('dateFrom', filters.dateFrom)
+  }
+  if (filters.dateTo) {
+    params.set('dateTo', filters.dateTo)
+  }
+  if (filters.clientName) {
+    params.set('clientName', filters.clientName)
+  }
+  if (filters.scaleCode) {
+    params.set('scaleCode', filters.scaleCode)
+  }
+  if (filters.includeMisentered) {
+    params.set('includeMisentered', 'true')
+  }
+  if (page > 1) {
+    params.set('page', String(page))
+  }
+
+  return params
+}
+
+function buildSessionDetailPath(
+  record: AssessmentRecordPage['items'][number],
+  returnTo: string,
+) {
+  const params = new URLSearchParams()
+  const highlightScaleCode = record.scaleCode?.trim()
+
+  if (highlightScaleCode) {
+    params.set('highlightScaleCode', highlightScaleCode)
+  }
+
+  params.set('returnTo', returnTo)
+
+  const search = params.toString()
+
+  return search
+    ? `/assessments/sessions/${record.sessionId}?${search}`
+    : `/assessments/sessions/${record.sessionId}`
+}
+
 export function AssessmentRecordListPage() {
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [records, setRecords] = useState<AssessmentRecordPage | null>(null)
-  const [dateFrom, setDateFrom] = useState(searchParams.get('dateFrom') ?? '')
-  const [dateTo, setDateTo] = useState(searchParams.get('dateTo') ?? '')
-  const [clientName, setClientName] = useState(searchParams.get('clientName') ?? '')
-  const [scaleCode, setScaleCode] = useState(searchParams.get('scaleCode') ?? '')
-  const [includeMisentered, setIncludeMisentered] = useState(searchParams.get('includeMisentered') === 'true')
-  const [page, setPage] = useState(1)
+  const [filters, setFilters] = useState(() => createFilters(searchParams))
+  const [appliedFilters, setAppliedFilters] = useState(() => createFilters(searchParams))
+  const [page, setPage] = useState(() => parsePage(searchParams))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const requestSequence = useRef(0)
 
   useEffect(() => {
-    void load(1)
+    void load(parsePage(searchParams), createFilters(searchParams))
   }, [])
 
-  async function load(nextPage = page) {
+  async function load(nextPage: number, nextFilters: RecordFilters) {
+    const requestId = requestSequence.current + 1
+    requestSequence.current = requestId
+
     setLoading(true)
+    setError(null)
+    setPage(nextPage)
+    setAppliedFilters(nextFilters)
+
     try {
       const data = await fetchAssessmentRecords({
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-        clientName: clientName || undefined,
-        scaleCode: scaleCode || undefined,
-        includeMisentered,
+        dateFrom: nextFilters.dateFrom || undefined,
+        dateTo: nextFilters.dateTo || undefined,
+        clientName: nextFilters.clientName || undefined,
+        scaleCode: nextFilters.scaleCode || undefined,
+        includeMisentered: nextFilters.includeMisentered,
         page: nextPage,
         size: DEFAULT_SIZE,
       })
+      if (requestId !== requestSequence.current) {
+        return
+      }
+
+      const resolvedPage = data.page > 0 ? data.page : nextPage
+      const nextSearchParams = createRecordSearchParams(nextFilters, resolvedPage)
+      const nextSearch = nextSearchParams.toString()
+
       setRecords(data)
-      setPage(nextPage)
+      setPage(resolvedPage)
       setError(null)
+      if (location.search !== (nextSearch ? `?${nextSearch}` : '')) {
+        setSearchParams(nextSearchParams, { replace: true })
+      }
     } catch (requestError: any) {
+      if (requestId !== requestSequence.current) {
+        return
+      }
+
+      setRecords(null)
       setError(requestError?.response?.data?.message ?? '검사기록 목록을 불러오지 못했습니다.')
     } finally {
-      setLoading(false)
+      if (requestId === requestSequence.current) {
+        setLoading(false)
+      }
     }
   }
+
+  function handleFilterChange<K extends keyof RecordFilters>(key: K, value: RecordFilters[K]) {
+    setFilters((current) => ({
+      ...current,
+      [key]: value,
+    }))
+  }
+
+  function handleSearch() {
+    if (loading) {
+      return
+    }
+
+    void load(1, filters)
+  }
+
+  function handleRetry() {
+    if (loading) {
+      return
+    }
+
+    void load(page, appliedFilters)
+  }
+
+  const returnTo = `${location.pathname}${location.search}`
 
   return (
     <div className="stack">
       <PageHeader description="척도 결과 1건 단위로 조회합니다." title="검사기록 목록" />
       <div className="card">
         <div className="toolbar">
-          <input onChange={(event) => setDateFrom(event.target.value)} placeholder="시작일 YYYY-MM-DD" value={dateFrom} />
-          <input onChange={(event) => setDateTo(event.target.value)} placeholder="종료일 YYYY-MM-DD" value={dateTo} />
-          <input onChange={(event) => setClientName(event.target.value)} placeholder="대상자명" value={clientName} />
-          <input onChange={(event) => setScaleCode(event.target.value)} placeholder="척도코드 예: PHQ9" value={scaleCode} />
+          <input
+            onChange={(event) => handleFilterChange('dateFrom', event.target.value)}
+            placeholder="시작일 YYYY-MM-DD"
+            value={filters.dateFrom}
+          />
+          <input
+            onChange={(event) => handleFilterChange('dateTo', event.target.value)}
+            placeholder="종료일 YYYY-MM-DD"
+            value={filters.dateTo}
+          />
+          <input
+            onChange={(event) => handleFilterChange('clientName', event.target.value)}
+            placeholder="대상자명"
+            value={filters.clientName}
+          />
+          <input
+            onChange={(event) => handleFilterChange('scaleCode', event.target.value)}
+            placeholder="척도코드 예: PHQ9"
+            value={filters.scaleCode}
+          />
           <label className="option-item">
-            <input checked={includeMisentered} onChange={(event) => setIncludeMisentered(event.target.checked)} type="checkbox" />
+            <input
+              checked={filters.includeMisentered}
+              onChange={(event) => handleFilterChange('includeMisentered', event.target.checked)}
+              type="checkbox"
+            />
             오입력 포함
           </label>
-          <button className="secondary-button" onClick={() => void load(1)}>
+          <button className="secondary-button" disabled={loading} onClick={handleSearch} type="button">
             조회
           </button>
         </div>
-        {error ? <div className="error-text">{error}</div> : null}
         {loading ? (
-          <p>불러오는 중...</p>
+          <div aria-busy="true" className="muted">
+            검사기록 목록을 불러오는 중...
+          </div>
+        ) : error ? (
+          <div className="stack" role="alert">
+            <p className="error-text" style={{ margin: 0 }}>
+              {error}
+            </p>
+            <div className="actions">
+              <button className="secondary-button" onClick={handleRetry} type="button">
+                다시 시도
+              </button>
+            </div>
+          </div>
         ) : records && records.items.length > 0 ? (
           <>
             <table className="table">
@@ -77,15 +226,12 @@ export function AssessmentRecordListPage() {
                   <th>판정</th>
                   <th>경고</th>
                   <th>상태</th>
+                  <th>상세</th>
                 </tr>
               </thead>
               <tbody>
                 {records.items.map((record) => (
-                  <tr
-                    className="clickable-row"
-                    key={record.sessionScaleId}
-                    onClick={() => navigate(`/assessments/sessions/${record.sessionId}?highlightScaleCode=${record.scaleCode}`)}
-                  >
+                  <tr key={record.sessionScaleId}>
                     <td>{record.sessionCompletedAt}</td>
                     <td>{record.clientName}</td>
                     <td>{record.performedByName}</td>
@@ -93,7 +239,20 @@ export function AssessmentRecordListPage() {
                     <td>{record.totalScore}</td>
                     <td>{record.resultLevel}</td>
                     <td>{record.hasAlert ? '있음' : '없음'}</td>
-                    <td>{record.sessionStatus}</td>
+                    <td>
+                      <span
+                        className={record.sessionStatus === 'MISENTERED' ? 'status-chip status-chip-danger' : 'status-chip'}
+                        data-status={record.sessionStatus}
+                        data-testid={`record-status-${record.sessionScaleId}`}
+                      >
+                        {record.sessionStatus === 'MISENTERED' ? '오입력' : '정상'}
+                      </span>
+                    </td>
+                    <td>
+                      <Link className="secondary-button" to={buildSessionDetailPath(record, returnTo)}>
+                        상세 보기
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -103,13 +262,19 @@ export function AssessmentRecordListPage() {
                 {records.totalItems}건 / {records.page}페이지
               </span>
               <div className="actions">
-                <button className="secondary-button" disabled={page <= 1} onClick={() => void load(page - 1)}>
+                <button
+                  className="secondary-button"
+                  disabled={loading || page <= 1}
+                  onClick={() => void load(page - 1, appliedFilters)}
+                  type="button"
+                >
                   이전
                 </button>
                 <button
                   className="secondary-button"
-                  disabled={!records || records.totalPages === 0 || page >= records.totalPages}
-                  onClick={() => void load(page + 1)}
+                  disabled={loading || !records || records.totalPages === 0 || page >= records.totalPages}
+                  onClick={() => void load(page + 1, appliedFilters)}
+                  type="button"
                 >
                   다음
                 </button>

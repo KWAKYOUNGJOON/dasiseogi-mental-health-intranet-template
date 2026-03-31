@@ -117,7 +117,7 @@ export interface AssessmentRecordPage {
     clientId: number
     clientName: string
     performedByName: string
-    scaleCode: string
+    scaleCode: string | null
     scaleName: string
     totalScore: number
     resultLevel: string
@@ -163,8 +163,10 @@ export async function createAssessmentSession(payload: {
   return response.data.data
 }
 
-export async function fetchSessionDetail(sessionId: number) {
-  const response = await http.get<ApiResponse<SessionDetail>>(`/assessment-sessions/${sessionId}`)
+export async function fetchSessionDetail(sessionId: number, options?: { highlightScaleCode?: string }) {
+  const response = await http.get<ApiResponse<SessionDetail>>(`/assessment-sessions/${sessionId}`, {
+    params: options?.highlightScaleCode ? { highlightScaleCode: options.highlightScaleCode } : undefined,
+  })
   return response.data.data
 }
 

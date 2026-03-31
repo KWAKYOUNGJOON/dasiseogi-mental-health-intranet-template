@@ -85,6 +85,21 @@ function renderAdminSignupRequestsPage() {
   )
 }
 
+function createDeferredPromise<T>() {
+  let resolvePromise!: (value: T | PromiseLike<T>) => void
+  let rejectPromise!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolve, reject) => {
+    resolvePromise = resolve
+    rejectPromise = reject
+  })
+
+  return {
+    promise,
+    reject: rejectPromise,
+    resolve: resolvePromise,
+  }
+}
+
 beforeEach(() => {
   mockUseAuth.mockReturnValue({
     user: createAdminUser(),
@@ -144,36 +159,60 @@ describe('admin signup requests', () => {
     expect((screen.getByLabelText('페이지 크기') as HTMLSelectElement).value).toBe('20')
   })
 
-  it('calls approve API with processNote and refreshes the current page after approval', async () => {
+  it('keeps the pending signup request approval flow stable through processing lock and refreshed list state', async () => {
     const user = userEvent.setup()
+    const deferredApproval = createDeferredPromise<{
+      requestId: number
+      userId: number
+      requestStatus: 'APPROVED'
+      userStatus: 'ACTIVE'
+    }>()
 
     mockedFetchSignupRequestPage
       .mockResolvedValueOnce(createSignupRequestPage([createSignupRequestItem()]))
       .mockResolvedValueOnce(createSignupRequestPage([]))
-    mockedApproveSignupRequest.mockResolvedValue({
-      requestId: 10,
-      userId: 25,
-      requestStatus: 'APPROVED',
-      userStatus: 'ACTIVE',
-    })
+    mockedApproveSignupRequest.mockReturnValueOnce(deferredApproval.promise)
 
     renderAdminSignupRequestsPage()
 
-    await user.click(await screen.findByRole('button', { name: '승인' }))
+    const requestName = await screen.findByText('김지원')
+    const requestRow = requestName.closest('tr')
+
+    expect(requestRow).toBeTruthy()
+    expect(within(requestRow as HTMLTableRowElement).getByText('승인 대기')).toBeTruthy()
+    expect(mockedFetchSignupRequestPage).toHaveBeenCalledWith({ status: 'PENDING', page: 1, size: 20 })
+
+    await user.click(within(requestRow as HTMLTableRowElement).getByRole('button', { name: '승인' }))
 
     const dialog = screen.getByRole('dialog')
     await user.type(within(dialog).getByLabelText('처리 메모'), '승인 메모')
     await user.click(within(dialog).getByRole('button', { name: '승인' }))
 
     await waitFor(() => {
-      expect(mockedApproveSignupRequest).toHaveBeenCalledWith(10, { processNote: '승인 메모' })
+      expect(mockedApproveSignupRequest).toHaveBeenCalledTimes(1)
     })
+
+    expect(mockedApproveSignupRequest).toHaveBeenCalledWith(10, { processNote: '승인 메모' })
+
+    await waitFor(() => {
+      expect(within(screen.getByRole('dialog')).getByRole('button', { name: '처리 중...' }).hasAttribute('disabled')).toBe(true)
+    })
+
+    deferredApproval.resolve({
+      requestId: 10,
+      userId: 25,
+      requestStatus: 'APPROVED',
+      userStatus: 'ACTIVE',
+    })
+
     await waitFor(() => {
       expect(mockedFetchSignupRequestPage).toHaveBeenCalledTimes(2)
     })
 
     expect(screen.getByText('가입 신청을 승인했습니다.')).toBeTruthy()
     expect(screen.getByText('조건에 맞는 가입 신청이 없습니다.')).toBeTruthy()
+    expect(screen.queryByText('김지원')).toBeNull()
+    expect(screen.queryByRole('button', { name: '승인' })).toBeNull()
   })
 
   it('moves back to page 1 after rejection when the current page is not the first page', async () => {

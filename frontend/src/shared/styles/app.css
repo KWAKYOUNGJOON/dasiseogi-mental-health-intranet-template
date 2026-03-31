@@ -324,6 +324,11 @@ button {
   font-size: 13px;
 }
 
+.status-chip-danger {
+  background: #f8e1e1;
+  color: #8f2f2f;
+}
+
 .summary-grid {
   display: grid;
   gap: 16px;
