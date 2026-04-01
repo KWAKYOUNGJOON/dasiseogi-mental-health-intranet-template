@@ -1,0 +1,11 @@
+# Keep text files LF across platforms to avoid noisy Git warnings on Windows.
+* text=auto eol=lf
+
+# Windows batch scripts should keep CRLF.
+*.bat text eol=crlf
+
+# Explicitly keep common config and shell files LF.
+.env* text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
