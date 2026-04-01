@@ -30,6 +30,13 @@ public class SessionAnswer {
     @JoinColumn(name = "session_scale_id")
     private SessionScale sessionScale;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "session_id")
+    private AssessmentSession session;
+
+    @Column(nullable = false, length = 30)
+    private String scaleCode;
+
     @Column(nullable = false)
     private int questionNo;
 
@@ -47,6 +54,9 @@ public class SessionAnswer {
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal scoreValue;
+
+    @Column(name = "is_reverse_scored", nullable = false)
+    private boolean reverseScored;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;

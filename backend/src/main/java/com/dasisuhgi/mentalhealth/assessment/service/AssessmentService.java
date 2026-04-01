@@ -146,6 +146,8 @@ public class AssessmentService {
         session.setSessionStartedAt(request.sessionStartedAt());
         session.setSessionCompletedAt(request.sessionCompletedAt());
         session.setPerformedBy(currentUser);
+        session.setCreatedBy(currentUser);
+        session.setUpdatedBy(currentUser);
         session.setScaleCount(evaluations.size());
         session.setHasAlert(evaluations.stream().anyMatch(ScaleEvaluation::hasAlert));
         session.setMemo(blankToNull(request.memo()));
@@ -168,12 +170,15 @@ public class AssessmentService {
             for (EvaluatedAnswer evaluatedAnswer : evaluation.answers()) {
                 SessionAnswer answer = new SessionAnswer();
                 answer.setSessionScale(savedScale);
+                answer.setSession(savedSession);
+                answer.setScaleCode(evaluation.definition().scaleCode());
                 answer.setQuestionNo(evaluatedAnswer.question().questionNo());
                 answer.setQuestionKey(evaluatedAnswer.question().questionKey());
                 answer.setQuestionTextSnapshot(evaluatedAnswer.question().text());
                 answer.setAnswerValue(evaluatedAnswer.option().value());
                 answer.setAnswerLabelSnapshot(evaluatedAnswer.option().label());
                 answer.setScoreValue(BigDecimal.valueOf(evaluatedAnswer.appliedScore()));
+                answer.setReverseScored(evaluatedAnswer.question().reverseScored());
                 sessionAnswerRepository.save(answer);
             }
 
@@ -181,6 +186,7 @@ public class AssessmentService {
                 SessionAlert alert = new SessionAlert();
                 alert.setSession(savedSession);
                 alert.setSessionScale(savedScale);
+                alert.setClient(client);
                 alert.setScaleCode(evaluation.definition().scaleCode());
                 alert.setAlertType(alertData.alertType());
                 alert.setAlertCode(alertData.code());
@@ -348,6 +354,7 @@ public class AssessmentService {
         session.setStatus(AssessmentSessionStatus.MISENTERED);
         session.setMisenteredAt(LocalDateTime.now());
         session.setMisenteredBy(currentUser);
+        session.setUpdatedBy(currentUser);
         session.setMisenteredReason(request.reason().trim());
         activityLogService.log(
                 currentUser,

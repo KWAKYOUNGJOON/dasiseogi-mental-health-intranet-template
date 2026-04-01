@@ -56,6 +56,14 @@ public class AssessmentSession {
     @JoinColumn(name = "misentered_by")
     private User misenteredBy;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by")
+    private User updatedBy;
+
     @Column(nullable = false)
     private int scaleCount;
 
@@ -82,6 +90,12 @@ public class AssessmentSession {
 
     @PrePersist
     void onCreate() {
+        if (createdBy == null) {
+            createdBy = performedBy;
+        }
+        if (updatedBy == null) {
+            updatedBy = createdBy != null ? createdBy : performedBy;
+        }
         LocalDateTime now = LocalDateTime.now();
         createdAt = now;
         updatedAt = now;

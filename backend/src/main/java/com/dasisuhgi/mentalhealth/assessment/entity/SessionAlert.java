@@ -1,5 +1,6 @@
 package com.dasisuhgi.mentalhealth.assessment.entity;
 
+import com.dasisuhgi.mentalhealth.client.entity.Client;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -31,9 +32,13 @@ public class SessionAlert {
     @JoinColumn(name = "session_id")
     private AssessmentSession session;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_scale_id")
     private SessionScale sessionScale;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "client_id")
+    private Client client;
 
     @Column(nullable = false, length = 30)
     private String scaleCode;
@@ -58,6 +63,9 @@ public class SessionAlert {
 
     @PrePersist
     void onCreate() {
+        if (client == null && session != null) {
+            client = session.getClient();
+        }
         createdAt = LocalDateTime.now();
     }
 }
