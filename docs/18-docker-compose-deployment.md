@@ -340,16 +340,19 @@ docker compose ps
 - 이 경우 frontend 자체 장애로 바로 판단하지 말고 backend 가 `healthy` 로 바뀐 뒤 같은 URL 을 다시 확인한다.
 
 배포 후 smoke test 최소 범위:
-1. `/login` 접속
-2. 로그인 전 `/api/v1/auth/me` 가 `401` 인지 확인
-3. 초기 관리자 로그인
-4. 로그인 후 `/api/v1/auth/me` 가 사용자 정보를 반환하는지 확인
-5. 대상자 목록 조회
-6. 샘플 대상자 상세 조회
-7. 최소 2종 멀티 척도 세션 저장
-8. 세션 상세 / `print view` 확인
-9. `statistics/summary`, `statistics/scales`, `statistics/alerts` 확인
-10. `CSV export` 확인
+1. `health` endpoint 확인
+2. 관리자 로그인 확인
+   - `/login` 접속, 로그인 전 `/api/v1/auth/me` 가 `401` 인지 확인, 로그인 후 `/api/v1/auth/me` 가 사용자 정보를 반환하는지 확인한다.
+3. 관리자 메뉴 접근 확인
+4. 대상자 생성 확인
+5. 최소 2종 세션 저장 확인
+6. 세션 상세 확인
+7. `print view` 확인
+8. `statistics` 확인
+   - `statistics/summary`, `statistics/scales`, `statistics/alerts` 를 함께 확인한다.
+9. `CSV export` 확인
+10. 활동 로그 확인
+11. 수동 백업 확인
 
 ---
 
