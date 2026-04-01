@@ -28,9 +28,25 @@
 - 운영 기준 `spring.jpa.hibernate.ddl-auto=validate` 이다.
 - 운영 기준 `app.seed.enabled=false` 이다.
 - 따라서 **운영 DB 가 빈 상태이면 backend 기동이 실패한다.**
-- 운영 DB 는 `docker compose up -d` 전에 반드시 `backend/src/main/resources/schema.sql` 이 적용되어 있어야 한다.
+- 운영 DB 는 backend 앱이 `prod` profile 로 1회라도 기동되기 전에 반드시 `backend/src/main/resources/schema.sql` 이 적용되어 있어야 한다.
 - 초기 관리자 계정도 운영 시작 전에 별도 준비되어야 한다.
 - `.env` 값 변경 후 `docker compose restart` 만으로는 새 환경값이 반영되지 않는다. 값 변경 후에는 `docker compose up -d --force-recreate` 를 사용한다.
+
+### 2.1 배포 전 선행 확인
+
+실제 운영 반영은 아래 preflight 게이트가 모두 닫힌 뒤에만 시작한다.
+
+- [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 의 최종 확인 체크가 먼저 끝나 있어야 한다.
+- `docs/20-production-input-sheet.md` 에는 실제 운영 DB 정보, `.env` 작성 위치와 관리 방식, `schema.sql` 적용 수단/실행 위치/담당자/검수자, 초기 관리자 준비 담당자가 먼저 정리되어 있어야 한다.
+- `backend/src/main/resources/schema.sql` 은 backend 컨테이너가 `prod` 로 1회라도 기동되기 전에 외부 MariaDB 에 먼저 적용되어 있어야 한다.
+- 루트 `.env` 의 `APP_DB_URL_DOCKER`, `APP_DB_USERNAME`, `APP_DB_PASSWORD`, `APP_DB_DRIVER` 는 모두 비어 있지 않아야 한다.
+- `docker compose config` 결과의 backend 환경값을 [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 작업본과 대조해, backend 가 실제 운영 DB 를 가리키는지 먼저 확인해야 한다.
+- `APP_DB_URL_DOCKER` 가 비어 있거나, placeholder, `jdbc:h2:` 류 값, 또는 실제 운영 외부 MariaDB JDBC URL 로 확정되지 않은 값이면 진행하지 않는다.
+
+주의:
+- 현재 backend Docker entrypoint 는 Docker DB 환경값이 비어 있거나 placeholder 상태면 local H2 profile 로 fallback 할 수 있다.
+- 따라서 `APP_DB_URL_DOCKER` 를 포함한 DB 환경값 검증 전에 `docker compose up -d` 를 먼저 실행하지 않는다.
+- 위 preflight 항목 중 하나라도 실패하면 실제 운영 반영 단계로 넘어가지 않는다.
 
 ---
 
@@ -47,16 +63,21 @@ Copy-Item .env.docker.example .env
 - `APP_DB_URL_DOCKER`
   - 컨테이너 내부에서 접근할 외부 MariaDB JDBC URL 이다.
   - 예: `jdbc:mariadb://host.docker.internal:3306/mental_health_prod?useUnicode=true&characterEncoding=utf8`
-  - `docker compose config` 결과에서 비어 있으면 진행하지 않는다.
+  - `docker compose config` 결과와 [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 작업본을 대조해 실제 운영 DB host/port/name 기준이 일치해야 한다.
+  - 비어 있거나, placeholder 문자열이 포함되거나, `jdbc:h2:` 류 값이거나, 실제 운영 외부 MariaDB JDBC URL 로 확정되지 않았으면 진행하지 않는다.
 - `APP_DB_USERNAME`
   - 운영 앱 전용 DB 계정이다.
+  - `docker compose config` 결과에서 비어 있거나 placeholder 상태면 진행하지 않는다.
 - `APP_DB_PASSWORD`
   - 운영 앱 전용 DB 계정 비밀번호다.
+  - `docker compose config` 결과에서 비어 있거나 placeholder 상태면 진행하지 않는다.
+- `APP_DB_DRIVER`
+  - 운영 DB JDBC 드라이버다.
+  - 운영 MariaDB 기준 기본 예시는 `org.mariadb.jdbc.Driver` 다.
+  - `docker compose config` 결과에서 비어 있으면 진행하지 않는다.
 
 ### 3.2 운영 정책에 따라 조정할 값
 
-- `APP_DB_DRIVER`
-  - 기본값은 `org.mariadb.jdbc.Driver` 다.
 - `APP_SESSION_TIMEOUT`
   - 세션 기반 인증 유지 시간이다.
 - `APP_FORWARD_HEADERS_STRATEGY`
@@ -85,10 +106,21 @@ Copy-Item .env.docker.example .env
 docker compose config
 ```
 
+대조 기준:
+- backend 환경값의 `APP_DB_URL_DOCKER`, `APP_DB_USERNAME`, `APP_DB_PASSWORD`, `APP_DB_DRIVER` 가 모두 채워져 있어야 한다.
+- backend 환경값의 `APP_DB_URL_DOCKER` 가 실제 운영 외부 MariaDB JDBC URL 이어야 한다.
+- `docker compose config` 결과의 backend 환경값이 [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 작업본과 일치해야 한다.
+- 비어 있는 값, placeholder, `jdbc:h2:` 류 값, 또는 의도하지 않은 테스트/로컬 DB 주소가 보이면 실제 운영 반영으로 넘어가지 않는다.
+
 중단 조건:
-- `APP_DB_URL_DOCKER` 가 비어 있다.
-- `APP_DB_USERNAME` 또는 `APP_DB_PASSWORD` 가 placeholder 상태다.
+- [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 최종 확인 체크가 끝나지 않았다.
+- `schema.sql` 선적용 또는 적용 확인이 끝나지 않았다.
+- `APP_DB_URL_DOCKER`, `APP_DB_USERNAME`, `APP_DB_PASSWORD`, `APP_DB_DRIVER` 중 하나라도 비어 있다.
+- `APP_DB_URL_DOCKER` 가 placeholder 이거나 `jdbc:h2:` 류 값이거나 실제 운영 DB 로 대조되지 않았다.
+- `docker compose config` 결과의 backend 환경값이 [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 작업본과 다르다.
 - 로그 / 임시 / 백업 host path 가 의도와 다르다.
+
+위 항목 중 하나라도 해당되면 preflight 실패로 보고 실제 운영 반영 단계로 넘어가지 않는다.
 
 ---
 
@@ -112,6 +144,8 @@ FLUSH PRIVILEGES;
 주의:
 - `ddl-auto=validate` 이므로 DB 생성만으로는 충분하지 않다.
 - DB 생성 후 반드시 `backend/src/main/resources/schema.sql` 을 적용해야 한다.
+- `schema.sql` 적용은 backend 앱의 `prod` 1회 기동 전에 끝나 있어야 한다.
+- `schema.sql` 적용 또는 적용 검수 결과가 없으면 `docker compose up -d` 단계로 넘어가지 않는다.
 
 예시 명령:
 
@@ -204,17 +238,21 @@ COMMIT;
 
 ## 6. Docker Compose 최초 기동 절차
 
-1. 루트 `.env` 생성
-2. `.env` 값 입력
-3. `docker compose config` 로 실제 반영값 확인
-4. 컨테이너 기동
+실제 운영 반영은 2.1 과 3.4 의 중단 조건이 모두 해소된 뒤에만 진행한다.
+
+1. [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 최종 확인 체크 완료
+2. 외부 MariaDB 에 `backend/src/main/resources/schema.sql` 선적용 완료
+3. 루트 `.env` 생성
+4. `.env` 값 입력
+5. `docker compose config` 로 backend 실제 반영값 대조
+6. 컨테이너 기동
 
 ```powershell
 docker compose up -d
 docker compose ps
 ```
 
-5. 기동 직후 health 확인
+7. 기동 직후 health 확인
 
 ```powershell
 Invoke-RestMethod -Uri http://127.0.0.1:8080/api/v1/health | ConvertTo-Json -Depth 10

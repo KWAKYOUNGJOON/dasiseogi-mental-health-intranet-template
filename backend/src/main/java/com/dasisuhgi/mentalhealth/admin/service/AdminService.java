@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -250,9 +251,10 @@ public class AdminService {
     }
 
     private UserApprovalRequest getApprovalRequest(Long requestId) {
-        return userApprovalRequestRepository.findById(requestId)
+        Long requiredRequestId = Objects.requireNonNull(requestId, "requestId must not be null");
+        return userApprovalRequestRepository.findById(requiredRequestId)
                 .orElseThrow(() -> {
-                    if (userRepository.existsById(requestId)) {
+                    if (userRepository.existsById(requiredRequestId)) {
                         return new AppException(HttpStatus.BAD_REQUEST, "SIGNUP_REQUEST_ID_REQUIRED", "가입 신청 처리에는 requestId를 사용해야 합니다.");
                     }
                     return new AppException(HttpStatus.NOT_FOUND, "SIGNUP_REQUEST_NOT_FOUND", "가입 신청을 찾을 수 없습니다.");
@@ -260,7 +262,7 @@ public class AdminService {
     }
 
     private User getUser(Long userId) {
-        return userRepository.findById(userId)
+        return userRepository.findById(Objects.requireNonNull(userId, "userId must not be null"))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다."));
     }
 

@@ -3,6 +3,7 @@ package com.dasisuhgi.mentalhealth.common.error;
 import com.dasisuhgi.mentalhealth.common.api.ApiResponse;
 import com.dasisuhgi.mentalhealth.common.api.FieldErrorItem;
 import java.util.List;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -19,7 +20,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Void>> handleAppException(AppException exception) {
-        return ResponseEntity.status(exception.getStatus())
+        return ResponseEntity.status(Objects.requireNonNull(exception.getStatus(), "exception status must not be null"))
                 .body(ApiResponse.failure(exception.getMessage(), exception.getErrorCode(), exception.getFieldErrors()));
     }
 

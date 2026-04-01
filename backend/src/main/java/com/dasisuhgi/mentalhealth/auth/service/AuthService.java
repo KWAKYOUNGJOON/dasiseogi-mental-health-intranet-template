@@ -15,6 +15,7 @@ import com.dasisuhgi.mentalhealth.user.repository.UserRepository;
 import jakarta.servlet.http.HttpSession;
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -65,7 +66,7 @@ public class AuthService {
 
     public AuthUserResponse getCurrentUser(HttpSession session) {
         SessionUser sessionUser = getRequiredSessionUser(session);
-        User user = userRepository.findById(sessionUser.userId())
+        User user = userRepository.findById(Objects.requireNonNull(sessionUser.userId(), "sessionUser.userId must not be null"))
                 .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요합니다."));
         return toResponse(user);
     }

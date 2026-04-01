@@ -121,7 +121,7 @@ public class AssessmentService {
             throw new AppException(HttpStatus.BAD_REQUEST, "INVALID_SESSION_TIME_RANGE", "검사 종료 시각은 시작 시각보다 빠를 수 없습니다.");
         }
 
-        Client client = clientRepository.findById(request.clientId())
+        Client client = clientRepository.findById(Objects.requireNonNull(request.clientId(), "clientId must not be null"))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "CLIENT_NOT_FOUND", "대상자를 찾을 수 없습니다."));
         if (client.getStatus() != ClientStatus.ACTIVE) {
             throw new AppException(HttpStatus.BAD_REQUEST, "CLIENT_NOT_ACTIVE", "활성 대상자만 검사할 수 있습니다.");
@@ -219,7 +219,7 @@ public class AssessmentService {
     @Transactional(readOnly = true)
     public AssessmentSessionDetailResponse getSessionDetail(Long sessionId, SessionUser sessionUser) {
         User currentUser = accessPolicyService.getCurrentUser(sessionUser);
-        AssessmentSession session = assessmentSessionRepository.findById(sessionId)
+        AssessmentSession session = assessmentSessionRepository.findById(Objects.requireNonNull(sessionId, "sessionId must not be null"))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", "검사 세션을 찾을 수 없습니다."));
         accessPolicyService.assertCanViewSession(currentUser, session);
 
@@ -285,7 +285,7 @@ public class AssessmentService {
     @Transactional
     public AssessmentSessionPrintDataResponse getSessionPrintData(Long sessionId, SessionUser sessionUser) {
         User currentUser = accessPolicyService.getCurrentUser(sessionUser);
-        AssessmentSession session = assessmentSessionRepository.findById(sessionId)
+        AssessmentSession session = assessmentSessionRepository.findById(Objects.requireNonNull(sessionId, "sessionId must not be null"))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", "검사 세션을 찾을 수 없습니다."));
         accessPolicyService.assertCanViewSession(currentUser, session);
 
@@ -344,7 +344,7 @@ public class AssessmentService {
     @Transactional
     public SessionStatusChangeResponse markMisentered(Long sessionId, MarkMisenteredRequest request, SessionUser sessionUser) {
         User currentUser = accessPolicyService.getCurrentUser(sessionUser);
-        AssessmentSession session = assessmentSessionRepository.findById(sessionId)
+        AssessmentSession session = assessmentSessionRepository.findById(Objects.requireNonNull(sessionId, "sessionId must not be null"))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", "검사 세션을 찾을 수 없습니다."));
         accessPolicyService.assertCanMarkSessionMisentered(currentUser, session);
         if (session.getStatus() == AssessmentSessionStatus.MISENTERED) {

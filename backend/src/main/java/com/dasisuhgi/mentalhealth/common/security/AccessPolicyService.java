@@ -9,6 +9,7 @@ import com.dasisuhgi.mentalhealth.common.session.SessionUser;
 import com.dasisuhgi.mentalhealth.user.entity.User;
 import com.dasisuhgi.mentalhealth.user.entity.UserRole;
 import com.dasisuhgi.mentalhealth.user.repository.UserRepository;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +22,7 @@ public class AccessPolicyService {
     }
 
     public User getCurrentUser(SessionUser sessionUser) {
-        return userRepository.findById(sessionUser.userId())
+        return userRepository.findById(Objects.requireNonNull(sessionUser.userId(), "sessionUser.userId must not be null"))
                 .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요합니다."));
     }
 

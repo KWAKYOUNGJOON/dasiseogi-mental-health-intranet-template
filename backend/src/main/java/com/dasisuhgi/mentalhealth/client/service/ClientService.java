@@ -35,6 +35,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -115,7 +116,7 @@ public class ClientService {
     @Transactional
     public ClientCreateResponse createClient(CreateClientRequest request, SessionUser sessionUser) {
         User currentUser = accessPolicyService.getCurrentUser(sessionUser);
-        User primaryWorker = userRepository.findById(request.primaryWorkerId())
+        User primaryWorker = userRepository.findById(Objects.requireNonNull(request.primaryWorkerId(), "primaryWorkerId must not be null"))
                 .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "PRIMARY_WORKER_NOT_FOUND", "담당자를 찾을 수 없습니다."));
         if (primaryWorker.getStatus() != UserStatus.ACTIVE) {
             throw new AppException(HttpStatus.BAD_REQUEST, "PRIMARY_WORKER_NOT_ACTIVE", "활성 사용자만 담당자로 지정할 수 있습니다.");
@@ -146,7 +147,7 @@ public class ClientService {
     @Transactional(readOnly = true)
     public ClientDetailResponse getClientDetail(Long clientId, SessionUser sessionUser) {
         User currentUser = accessPolicyService.getCurrentUser(sessionUser);
-        Client client = clientRepository.findById(clientId)
+        Client client = clientRepository.findById(Objects.requireNonNull(clientId, "clientId must not be null"))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "CLIENT_NOT_FOUND", "대상자를 찾을 수 없습니다."));
         accessPolicyService.assertCanViewClient(currentUser, client);
 
@@ -180,11 +181,11 @@ public class ClientService {
     @Transactional
     public ClientDetailResponse updateClient(Long clientId, UpdateClientRequest request, SessionUser sessionUser) {
         User currentUser = accessPolicyService.getCurrentUser(sessionUser);
-        Client client = clientRepository.findById(clientId)
+        Client client = clientRepository.findById(Objects.requireNonNull(clientId, "clientId must not be null"))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "CLIENT_NOT_FOUND", "대상자를 찾을 수 없습니다."));
         accessPolicyService.assertCanUpdateClient(currentUser, client);
 
-        User primaryWorker = userRepository.findById(request.primaryWorkerId())
+        User primaryWorker = userRepository.findById(Objects.requireNonNull(request.primaryWorkerId(), "primaryWorkerId must not be null"))
                 .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "PRIMARY_WORKER_NOT_FOUND", "담당자를 찾을 수 없습니다."));
         if (primaryWorker.getStatus() != UserStatus.ACTIVE) {
             throw new AppException(HttpStatus.BAD_REQUEST, "PRIMARY_WORKER_NOT_ACTIVE", "활성 사용자만 담당자로 지정할 수 있습니다.");
@@ -211,7 +212,7 @@ public class ClientService {
     @Transactional
     public ClientStatusChangeResponse markMisregistered(Long clientId, MarkMisregisteredRequest request, SessionUser sessionUser) {
         User currentUser = accessPolicyService.getCurrentUser(sessionUser);
-        Client client = clientRepository.findById(clientId)
+        Client client = clientRepository.findById(Objects.requireNonNull(clientId, "clientId must not be null"))
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "CLIENT_NOT_FOUND", "대상자를 찾을 수 없습니다."));
         accessPolicyService.assertCanMarkClientMisregistered(currentUser, client);
         if (client.getStatus() == ClientStatus.MISREGISTERED) {
