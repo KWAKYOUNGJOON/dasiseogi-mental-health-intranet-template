@@ -341,18 +341,31 @@ docker compose ps
 
 배포 후 smoke test 최소 범위:
 1. `health` endpoint 확인
+   - HTTP `200`, `status=UP`, `appStatus=UP`, `dbStatus=UP`, `scaleRegistryStatus=UP`, `loadedScaleCount` 가 기대 척도 수와 일치하는지 확인한다.
 2. 관리자 로그인 확인
-   - `/login` 접속, 로그인 전 `/api/v1/auth/me` 가 `401` 인지 확인, 로그인 후 `/api/v1/auth/me` 가 사용자 정보를 반환하는지 확인한다.
-3. 관리자 메뉴 접근 확인
+   - bootstrap 또는 기존 운영 관리자 계정으로 로그인 성공을 확인한다.
+3. 관리자 메뉴 접근 확인 / 일반 사용자 계정 관리자 메뉴 미노출 확인
+   - 관리자 메뉴 접근이 가능하고 일반 사용자 계정에서는 관리자 메뉴가 노출되지 않는지 확인한다.
 4. 대상자 생성 확인
+   - 신규 대상자 생성 성공, `clientNo` 생성, 상세 화면 또는 응답 정상 여부를 확인한다.
 5. 최소 2종 세션 저장 확인
+   - 예: `PHQ-9 + GAD-7` 조합 등 최소 2종 척도 세션 저장 성공과 `sessionNo` 생성을 확인한다.
 6. 세션 상세 확인
+   - 방금 저장한 세션 상세 화면이 정상 열리고 총점, 판정, 경고, 문항 응답 표시가 정상인지 확인한다.
 7. `print view` 확인
+   - 같은 세션의 `print view` 가 정상 표시되고 인쇄 화면까지 확인되며 세션 메모는 포함되지 않는지 확인한다.
 8. `statistics` 확인
-   - `statistics/summary`, `statistics/scales`, `statistics/alerts` 를 함께 확인한다.
+   - `statistics/summary`, `statistics/scales`, `statistics/alerts` 가 모두 정상 응답하고 최신 저장 데이터가 집계에 반영되는지 확인한다.
 9. `CSV export` 확인
+   - 관리자 계정 기준 다운로드 성공, 빈 파일 아님, 인코딩 또는 컬럼 깨짐 없음을 확인한다.
 10. 활동 로그 확인
+   - 로그인, 대상자 생성, 세션 저장, `print view`, export, 백업 등 주요 행위가 최신순으로 남는지 확인한다.
 11. 수동 백업 확인
+   - 운영에서 사용하기로 한 수동 백업 절차 1회 확인, 백업 이력과 실제 산출물 또는 운영 승인 대체 수단이 일치하는지 확인한다.
+
+보조 인증 점검:
+- `/login` 접속 후 로그인 전 `/api/v1/auth/me` 가 `401` 인지 확인한다.
+- 로그인 후 `/api/v1/auth/me` 가 사용자 정보를 반환하는지 확인한다.
 
 ---
 
