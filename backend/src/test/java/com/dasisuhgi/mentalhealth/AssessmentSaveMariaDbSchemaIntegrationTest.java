@@ -135,6 +135,38 @@ class AssessmentSaveMariaDbSchemaIntegrationTest {
                 .andExpect(jsonPath("$.data.scales[1].scaleCode").value("GAD7"));
     }
 
+    @Test
+    void createClientAndFetchDetailAgainstSchemaSqlOnMariaDb() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+
+        MvcResult createResult = mockMvc.perform(post("/api/v1/clients")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "name", "마리아신규대상",
+                                "gender", "FEMALE",
+                                "birthDate", "1991-05-17",
+                                "phone", "010-1111-2222",
+                                "primaryWorkerId", 2L
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").isNumber())
+                .andExpect(jsonPath("$.data.clientNo").isString())
+                .andReturn();
+
+        long clientId = body(createResult).path("data").path("id").asLong();
+
+        mockMvc.perform(get("/api/v1/clients/{clientId}", clientId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(clientId))
+                .andExpect(jsonPath("$.data.name").value("마리아신규대상"))
+                .andExpect(jsonPath("$.data.birthDate").value("1991-05-17"))
+                .andExpect(jsonPath("$.data.phone").value("010-1111-2222"))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.recentSessions").isArray())
+                .andExpect(jsonPath("$.data.recentSessions").isEmpty());
+    }
+
     private MockHttpSession login(String loginId, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(APPLICATION_JSON)

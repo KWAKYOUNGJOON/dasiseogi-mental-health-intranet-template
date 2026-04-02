@@ -10,6 +10,7 @@ import { AdminBackupsPage } from '../../pages/admin/AdminBackupsPage'
 import { AdminLogsPage } from '../../pages/admin/AdminLogsPage'
 import { AdminSignupRequestsPage } from '../../pages/admin/AdminSignupRequestsPage'
 import { AdminUsersPage } from '../../pages/admin/AdminUsersPage'
+import { MyInfoPage } from '../../pages/account/MyInfoPage'
 import { LoginPage } from '../../pages/auth/LoginPage'
 import { SignupRequestPage } from '../../pages/auth/SignupRequestPage'
 import { ClientCreatePage } from '../../pages/clients/ClientCreatePage'
@@ -167,6 +168,7 @@ export function AppRouter() {
       <Route element={<ProtectedLayout />}>
         <Route path="/" element={<Navigate to="/clients" replace />} />
         <Route path="/clients" element={<ClientListPage />} />
+        <Route path="/my-info" element={<MyInfoPage />} />
         <Route path="/clients/new" element={<ClientCreatePage />} />
         <Route path="/clients/:clientId" element={<ClientDetailPage />} />
         <Route path="/clients/:clientId/edit" element={<ClientEditPage />} />

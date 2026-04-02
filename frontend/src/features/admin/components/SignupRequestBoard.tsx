@@ -33,6 +33,11 @@ const EMPTY_STATE_MESSAGE = '조건에 맞는 가입 신청이 없습니다.'
 const GENERIC_VALIDATION_MESSAGE = '입력값을 다시 확인해주세요.'
 const GENERIC_LIST_ERROR_MESSAGE = '가입 신청 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
 const GENERIC_PROCESS_ERROR_MESSAGE = '가입 신청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+const SIGNUP_REQUEST_STATUS_LABELS: Record<SignupRequestManagementStatus, string> = {
+  PENDING: '승인 대기',
+  APPROVED: '승인 완료',
+  REJECTED: '반려',
+}
 
 function createDefaultFilters(): FilterState {
   return {
@@ -74,14 +79,7 @@ function getSignupRequestErrorMessage(response: ApiResponse<unknown> | undefined
 }
 
 function getStatusLabel(status: SignupRequestManagementStatus) {
-  switch (status) {
-    case 'APPROVED':
-      return '승인 완료'
-    case 'REJECTED':
-      return '반려 완료'
-    default:
-      return '승인 대기'
-  }
+  return SIGNUP_REQUEST_STATUS_LABELS[status]
 }
 
 function getStatusStyle(status: SignupRequestManagementStatus): CSSProperties {
@@ -310,7 +308,7 @@ export function SignupRequestBoard() {
             >
               {SIGNUP_REQUEST_STATUS_OPTIONS.map((statusOption) => (
                 <option key={statusOption} value={statusOption}>
-                  {statusOption}
+                  {getStatusLabel(statusOption)}
                 </option>
               ))}
             </select>

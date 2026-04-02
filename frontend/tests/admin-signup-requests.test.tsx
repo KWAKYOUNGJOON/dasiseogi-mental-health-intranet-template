@@ -132,6 +132,18 @@ describe('admin signup requests', () => {
     expect(screen.getByText('jwkim')).toBeTruthy()
     expect(screen.getByText('신규 입사자 계정 요청')).toBeTruthy()
     expect(screen.getByText('승인 대기')).toBeTruthy()
+
+    const statusSelect = screen.getByLabelText('상태') as HTMLSelectElement
+    expect(
+      Array.from(statusSelect.options).map((option) => ({
+        label: option.text,
+        value: option.value,
+      })),
+    ).toEqual([
+      { label: '승인 대기', value: 'PENDING' },
+      { label: '승인 완료', value: 'APPROVED' },
+      { label: '반려', value: 'REJECTED' },
+    ])
   })
 
   it('applies filters on search and restores defaults on reset', async () => {

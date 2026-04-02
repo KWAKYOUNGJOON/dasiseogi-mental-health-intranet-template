@@ -98,6 +98,14 @@ function renderLoginPage(initialEntries: string[] = ['/login']) {
   )
 }
 
+async function fillLoginForm(user: ReturnType<typeof userEvent.setup>, loginId = 'usera', password = 'Test1234!') {
+  const loginIdInput = screen.getByLabelText('아이디')
+  const passwordInput = screen.getByLabelText('비밀번호')
+
+  await user.type(loginIdInput, loginId)
+  await user.type(passwordInput, password)
+}
+
 beforeEach(() => {
   mockNavigate.mockReset()
   mockLogin.mockReset()
@@ -119,6 +127,7 @@ describe('auth login page', () => {
     renderLoginPage()
 
     expect(screen.getByRole('heading', { name: '다시서기 정신건강 평가관리 시스템' })).toBeTruthy()
+    expect(screen.getByText('업무용 계정 정보를 입력해 로그인해주세요.')).toBeTruthy()
     expect(screen.getByLabelText('아이디')).toBeTruthy()
     expect(screen.getByLabelText('비밀번호')).toBeTruthy()
 
@@ -126,6 +135,16 @@ describe('auth login page', () => {
 
     expect(signupLink).toBeTruthy()
     expect(signupLink.getAttribute('href')).toBe('/signup')
+  })
+
+  it('renders empty login inputs and hides seeded account guidance on first load', () => {
+    renderLoginPage()
+
+    expect(screen.getByLabelText('아이디')).toHaveValue('')
+    expect(screen.getByLabelText('비밀번호')).toHaveValue('')
+    expect(screen.queryByText(/seed 계정/i)).toBeNull()
+    expect(screen.queryByText(/admina/i)).toBeNull()
+    expect(screen.queryByText(/Test1234!/i)).toBeNull()
   })
 
   it('shows the signup requested notice from the query string', () => {
@@ -143,6 +162,7 @@ describe('auth login page', () => {
 
     expect(screen.getByText('세션이 만료되었습니다. 다시 로그인해주세요.')).toBeTruthy()
 
+    await fillLoginForm(user)
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     await waitFor(() => {
@@ -243,6 +263,7 @@ describe('auth login page', () => {
     )
 
     renderLoginPage()
+    await fillLoginForm(user)
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     await waitFor(() => {
@@ -257,6 +278,7 @@ describe('auth login page', () => {
     mockLogin.mockRejectedValue(new Error('network'))
 
     renderLoginPage()
+    await fillLoginForm(user)
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     await waitFor(() => {

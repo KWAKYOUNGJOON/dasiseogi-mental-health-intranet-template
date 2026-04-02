@@ -4,7 +4,7 @@ import { LoginForm } from '../../features/auth/components/LoginForm'
 export function LoginPage() {
   return (
     <AuthFormShell
-      description="seed 계정: `admina / Test1234!`, `usera / Test1234!`"
+      description="업무용 계정 정보를 입력해 로그인해주세요."
       title="다시서기 정신건강 평가관리 시스템"
     >
       <LoginForm />

@@ -7,8 +7,8 @@ export interface LoginFormValues {
 }
 
 export const DEFAULT_LOGIN_FORM_VALUES: LoginFormValues = {
-  loginId: 'admina',
-  password: 'Test1234!',
+  loginId: '',
+  password: '',
 }
 
 export const DEFAULT_LOGIN_ERROR_MESSAGE = '로그인에 실패했습니다.'

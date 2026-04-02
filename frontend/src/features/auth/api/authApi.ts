@@ -18,6 +18,13 @@ export interface LoginResponse {
   sessionTimeoutMinutes: number
 }
 
+export interface UpdateMyProfilePayload {
+  name: string
+  phone?: string
+  positionName?: string
+  teamName?: string
+}
+
 export async function login(loginId: string, password: string) {
   const response = await http.post<ApiResponse<LoginResponse>>('/auth/login', { loginId, password })
   return response.data.data
@@ -38,6 +45,11 @@ export async function fetchMeOrNull() {
 
     throw error
   }
+}
+
+export async function updateMyProfile(payload: UpdateMyProfilePayload) {
+  const response = await http.patch<ApiResponse<AuthUser>>('/auth/me', payload)
+  return response.data.data
 }
 
 export async function logout() {

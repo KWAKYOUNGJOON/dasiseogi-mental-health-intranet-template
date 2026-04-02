@@ -1,6 +1,5 @@
 package com.dasisuhgi.mentalhealth.client.service;
 
-import com.dasisuhgi.mentalhealth.assessment.entity.AssessmentSession;
 import com.dasisuhgi.mentalhealth.assessment.entity.AssessmentSessionStatus;
 import com.dasisuhgi.mentalhealth.assessment.repository.AssessmentSessionRepository;
 import com.dasisuhgi.mentalhealth.audit.entity.ActivityActionType;
@@ -15,6 +14,7 @@ import com.dasisuhgi.mentalhealth.client.dto.DuplicateCandidateResponse;
 import com.dasisuhgi.mentalhealth.client.dto.DuplicateCheckRequest;
 import com.dasisuhgi.mentalhealth.client.dto.DuplicateCheckResponse;
 import com.dasisuhgi.mentalhealth.client.dto.MarkMisregisteredRequest;
+import com.dasisuhgi.mentalhealth.client.dto.RecentSessionSummaryQueryRow;
 import com.dasisuhgi.mentalhealth.client.dto.RecentSessionSummaryResponse;
 import com.dasisuhgi.mentalhealth.client.dto.UpdateClientRequest;
 import com.dasisuhgi.mentalhealth.client.entity.Client;
@@ -36,6 +36,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -133,7 +134,7 @@ public class ClientService {
         client.setStatus(ClientStatus.ACTIVE);
 
         Client saved = clientRepository.save(client);
-        activityLogService.log(
+        activityLogService.logBestEffort(
                 currentUser,
                 ActivityActionType.CLIENT_CREATE,
                 ActivityTargetType.CLIENT,
@@ -152,7 +153,7 @@ public class ClientService {
         accessPolicyService.assertCanViewClient(currentUser, client);
 
         List<RecentSessionSummaryResponse> recentSessions = assessmentSessionRepository
-                .findTop10ByClientIdAndStatusOrderBySessionCompletedAtDesc(clientId, AssessmentSessionStatus.COMPLETED)
+                .findRecentSessionSummaries(clientId, AssessmentSessionStatus.COMPLETED, PageRequest.of(0, 10))
                 .stream()
                 .map(this::toRecentSession)
                 .toList();
@@ -197,7 +198,7 @@ public class ClientService {
         client.setPhone(blankToNull(request.phone()));
         client.setPrimaryWorker(primaryWorker);
 
-        activityLogService.log(
+        activityLogService.logBestEffort(
                 currentUser,
                 ActivityActionType.CLIENT_UPDATE,
                 ActivityTargetType.CLIENT,
@@ -223,7 +224,7 @@ public class ClientService {
         client.setMisregisteredAt(LocalDateTime.now());
         client.setMisregisteredBy(currentUser);
         client.setMisregisteredReason(request.reason().trim());
-        activityLogService.log(
+        activityLogService.logBestEffort(
                 currentUser,
                 ActivityActionType.CLIENT_MARK_MISREGISTERED,
                 ActivityTargetType.CLIENT,
@@ -239,15 +240,15 @@ public class ClientService {
         );
     }
 
-    private RecentSessionSummaryResponse toRecentSession(AssessmentSession session) {
+    private RecentSessionSummaryResponse toRecentSession(RecentSessionSummaryQueryRow session) {
         return new RecentSessionSummaryResponse(
-                session.getId(),
-                session.getSessionNo(),
-                DATETIME_FORMAT.format(session.getSessionCompletedAt()),
-                session.getPerformedBy().getName(),
-                session.getScaleCount(),
-                session.isHasAlert(),
-                session.getStatus().name()
+                session.id(),
+                session.sessionNo(),
+                DATETIME_FORMAT.format(session.sessionCompletedAt()),
+                session.performedByName(),
+                session.scaleCount(),
+                session.hasAlert(),
+                session.status().name()
         );
     }
 

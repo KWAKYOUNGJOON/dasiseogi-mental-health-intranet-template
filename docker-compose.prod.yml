@@ -1,0 +1,79 @@
+services:
+  backend:
+    image: youngjoon0520/dasiseogi-backend:latest
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      APP_DB_URL_DOCKER: jdbc:mariadb://db:3306/${PROD_DB_NAME:-mental_health}?useUnicode=true&characterEncoding=utf8
+      APP_DB_USERNAME: ${PROD_DB_USERNAME:-mental_user}
+      APP_DB_PASSWORD: ${PROD_DB_PASSWORD}
+      APP_DB_DRIVER: ${APP_DB_DRIVER:-org.mariadb.jdbc.Driver}
+      APP_SESSION_TIMEOUT: ${APP_SESSION_TIMEOUT:-120m}
+      APP_FORWARD_HEADERS_STRATEGY: ${APP_FORWARD_HEADERS_STRATEGY:-none}
+      APP_TRUST_PROXY_HEADERS: ${APP_TRUST_PROXY_HEADERS:-false}
+      APP_LOG_FILE_PATH: /data/logs
+      APP_EXPORT_TEMP_PATH: /data/tmp/exports
+      APP_BACKUP_ROOT_PATH: /data/backups
+    volumes:
+      - backend_logs:/data/logs
+      - backend_tmp:/data/tmp
+      - backend_backups:/data/backups
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/v1/health > /dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    ports:
+      - "8080:8080"
+    networks:
+      - dasiseogi-network
+
+  frontend:
+    image: youngjoon0520/dasiseogi-frontend:latest
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "4173:4173"
+    networks:
+      - dasiseogi-network
+
+  db:
+    image: mariadb:11.4
+    restart: always
+    environment:
+      MARIADB_DATABASE: ${PROD_DB_NAME:-mental_health}
+      MARIADB_USER: ${PROD_DB_USERNAME:-mental_user}
+      MARIADB_PASSWORD: ${PROD_DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${PROD_DB_ROOT_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./backend/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mariadb-admin ping -h 127.0.0.1 -uroot -p$$MARIADB_ROOT_PASSWORD --silent || exit 1
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    networks:
+      - dasiseogi-network
+
+volumes:
+  backend_logs:
+  backend_tmp:
+  backend_backups:
+  db_data:
+
+networks:
+  dasiseogi-network:
+    driver: bridge

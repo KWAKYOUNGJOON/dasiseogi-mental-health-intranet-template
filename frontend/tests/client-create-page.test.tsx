@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
@@ -138,6 +138,19 @@ describe('client create page', () => {
     expect(screen.getByLabelText(/^생년월일/)).toBeTruthy()
     expect(screen.getByLabelText(/^연락처/)).toBeTruthy()
     expect((screen.getByLabelText(/^담당자/) as HTMLInputElement).value).toBe('김담당')
+    expect(screen.getByRole('button', { name: '취소' })).toBeTruthy()
+  })
+
+  it('navigates to the client list without calling apis when cancel is clicked', async () => {
+    const user = userEvent.setup()
+
+    renderClientCreatePage()
+
+    await user.click(screen.getByRole('button', { name: '취소' }))
+
+    expect(mockNavigate).toHaveBeenCalledWith('/clients')
+    expect(mockedCreateClient).not.toHaveBeenCalled()
+    expect(mockedDuplicateCheck).not.toHaveBeenCalled()
   })
 
   it('blocks submit when required values are missing or the phone format is invalid', async () => {
@@ -161,7 +174,7 @@ describe('client create page', () => {
     expect(screen.getByText('연락처 형식을 확인해주세요.')).toBeTruthy()
   })
 
-  it('keeps the duplicate check warning behavior', async () => {
+  it('renders duplicate candidates with the existing warning message', async () => {
     const user = userEvent.setup()
 
     mockedDuplicateCheck.mockResolvedValue({
@@ -175,6 +188,15 @@ describe('client create page', () => {
           gender: 'MALE',
           primaryWorkerName: '기존 담당자',
           status: 'ACTIVE',
+        },
+        {
+          id: 12,
+          clientNo: 'CL-00012',
+          name: '김대상',
+          birthDate: '1990-01-02',
+          gender: 'FEMALE',
+          primaryWorkerName: '오등록 담당자',
+          status: 'MISREGISTERED',
         },
       ],
     })
@@ -191,16 +213,118 @@ describe('client create page', () => {
     })
 
     expect(screen.getByText('동일 이름/생년월일 대상자가 이미 있습니다. 계속 등록할 수 있습니다.')).toBeTruthy()
+    const duplicateCandidateTable = screen.getByRole('table', { name: '중복 후보 목록' })
+    const tableScope = within(duplicateCandidateTable)
+
+    expect(tableScope.getByRole('columnheader', { name: '사례번호' })).toBeTruthy()
+    expect(tableScope.getByRole('columnheader', { name: '담당자' })).toBeTruthy()
+    expect(tableScope.getByText('CL-00011')).toBeTruthy()
+    expect(tableScope.getByText('기존 담당자')).toBeTruthy()
+    expect(tableScope.getByText('활성')).toBeTruthy()
+    expect(tableScope.getByText('CL-00012')).toBeTruthy()
+    expect(tableScope.getByText('오등록 담당자')).toBeTruthy()
+    expect(tableScope.getByText('오등록')).toBeTruthy()
+  })
+
+  it('hides the duplicate candidate list when the duplicate check has no matches', async () => {
+    const user = userEvent.setup()
+
+    mockedDuplicateCheck.mockResolvedValue({
+      isDuplicate: false,
+      candidates: [],
+    })
+
+    renderClientCreatePage()
+    await fillClientCreateForm(user)
+    await user.click(screen.getByRole('button', { name: '중복 확인' }))
+
+    await waitFor(() => {
+      expect(mockedDuplicateCheck).toHaveBeenCalledWith({
+        name: '김대상',
+        birthDate: '1990-01-02',
+      })
+    })
+
+    expect(screen.getByText('중복 후보가 없습니다.')).toBeTruthy()
+    expect(screen.queryByRole('table', { name: '중복 후보 목록' })).toBeNull()
+  })
+
+  it('clears the previous duplicate candidates when the identifying fields change and checks again', async () => {
+    const user = userEvent.setup()
+
+    mockedDuplicateCheck.mockResolvedValueOnce({
+      isDuplicate: true,
+      candidates: [
+        {
+          id: 11,
+          clientNo: 'CL-00011',
+          name: '김대상',
+          birthDate: '1990-01-02',
+          gender: 'MALE',
+          primaryWorkerName: '기존 담당자',
+          status: 'ACTIVE',
+        },
+      ],
+    })
+    mockedDuplicateCheck.mockResolvedValueOnce({
+      isDuplicate: false,
+      candidates: [],
+    })
+
+    renderClientCreatePage()
+    await fillClientCreateForm(user)
+    await user.click(screen.getByRole('button', { name: '중복 확인' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('CL-00011')).toBeTruthy()
+    })
+
+    await user.clear(screen.getByLabelText(/^이름/))
+    await user.type(screen.getByLabelText(/^이름/), '이새대상')
+
+    expect(screen.queryByText('CL-00011')).toBeNull()
+    expect(screen.queryByRole('table', { name: '중복 후보 목록' })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: '중복 확인' }))
+
+    await waitFor(() => {
+      expect(mockedDuplicateCheck).toHaveBeenLastCalledWith({
+        name: '이새대상',
+        birthDate: '1990-01-02',
+      })
+    })
+
+    expect(screen.getByText('중복 후보가 없습니다.')).toBeTruthy()
+    expect(screen.queryByText('CL-00011')).toBeNull()
   })
 
   it('submits once and keeps the existing success navigation', async () => {
     const deferredCreate = createDeferredPromise<{ clientNo: string; id: number }>()
     const user = userEvent.setup()
 
+    mockedDuplicateCheck.mockResolvedValue({
+      isDuplicate: true,
+      candidates: [
+        {
+          id: 11,
+          clientNo: 'CL-00011',
+          name: '김대상',
+          birthDate: '1990-01-02',
+          gender: 'MALE',
+          primaryWorkerName: '기존 담당자',
+          status: 'ACTIVE',
+        },
+      ],
+    })
     mockedCreateClient.mockReturnValue(deferredCreate.promise)
 
     renderClientCreatePage()
     await fillClientCreateForm(user, { phone: '010-1111-2222' })
+    await user.click(screen.getByRole('button', { name: '중복 확인' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('동일 이름/생년월일 대상자가 이미 있습니다. 계속 등록할 수 있습니다.')).toBeTruthy()
+    })
 
     await user.click(screen.getByRole('button', { name: '저장' }))
 

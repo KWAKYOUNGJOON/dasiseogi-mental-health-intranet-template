@@ -2,6 +2,7 @@ package com.dasisuhgi.mentalhealth.audit.entity;
 
 public enum ActivityActionType {
     LOGIN,
+    USER_PROFILE_UPDATE,
     SIGNUP_REQUEST,
     SIGNUP_APPROVE,
     SIGNUP_REJECT,

@@ -45,6 +45,13 @@ const FIELD_DEFINITIONS: ReadonlyArray<FieldDefinition> = [
   { name: 'birthDate', label: '생년월일', type: 'date' },
   { name: 'phone', label: '연락처', autoComplete: 'tel', inputMode: 'tel', maxLength: 20 },
 ]
+const DUPLICATE_CANDIDATE_STATUS_LABELS: Readonly<Record<string, string>> = {
+  ACTIVE: '활성',
+  INACTIVE: '비활성',
+  MISREGISTERED: '오등록',
+}
+
+type DuplicateCandidate = Awaited<ReturnType<typeof requestClientDuplicateCheck>>['candidates'][number]
 
 function getFieldInputClassName(error: string | undefined) {
   return error ? 'input-error' : undefined
@@ -62,6 +69,14 @@ function getFieldDescribedBy(field: ClientCreateFieldName, hasError: boolean) {
   return hasError ? getFieldErrorId(field) : undefined
 }
 
+function getDuplicateCandidateStatusLabel(status: string | null | undefined) {
+  if (!status) {
+    return '-'
+  }
+
+  return DUPLICATE_CANDIDATE_STATUS_LABELS[status] ?? status
+}
+
 export function ClientCreateForm() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -70,6 +85,7 @@ export function ClientCreateForm() {
   const [fieldErrors, setFieldErrors] = useState<ClientCreateFieldErrors>({})
   const [formMessage, setFormMessage] = useState<string | null>(null)
   const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null)
+  const [duplicateCandidates, setDuplicateCandidates] = useState<DuplicateCandidate[]>([])
   const [checkingDuplicate, setCheckingDuplicate] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -101,6 +117,11 @@ export function ClientCreateForm() {
     })
   }
 
+  function resetDuplicateCheckResult() {
+    setDuplicateMessage(null)
+    setDuplicateCandidates([])
+  }
+
   function handleFieldChange(field: ClientCreateFieldName) {
     return (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       const value =
@@ -110,7 +131,7 @@ export function ClientCreateForm() {
       setForm(nextForm)
 
       if (field === 'name' || field === 'birthDate') {
-        setDuplicateMessage(null)
+        resetDuplicateCheckResult()
       }
 
       if (touched[field]) {
@@ -136,7 +157,7 @@ export function ClientCreateForm() {
       const nextForm = { ...form, [field]: value } as ClientCreateFormValues
 
       setForm(nextForm)
-      setDuplicateMessage(null)
+      resetDuplicateCheckResult()
 
       if (touched[field]) {
         updateFieldError(field, nextForm)
@@ -173,12 +194,14 @@ export function ClientCreateForm() {
     }
 
     setFormMessage(null)
+    resetDuplicateCheckResult()
     setCheckingDuplicate(true)
 
     try {
       const response = await requestClientDuplicateCheck(form)
 
       setDuplicateMessage(getDuplicateCheckMessage(response.isDuplicate))
+      setDuplicateCandidates(response.candidates)
     } catch (error) {
       const response = getClientCreateApiResponse(error)
 
@@ -224,6 +247,10 @@ export function ClientCreateForm() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function handleCancel() {
+    navigate('/clients')
   }
 
   return (
@@ -346,7 +373,40 @@ export function ClientCreateForm() {
 
       {duplicateMessage ? <div className="muted">{duplicateMessage}</div> : null}
 
+      {duplicateCandidates.length > 0 ? (
+        <div className="stack" style={{ gap: 12 }}>
+          <p style={{ fontWeight: 600, margin: 0 }}>중복 후보 목록</p>
+          <div style={{ overflowX: 'auto' }}>
+            <table aria-label="중복 후보 목록" className="table">
+              <thead>
+                <tr>
+                  <th>사례번호</th>
+                  <th>이름</th>
+                  <th>생년월일</th>
+                  <th>담당자</th>
+                  <th>상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                {duplicateCandidates.map((candidate) => (
+                  <tr key={candidate.id}>
+                    <td>{candidate.clientNo}</td>
+                    <td>{candidate.name}</td>
+                    <td>{candidate.birthDate}</td>
+                    <td>{candidate.primaryWorkerName || '-'}</td>
+                    <td>{getDuplicateCandidateStatusLabel(candidate.status)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
       <div className="actions">
+        <button className="secondary-button" disabled={submitting} onClick={handleCancel} type="button">
+          취소
+        </button>
         <button className="primary-button" disabled={submitting} type="submit">
           {submitting ? '저장 중...' : '저장'}
         </button>

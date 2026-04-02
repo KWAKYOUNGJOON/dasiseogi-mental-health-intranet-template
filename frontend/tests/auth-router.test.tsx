@@ -134,6 +134,20 @@ describe('auth router', () => {
     renderRouter()
 
     expect(await screen.findByText('보호된 화면')).toBeTruthy()
+    expect(screen.getByRole('link', { name: '내 정보' }).getAttribute('href')).toBe('/my-info')
+  })
+
+  it('renders the my-info route when the session is authenticated', async () => {
+    mockUseAuth.mockReturnValue(
+      createAuthValue({
+        user: createUser(),
+        status: 'authenticated',
+      }),
+    )
+
+    renderRouter(['/my-info'])
+
+    expect(await screen.findByRole('heading', { name: '내 정보' })).toBeTruthy()
   })
 
   it('redirects unauthenticated protected routes to the login page', async () => {

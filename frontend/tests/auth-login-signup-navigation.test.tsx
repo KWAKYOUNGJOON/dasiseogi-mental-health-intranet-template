@@ -71,6 +71,14 @@ function renderLoginPage() {
   )
 }
 
+async function fillLoginForm(user: ReturnType<typeof userEvent.setup>, loginId = 'usera', password = 'Test1234!') {
+  const loginIdInput = screen.getByLabelText('아이디')
+  const passwordInput = screen.getByLabelText('비밀번호')
+
+  await user.type(loginIdInput, loginId)
+  await user.type(passwordInput, password)
+}
+
 beforeEach(() => {
   mockNavigate.mockReset()
   mockLogin.mockReset()
@@ -164,6 +172,7 @@ describe('auth login to signup navigation', () => {
 
     renderLoginPage()
 
+    await fillLoginForm(user)
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     await waitFor(() => {

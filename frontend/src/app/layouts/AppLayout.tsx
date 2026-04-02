@@ -29,13 +29,18 @@ export function AppLayout() {
       </aside>
       <div className="content-shell">
         <header className="topbar">
-          <div>
+          <div className="topbar-user">
             <strong>{user?.name}</strong>
             <span>{user?.role === 'ADMIN' ? '관리자' : '일반 사용자'}</span>
           </div>
-          <button className="secondary-button" onClick={() => void handleLogout()}>
-            로그아웃
-          </button>
+          <div className="topbar-actions">
+            <NavLink className="secondary-button" to="/my-info">
+              내 정보
+            </NavLink>
+            <button className="secondary-button" onClick={() => void handleLogout()}>
+              로그아웃
+            </button>
+          </div>
         </header>
         <main className="page-content">
           <Outlet />

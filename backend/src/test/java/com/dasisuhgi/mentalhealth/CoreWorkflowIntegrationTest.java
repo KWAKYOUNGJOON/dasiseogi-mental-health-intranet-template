@@ -196,6 +196,93 @@ class CoreWorkflowIntegrationTest {
     }
 
     @Test
+    void updateMyProfileUpdatesOnlyWhitelistedFields() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+        User beforeUpdate = findUser("usera");
+
+        mockMvc.perform(patch("/api/v1/auth/me")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "name", "수정사용자",
+                                "phone", "010-9999-8888",
+                                "positionName", "선임 상담사",
+                                "teamName", "통합지원팀"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.loginId").value("usera"))
+                .andExpect(jsonPath("$.data.name").value("수정사용자"))
+                .andExpect(jsonPath("$.data.phone").value("010-9999-8888"))
+                .andExpect(jsonPath("$.data.positionName").value("선임 상담사"))
+                .andExpect(jsonPath("$.data.teamName").value("통합지원팀"))
+                .andExpect(jsonPath("$.data.role").value(beforeUpdate.getRole().name()))
+                .andExpect(jsonPath("$.data.status").value(beforeUpdate.getStatus().name()));
+
+        User updated = findUser("usera");
+        assertThat(updated.getId()).isEqualTo(beforeUpdate.getId());
+        assertThat(updated.getLoginId()).isEqualTo("usera");
+        assertThat(updated.getName()).isEqualTo("수정사용자");
+        assertThat(updated.getPhone()).isEqualTo("010-9999-8888");
+        assertThat(updated.getPositionName()).isEqualTo("선임 상담사");
+        assertThat(updated.getTeamName()).isEqualTo("통합지원팀");
+        assertThat(updated.getRole()).isEqualTo(beforeUpdate.getRole());
+        assertThat(updated.getStatus()).isEqualTo(beforeUpdate.getStatus());
+
+        mockMvc.perform(get("/api/v1/auth/me").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("수정사용자"));
+
+        assertThat(hasActivityLog(ActivityActionType.USER_PROFILE_UPDATE, updated.getId())).isTrue();
+    }
+
+    @Test
+    void updateMyProfileRejectsProtectedFieldsFromPayload() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("name", "사용자A");
+        payload.put("role", "ADMIN");
+        payload.put("status", "INACTIVE");
+        payload.put("loginId", "changed-login-id");
+
+        MvcResult result = mockMvc.perform(patch("/api/v1/auth/me")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(payload)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode").value("USER_PROFILE_UPDATE_FIELD_NOT_ALLOWED"))
+                .andReturn();
+
+        assertThat(textValues(body(result).path("fieldErrors"), "field"))
+                .contains("loginId", "role", "status");
+
+        User unchanged = findUser("usera");
+        assertThat(unchanged.getLoginId()).isEqualTo("usera");
+        assertThat(unchanged.getRole().name()).isEqualTo("USER");
+        assertThat(unchanged.getStatus().name()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void updateMyProfileValidatesPhoneFormat() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+
+        mockMvc.perform(patch("/api/v1/auth/me")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "name", "사용자A",
+                                "phone", "01012"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("phone"))
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("연락처 형식을 확인해주세요."));
+    }
+
+    @Test
     void signupRequestCreatesUserApprovalRequest() throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/signup-requests")
                         .header("X-Forwarded-For", "198.51.100.20")
@@ -1183,12 +1270,13 @@ class CoreWorkflowIntegrationTest {
         login("usera", "Test1234!");
         login("userb", "Test1234!");
         MockHttpSession session = login("admina", "Test1234!");
+        LocalDate today = LocalDate.now();
 
         MvcResult pageOne = mockMvc.perform(get("/api/v1/admin/activity-logs")
                         .session(session)
                         .param("actionType", "LOGIN")
-                        .param("dateFrom", "2026-03-01")
-                        .param("dateTo", "2026-03-31")
+                        .param("dateFrom", today.minusDays(1).toString())
+                        .param("dateTo", today.plusDays(1).toString())
                         .param("page", "1")
                         .param("size", "1"))
                 .andExpect(status().isOk())
@@ -1200,8 +1288,8 @@ class CoreWorkflowIntegrationTest {
         MvcResult pageTwo = mockMvc.perform(get("/api/v1/admin/activity-logs")
                         .session(session)
                         .param("actionType", "LOGIN")
-                        .param("dateFrom", "2026-03-01")
-                        .param("dateTo", "2026-03-31")
+                        .param("dateFrom", today.minusDays(1).toString())
+                        .param("dateTo", today.plusDays(1).toString())
                         .param("page", "2")
                         .param("size", "1"))
                 .andExpect(status().isOk())
