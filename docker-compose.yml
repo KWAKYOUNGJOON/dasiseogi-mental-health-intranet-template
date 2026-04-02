@@ -42,8 +42,6 @@ services:
     build:
       context: ./frontend
     image: dasiseogi-frontend:local
-    environment:
-      BACKEND_UPSTREAM_URL: ${FRONTEND_BACKEND_UPSTREAM_URL:-http://backend:8080}
     depends_on:
       backend:
         condition: service_healthy

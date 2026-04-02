@@ -63,9 +63,6 @@
 - `20-production-input-sheet.md`
   운영 입력값과 preflight 체크를 닫기 위한 입력 시트
 
-- `21-fly-io-deployment.md`
-  Fly.io 기준 backend / frontend 분리 배포 절차
-
 ---
 
 ## 3. 문서 읽기 권장 순서
@@ -85,7 +82,6 @@
 13. `18-docker-compose-deployment.md`
 14. `19-production-bootstrap.md`
 15. `20-production-input-sheet.md`
-16. `21-fly-io-deployment.md`
 
 ---
 

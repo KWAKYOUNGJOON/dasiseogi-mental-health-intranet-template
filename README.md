@@ -94,19 +94,6 @@ docker compose ps
 - `.env` 값을 바꾼 뒤에는 `docker compose restart` 가 아니라 `docker compose up -d --force-recreate` 로 다시 반영한다.
 - 현재 `docker-compose.yml` 은 `restart: unless-stopped` 기준이므로, Docker daemon 또는 서버 재부팅 뒤 자동 재기동을 기대할 수 있다.
 
-## Fly.io 배포
-
-Fly.io 배포는 `backend` 와 `frontend` 를 각각 별도 앱으로 올리는 구성을 기준으로 준비되어 있습니다.
-
-- backend 설정: `backend/fly.toml`
-- frontend 설정: `frontend/fly.toml`
-- 상세 절차: `docs/21-fly-io-deployment.md`
-
-핵심 포인트:
-- backend 는 외부 MariaDB 를 secret 으로 받아 기동한다.
-- frontend 는 `/api` 요청을 backend Fly URL 로 프록시한다.
-- 로컬 Compose 기본값은 `FRONTEND_BACKEND_UPSTREAM_URL=http://backend:8080` 이다.
-
 ### 선택형 local DB Compose 경로
 
 외부 MariaDB 경로는 그대로 두고, local MariaDB 를 같은 Compose 프로젝트에 함께 붙여 검증하려면 override 파일을 추가한다.
