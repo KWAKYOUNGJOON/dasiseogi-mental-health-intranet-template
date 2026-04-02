@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../app/providers/AuthProvider'
 import { fetchAdminUsers } from '../../features/admin/api/adminApi'
 import { fetchClientDetail, updateClient, type ClientDetail } from '../../features/clients/api/clientApi'
+import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
 
 export function ClientEditPage() {
@@ -124,7 +125,7 @@ export function ClientEditPage() {
           </label>
           <label className="field">
             <span>생년월일</span>
-            <input onChange={(event) => setForm((prev) => ({ ...prev, birthDate: event.target.value }))} type="date" value={form.birthDate} />
+            <DateTextInput onChange={(birthDate) => setForm((prev) => ({ ...prev, birthDate }))} value={form.birthDate} />
           </label>
           <label className="field">
             <span>연락처</span>

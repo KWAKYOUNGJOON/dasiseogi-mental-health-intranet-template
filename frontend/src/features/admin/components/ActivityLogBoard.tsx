@@ -1,7 +1,9 @@
 import { isAxiosError } from 'axios'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { DateTextInput } from '../../../shared/components/DateTextInput'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import type { ApiResponse } from '../../../shared/types/api'
+import { toValidDateText } from '../../../shared/utils/dateText'
 import {
   ACTIVITY_LOG_ACTION_OPTIONS,
   ACTIVITY_LOG_PAGE_SIZE_OPTIONS,
@@ -73,8 +75,8 @@ function buildQuery(filters: FilterState): Omit<ActivityLogQuery, 'page'> {
   const trimmedUserId = filters.userId.trim()
 
   return {
-    dateFrom: filters.dateFrom || undefined,
-    dateTo: filters.dateTo || undefined,
+    dateFrom: toValidDateText(filters.dateFrom) || undefined,
+    dateTo: toValidDateText(filters.dateTo) || undefined,
     userId: trimmedUserId ? Number(trimmedUserId) : undefined,
     actionType: filters.actionType || undefined,
     size: filters.pageSize,
@@ -82,11 +84,14 @@ function buildQuery(filters: FilterState): Omit<ActivityLogQuery, 'page'> {
 }
 
 function hasInvalidDateRange(filters: FilterState) {
-  if (!filters.dateFrom || !filters.dateTo) {
+  const dateFrom = toValidDateText(filters.dateFrom)
+  const dateTo = toValidDateText(filters.dateTo)
+
+  if (!dateFrom || !dateTo) {
     return false
   }
 
-  return filters.dateFrom > filters.dateTo
+  return dateFrom > dateTo
 }
 
 function hasInvalidUserId(filters: FilterState) {
@@ -179,19 +184,17 @@ export function ActivityLogBoard() {
         <div className="management-filter-grid">
           <label className="field">
             <span>시작일</span>
-            <input
+            <DateTextInput
               aria-label="시작일"
-              onChange={(event) => setFilters((prev) => ({ ...prev, dateFrom: event.target.value }))}
-              type="date"
+              onChange={(dateFrom) => setFilters((prev) => ({ ...prev, dateFrom }))}
               value={filters.dateFrom}
             />
           </label>
           <label className="field">
             <span>종료일</span>
-            <input
+            <DateTextInput
               aria-label="종료일"
-              onChange={(event) => setFilters((prev) => ({ ...prev, dateTo: event.target.value }))}
-              type="date"
+              onChange={(dateTo) => setFilters((prev) => ({ ...prev, dateTo }))}
               value={filters.dateTo}
             />
           </label>

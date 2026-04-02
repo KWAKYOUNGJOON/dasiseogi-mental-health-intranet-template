@@ -54,6 +54,18 @@
 - `11-deployment.md`  
   내부망 운영 배포 구조, 운영 설정, 로그/백업, 롤백 및 장애 대응
 
+- `18-docker-compose-deployment.md`
+  외부 MariaDB 기준 Docker Compose 운영 반영 절차
+
+- `19-production-bootstrap.md`
+  초기 관리자 1건 준비를 위한 부트스트랩 절차
+
+- `20-production-input-sheet.md`
+  운영 입력값과 preflight 체크를 닫기 위한 입력 시트
+
+- `21-fly-io-deployment.md`
+  Fly.io 기준 backend / frontend 분리 배포 절차
+
 ---
 
 ## 3. 문서 읽기 권장 순서
@@ -70,6 +82,10 @@
 10. `09-test-scenarios.md`
 11. `10-dev-setup.md`
 12. `11-deployment.md`
+13. `18-docker-compose-deployment.md`
+14. `19-production-bootstrap.md`
+15. `20-production-input-sheet.md`
+16. `21-fly-io-deployment.md`
 
 ---
 

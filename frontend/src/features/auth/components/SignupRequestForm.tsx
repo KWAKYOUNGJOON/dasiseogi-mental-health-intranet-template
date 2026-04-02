@@ -4,9 +4,19 @@ import { Link, useNavigate } from 'react-router-dom'
 import type { ApiResponse } from '../../../shared/types/api'
 import { createSignupRequest, type CreateSignupRequestPayload } from '../api/signupRequestApi'
 
-const SIGNUP_REQUEST_FIELDS = ['name', 'loginId', 'password', 'phone', 'positionName', 'teamName', 'requestMemo'] as const
+const SIGNUP_REQUEST_FIELDS = [
+  'name',
+  'loginId',
+  'password',
+  'passwordConfirm',
+  'phone',
+  'positionName',
+  'teamName',
+  'requestMemo',
+] as const
 
 type SignupRequestFieldName = (typeof SIGNUP_REQUEST_FIELDS)[number]
+type PasswordFieldName = Extract<SignupRequestFieldName, 'password' | 'passwordConfirm'>
 type SignupRequestFieldErrors = Partial<Record<SignupRequestFieldName, string>>
 type SignupRequestTouched = Partial<Record<SignupRequestFieldName, boolean>>
 
@@ -14,6 +24,7 @@ interface SignupRequestFormValues {
   name: string
   loginId: string
   password: string
+  passwordConfirm: string
   phone: string
   positionName: string
   teamName: string
@@ -28,6 +39,7 @@ interface SignupRequestFieldDefinition {
   inputMode?: 'text' | 'tel'
   maxLength?: number
   rows?: number
+  required?: boolean
   type?: 'password' | 'text'
 }
 
@@ -35,6 +47,7 @@ const INITIAL_FORM: SignupRequestFormValues = {
   name: '',
   loginId: '',
   password: '',
+  passwordConfirm: '',
   phone: '',
   positionName: '',
   teamName: '',
@@ -42,13 +55,14 @@ const INITIAL_FORM: SignupRequestFormValues = {
 }
 
 const FIELD_DEFINITIONS: ReadonlyArray<SignupRequestFieldDefinition> = [
-  { name: 'name', label: '이름', autoComplete: 'name', maxLength: 50 },
+  { name: 'name', label: '이름', autoComplete: 'name', maxLength: 50, required: true },
   {
     name: 'loginId',
     label: '아이디',
     autoComplete: 'username',
     hint: '영문 소문자, 숫자, -, _를 사용할 수 있습니다.',
     maxLength: 20,
+    required: true,
   },
   {
     name: 'password',
@@ -56,11 +70,21 @@ const FIELD_DEFINITIONS: ReadonlyArray<SignupRequestFieldDefinition> = [
     autoComplete: 'new-password',
     hint: '8자 이상 20자 이하로 입력해주세요.',
     maxLength: 20,
+    required: true,
     type: 'password',
   },
-  { name: 'phone', label: '연락처', autoComplete: 'tel', inputMode: 'tel', maxLength: 20 },
-  { name: 'positionName', label: '직책 또는 역할', maxLength: 50 },
-  { name: 'teamName', label: '소속 팀', maxLength: 100 },
+  {
+    name: 'passwordConfirm',
+    label: '비밀번호 확인',
+    autoComplete: 'new-password',
+    hint: '비밀번호를 한 번 더 입력해주세요.',
+    maxLength: 20,
+    required: true,
+    type: 'password',
+  },
+  { name: 'phone', label: '연락처', autoComplete: 'tel', inputMode: 'tel', maxLength: 20, required: true },
+  { name: 'positionName', label: '직책 또는 역할', maxLength: 50, required: true },
+  { name: 'teamName', label: '소속 팀', maxLength: 100, required: true },
   { name: 'requestMemo', label: '가입 신청 메모', hint: '0/500', maxLength: 500, rows: 4 },
 ]
 
@@ -94,11 +118,66 @@ function normalizeFormValues(values: SignupRequestFormValues): SignupRequestForm
     name: trimValue(values.name),
     loginId: trimValue(values.loginId).toLowerCase(),
     password: values.password.trim(),
-    phone: trimValue(values.phone),
+    passwordConfirm: values.passwordConfirm.trim(),
+    phone: formatPhoneNumber(values.phone),
     positionName: trimValue(values.positionName),
     teamName: trimValue(values.teamName),
     requestMemo: trimValue(values.requestMemo),
   }
+}
+
+function formatPhoneNumber(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+
+  if (digits.startsWith('02')) {
+    if (digits.length <= 2) {
+      return digits
+    }
+
+    if (digits.length <= 5) {
+      return `${digits.slice(0, 2)}-${digits.slice(2)}`
+    }
+
+    if (digits.length <= 9) {
+      return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`
+    }
+
+    return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`
+  }
+
+  if (digits.length <= 3) {
+    return digits
+  }
+
+  if (digits.length <= 6) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`
+  }
+
+  if (digits.length <= 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+  }
+
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
+}
+
+function isPasswordField(field: SignupRequestFieldName): field is PasswordFieldName {
+  return field === 'password' || field === 'passwordConfirm'
+}
+
+function getNextFieldValue(field: SignupRequestFieldName, value: string) {
+  if (field === 'phone') {
+    return formatPhoneNumber(value)
+  }
+
+  return value
+}
+
+function getValidationTargets(field: SignupRequestFieldName) {
+  if (field === 'password') {
+    return ['password', 'passwordConfirm'] as const
+  }
+
+  return [field] as const
 }
 
 function validateField(field: SignupRequestFieldName, values: SignupRequestFormValues) {
@@ -134,6 +213,14 @@ function validateField(field: SignupRequestFieldName, values: SignupRequestFormV
       }
       if (value.length < 8 || value.length > 20) {
         return '비밀번호는 8자 이상 20자 이하로 입력해주세요.'
+      }
+      return undefined
+    case 'passwordConfirm':
+      if (!value) {
+        return '비밀번호 확인을 입력해주세요.'
+      }
+      if (normalized.password && value !== normalized.password) {
+        return '비밀번호가 일치하지 않습니다.'
       }
       return undefined
     case 'phone':
@@ -282,32 +369,123 @@ export function SignupRequestForm() {
   const [touched, setTouched] = useState<SignupRequestTouched>({})
   const [fieldErrors, setFieldErrors] = useState<SignupRequestFieldErrors>({})
   const [formMessage, setFormMessage] = useState<string | null>(null)
+  const [passwordVisibility, setPasswordVisibility] = useState<Record<PasswordFieldName, boolean>>({
+    password: false,
+    passwordConfirm: false,
+  })
   const [submitting, setSubmitting] = useState(false)
 
-  function updateFieldError(field: SignupRequestFieldName, nextForm: SignupRequestFormValues) {
+  function updateFieldErrors(fields: ReadonlyArray<SignupRequestFieldName>, nextForm: SignupRequestFormValues) {
     setFieldErrors((current) => {
       const nextErrors = { ...current }
-      const message = validateField(field, nextForm)
 
-      if (message) {
-        nextErrors[field] = message
-      } else {
-        delete nextErrors[field]
-      }
+      fields.forEach((field) => {
+        const message = validateField(field, nextForm)
+
+        if (message) {
+          nextErrors[field] = message
+        } else {
+          delete nextErrors[field]
+        }
+      })
 
       return nextErrors
     })
   }
 
+  function togglePasswordVisibility(field: PasswordFieldName) {
+    return () => {
+      setPasswordVisibility((current) => ({
+        ...current,
+        [field]: !current[field],
+      }))
+    }
+  }
+
+  function getInputType(field: SignupRequestFieldDefinition) {
+    if (isPasswordField(field.name)) {
+      return passwordVisibility[field.name] ? 'text' : 'password'
+    }
+
+    return field.type ?? 'text'
+  }
+
+  function getToggleLabel(field: SignupRequestFieldDefinition) {
+    if (!isPasswordField(field.name)) {
+      return null
+    }
+
+    return passwordVisibility[field.name] ? '숨기기' : '보기'
+  }
+
+  function renderFieldLabel(field: SignupRequestFieldDefinition) {
+    return (
+      <label className="field-label" htmlFor={getFieldInputId(field.name)}>
+        <span>{field.label}</span>
+        {field.required ? (
+          <>
+            <span aria-hidden="true" className="field-required-mark">
+              *
+            </span>
+            <span className="visually-hidden">필수 입력</span>
+          </>
+        ) : null}
+      </label>
+    )
+  }
+
+  function renderFieldControl(
+    field: SignupRequestFieldDefinition,
+    commonProps: {
+      'aria-describedby': string | undefined
+      'aria-invalid': 'true' | undefined
+      'aria-required': 'true' | undefined
+      autoComplete: string | undefined
+      className: string | undefined
+      id: string
+      inputMode: 'text' | 'tel' | undefined
+      maxLength: number | undefined
+      name: SignupRequestFieldName
+      onBlur: () => void
+      onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
+      required: boolean | undefined
+    },
+  ) {
+    if (field.rows) {
+      return <textarea {...commonProps} rows={field.rows} value={form[field.name]} />
+    }
+
+    if (isPasswordField(field.name)) {
+      const toggleLabel = getToggleLabel(field)
+
+      return (
+        <div className="field-control-row">
+          <input {...commonProps} type={getInputType(field)} value={form[field.name]} />
+          <button
+            aria-label={`${field.label} ${toggleLabel}`}
+            className="field-inline-button"
+            onClick={togglePasswordVisibility(field.name)}
+            type="button"
+          >
+            {toggleLabel}
+          </button>
+        </div>
+      )
+    }
+
+    return <input {...commonProps} type={field.type ?? 'text'} value={form[field.name]} />
+  }
+
   function handleChange(field: SignupRequestFieldName) {
     return (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const value = event.target.value
+      const value = getNextFieldValue(field, event.target.value)
       const nextForm = { ...form, [field]: value }
+      const nextValidationTargets = getValidationTargets(field).filter((target) => touched[target])
 
       setForm(nextForm)
 
-      if (touched[field]) {
-        updateFieldError(field, nextForm)
+      if (nextValidationTargets.length > 0) {
+        updateFieldErrors(nextValidationTargets, nextForm)
       }
 
       if (formMessage) {
@@ -318,8 +496,11 @@ export function SignupRequestForm() {
 
   function handleBlur(field: SignupRequestFieldName) {
     return () => {
-      setTouched((current) => ({ ...current, [field]: true }))
-      updateFieldError(field, form)
+      const nextTouched = { ...touched, [field]: true }
+      const nextValidationTargets = getValidationTargets(field).filter((target) => nextTouched[target])
+
+      setTouched(nextTouched)
+      updateFieldErrors(nextValidationTargets, form)
     }
   }
 
@@ -380,23 +561,22 @@ export function SignupRequestForm() {
         const commonProps = {
           'aria-describedby': describedBy,
           'aria-invalid': errorMessage ? 'true' : undefined,
+          'aria-required': field.required ? 'true' : undefined,
           autoComplete: field.autoComplete,
           className: getFieldInputClassName(errorMessage),
           id: inputId,
+          inputMode: field.inputMode,
           maxLength: field.maxLength,
           name: field.name,
           onBlur: handleBlur(field.name),
           onChange: handleChange(field.name),
+          required: field.required || undefined,
         } as const
 
         return (
-          <label className="field" key={field.name} htmlFor={inputId}>
-            <span>{field.label}</span>
-            {field.rows ? (
-              <textarea {...commonProps} rows={field.rows} value={form[field.name]} />
-            ) : (
-              <input {...commonProps} inputMode={field.inputMode} type={field.type ?? 'text'} value={form[field.name]} />
-            )}
+          <div className="field" key={field.name}>
+            {renderFieldLabel(field)}
+            {renderFieldControl(field, commonProps)}
             {hintText ? (
               <span className="field-hint" id={hintId}>
                 {hintText}
@@ -407,7 +587,7 @@ export function SignupRequestForm() {
                 {errorMessage}
               </span>
             ) : null}
-          </label>
+          </div>
         )
       })}
 

@@ -10,7 +10,9 @@ import {
   type StatisticsScaleResponse,
   type StatisticsSummary,
 } from '../../features/statistics/api/statisticsApi'
+import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
+import { toValidDateText } from '../../shared/utils/dateText'
 
 const DEFAULT_ALERT_PAGE_SIZE = 10
 const ALERT_TYPE_OPTIONS = ['HIGH_RISK', 'CAUTION', 'CRITICAL_ITEM', 'COMPOSITE_RULE']
@@ -37,8 +39,8 @@ export function StatisticsPage() {
     setLoading(true)
     try {
       const params = {
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
+        dateFrom: toValidDateText(dateFrom) || undefined,
+        dateTo: toValidDateText(dateTo) || undefined,
       }
       const [summaryData, scaleData, alertData] = await Promise.all([
         fetchStatisticsSummary(params),
@@ -65,6 +67,9 @@ export function StatisticsPage() {
 
   const currentScaleItems = (scales?.items ?? []).filter((item) => item.isActive)
   const legacyScaleItems = (scales?.items ?? []).filter((item) => !item.isActive && item.totalCount > 0)
+  const alertScaleOptions = [...currentScaleItems, ...legacyScaleItems]
+  const exportDateFrom = toValidDateText(dateFrom) || undefined
+  const exportDateTo = toValidDateText(dateTo) || undefined
 
   return (
     <div className="stack">
@@ -72,13 +77,22 @@ export function StatisticsPage() {
         actions={
           user?.role === 'ADMIN' ? (
             <div className="actions">
-              <button className="secondary-button" onClick={() => void downloadStatisticsExport({ dateFrom, dateTo, type: 'SUMMARY' })}>
+              <button
+                className="secondary-button"
+                onClick={() => void downloadStatisticsExport({ dateFrom: exportDateFrom, dateTo: exportDateTo, type: 'SUMMARY' })}
+              >
                 요약 CSV
               </button>
-              <button className="secondary-button" onClick={() => void downloadStatisticsExport({ dateFrom, dateTo, type: 'SCALE_COMPARE' })}>
+              <button
+                className="secondary-button"
+                onClick={() => void downloadStatisticsExport({ dateFrom: exportDateFrom, dateTo: exportDateTo, type: 'SCALE_COMPARE' })}
+              >
                 척도비교 CSV
               </button>
-              <button className="secondary-button" onClick={() => void downloadStatisticsExport({ dateFrom, dateTo, type: 'ALERT_LIST' })}>
+              <button
+                className="secondary-button"
+                onClick={() => void downloadStatisticsExport({ dateFrom: exportDateFrom, dateTo: exportDateTo, type: 'ALERT_LIST' })}
+              >
                 경고목록 CSV
               </button>
             </div>
@@ -89,14 +103,17 @@ export function StatisticsPage() {
       />
       <div className="card stack">
         <div className="toolbar">
-          <input onChange={(event) => setDateFrom(event.target.value)} type="date" value={dateFrom} />
-          <input onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
-          <input
-            onChange={(event) => setAlertScaleCode(event.target.value.toUpperCase())}
-            placeholder="경고 척도코드 예: PHQ9"
-            value={alertScaleCode}
-          />
-          <select onChange={(event) => setAlertType(event.target.value)} value={alertType}>
+          <DateTextInput aria-label="시작일" onChange={setDateFrom} placeholder="시작일 (연도. 월. 일.)" value={dateFrom} />
+          <DateTextInput aria-label="종료일" onChange={setDateTo} placeholder="종료일 (연도. 월. 일.)" value={dateTo} />
+          <select aria-label="경고 척도" onChange={(event) => setAlertScaleCode(event.target.value)} value={alertScaleCode}>
+            <option value="">전체 척도</option>
+            {alertScaleOptions.map((item) => (
+              <option key={item.scaleCode} value={item.scaleCode}>
+                {item.scaleName} ({item.scaleCode}){item.isActive ? '' : ' - 비활성'}
+              </option>
+            ))}
+          </select>
+          <select aria-label="경고 유형" onChange={(event) => setAlertType(event.target.value)} value={alertType}>
             <option value="">전체 경고유형</option>
             {ALERT_TYPE_OPTIONS.map((option) => (
               <option key={option} value={option}>

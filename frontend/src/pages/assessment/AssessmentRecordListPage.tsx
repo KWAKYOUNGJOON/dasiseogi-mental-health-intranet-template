@@ -1,7 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
-import { fetchAssessmentRecords, type AssessmentRecordPage } from '../../features/assessment/api/assessmentApi'
+import {
+  fetchAssessmentRecords,
+  fetchScales,
+  type AssessmentRecordPage,
+  type ScaleListItem,
+} from '../../features/assessment/api/assessmentApi'
+import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
+import { toValidDateText } from '../../shared/utils/dateText'
 
 const DEFAULT_SIZE = 20
 
@@ -31,12 +38,14 @@ function parsePage(searchParams: URLSearchParams) {
 
 function createRecordSearchParams(filters: RecordFilters, page: number) {
   const params = new URLSearchParams()
+  const dateFrom = toValidDateText(filters.dateFrom)
+  const dateTo = toValidDateText(filters.dateTo)
 
-  if (filters.dateFrom) {
-    params.set('dateFrom', filters.dateFrom)
+  if (dateFrom) {
+    params.set('dateFrom', dateFrom)
   }
-  if (filters.dateTo) {
-    params.set('dateTo', filters.dateTo)
+  if (dateTo) {
+    params.set('dateTo', dateTo)
   }
   if (filters.clientName) {
     params.set('clientName', filters.clientName)
@@ -78,16 +87,40 @@ export function AssessmentRecordListPage() {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const [records, setRecords] = useState<AssessmentRecordPage | null>(null)
+  const [scaleItems, setScaleItems] = useState<ScaleListItem[]>([])
   const [filters, setFilters] = useState(() => createFilters(searchParams))
   const [appliedFilters, setAppliedFilters] = useState(() => createFilters(searchParams))
   const [page, setPage] = useState(() => parsePage(searchParams))
   const [loading, setLoading] = useState(true)
+  const [scaleLoading, setScaleLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [scaleError, setScaleError] = useState<string | null>(null)
   const requestSequence = useRef(0)
 
   useEffect(() => {
+    void loadScaleOptions()
     void load(parsePage(searchParams), createFilters(searchParams))
   }, [])
+
+  const sortedScaleItems = useMemo(
+    () => [...scaleItems].sort((left, right) => left.displayOrder - right.displayOrder),
+    [scaleItems],
+  )
+
+  async function loadScaleOptions() {
+    setScaleLoading(true)
+
+    try {
+      const data = await fetchScales()
+      setScaleItems(data)
+      setScaleError(null)
+    } catch (requestError: any) {
+      setScaleItems([])
+      setScaleError(requestError?.response?.data?.message ?? '척도 목록을 불러오지 못했습니다.')
+    } finally {
+      setScaleLoading(false)
+    }
+  }
 
   async function load(nextPage: number, nextFilters: RecordFilters) {
     const requestId = requestSequence.current + 1
@@ -100,8 +133,8 @@ export function AssessmentRecordListPage() {
 
     try {
       const data = await fetchAssessmentRecords({
-        dateFrom: nextFilters.dateFrom || undefined,
-        dateTo: nextFilters.dateTo || undefined,
+        dateFrom: toValidDateText(nextFilters.dateFrom) || undefined,
+        dateTo: toValidDateText(nextFilters.dateTo) || undefined,
         clientName: nextFilters.clientName || undefined,
         scaleCode: nextFilters.scaleCode || undefined,
         includeMisentered: nextFilters.includeMisentered,
@@ -166,14 +199,16 @@ export function AssessmentRecordListPage() {
       <PageHeader description="척도 결과 1건 단위로 조회합니다." title="검사기록 목록" />
       <div className="card">
         <div className="toolbar">
-          <input
-            onChange={(event) => handleFilterChange('dateFrom', event.target.value)}
-            placeholder="시작일 YYYY-MM-DD"
+          <DateTextInput
+            aria-label="시작일"
+            onChange={(value) => handleFilterChange('dateFrom', value)}
+            placeholder="시작일 (연도. 월. 일.)"
             value={filters.dateFrom}
           />
-          <input
-            onChange={(event) => handleFilterChange('dateTo', event.target.value)}
-            placeholder="종료일 YYYY-MM-DD"
+          <DateTextInput
+            aria-label="종료일"
+            onChange={(value) => handleFilterChange('dateTo', value)}
+            placeholder="종료일 (연도. 월. 일.)"
             value={filters.dateTo}
           />
           <input
@@ -181,11 +216,18 @@ export function AssessmentRecordListPage() {
             placeholder="대상자명"
             value={filters.clientName}
           />
-          <input
+          <select
+            disabled={scaleLoading}
             onChange={(event) => handleFilterChange('scaleCode', event.target.value)}
-            placeholder="척도코드 예: PHQ9"
             value={filters.scaleCode}
-          />
+          >
+            <option value="">{scaleLoading ? '척도 목록 불러오는 중...' : '전체 척도'}</option>
+            {sortedScaleItems.map((item) => (
+              <option key={item.scaleCode} value={item.scaleCode}>
+                {item.scaleName} ({item.scaleCode})
+              </option>
+            ))}
+          </select>
           <label className="option-item">
             <input
               checked={filters.includeMisentered}
@@ -198,6 +240,11 @@ export function AssessmentRecordListPage() {
             조회
           </button>
         </div>
+        {scaleError ? (
+          <p className="error-text" style={{ margin: '0 0 16px' }}>
+            {scaleError}
+          </p>
+        ) : null}
         {loading ? (
           <div aria-busy="true" className="muted">
             검사기록 목록을 불러오는 중...

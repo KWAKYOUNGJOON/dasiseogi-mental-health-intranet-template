@@ -197,7 +197,7 @@ describe('statistics page', () => {
       }),
     )
 
-    const { container } = renderStatisticsRoute()
+    renderStatisticsRoute()
 
     await waitFor(() => {
       expect(mockedFetchStatisticsSummary).toHaveBeenCalledTimes(1)
@@ -215,15 +215,15 @@ describe('statistics page', () => {
     expect(screen.getByRole('button', { name: '경고목록 CSV' })).toBeTruthy()
     expect(screen.queryByText('통계 정보를 불러오지 못했습니다.')).toBeNull()
 
-    const dateInputs = Array.from(container.querySelectorAll('input[type="date"]')) as HTMLInputElement[]
+    const dateFromInput = screen.getByLabelText('시작일') as HTMLInputElement
+    const dateToInput = screen.getByLabelText('종료일') as HTMLInputElement
 
-    expect(dateInputs).toHaveLength(2)
     expect(summaryCsvButton.hasAttribute('disabled')).toBe(false)
-    expect(dateInputs[0]?.value).toBe(initialDateRange?.dateFrom)
-    expect(dateInputs[1]?.value).toBe(initialDateRange?.dateTo)
+    expect(dateFromInput.value).toBe(initialDateRange?.dateFrom)
+    expect(dateToInput.value).toBe(initialDateRange?.dateTo)
 
-    fireEvent.change(dateInputs[0], { target: { value: '2026-03-01' } })
-    fireEvent.change(dateInputs[1], { target: { value: '2026-03-31' } })
+    fireEvent.change(dateFromInput, { target: { value: '2026-03-01' } })
+    fireEvent.change(dateToInput, { target: { value: '2026-03-31' } })
 
     await user.click(summaryCsvButton)
 
@@ -356,9 +356,8 @@ describe('statistics page', () => {
     expect(within(secondPageAlertRow as HTMLTableRowElement).getByText('박대상')).toBeTruthy()
     expect(screen.getByText('2건 / 2페이지')).toBeTruthy()
 
-    await user.clear(screen.getByPlaceholderText('경고 척도코드 예: PHQ9'))
-    await user.type(screen.getByPlaceholderText('경고 척도코드 예: PHQ9'), 'phq9')
-    await user.selectOptions(screen.getByRole('combobox'), 'HIGH_RISK')
+    await user.selectOptions(screen.getByLabelText('경고 척도'), 'PHQ9')
+    await user.selectOptions(screen.getByLabelText('경고 유형'), 'HIGH_RISK')
     await user.click(screen.getByRole('button', { name: '조회' }))
 
     await waitFor(() => {

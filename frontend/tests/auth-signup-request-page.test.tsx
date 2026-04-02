@@ -96,8 +96,9 @@ function renderSignupRequestPage(initialEntries: string[] = ['/signup']) {
 async function fillSignupRequestForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^이름/), '김지원')
   await user.type(screen.getByLabelText(/^아이디/), 'jwkim')
-  await user.type(screen.getByLabelText(/^비밀번호/), 'Test1234!')
-  await user.type(screen.getByLabelText(/^연락처/), '010-2222-3333')
+  await user.type(screen.getByLabelText(/^비밀번호/, { selector: 'input#signup-request-password' }), 'Test1234!')
+  await user.type(screen.getByLabelText(/^비밀번호 확인/, { selector: 'input#signup-request-passwordConfirm' }), 'Test1234!')
+  await user.type(screen.getByLabelText(/^연락처/), '01022223333')
   await user.type(screen.getByLabelText(/^직책 또는 역할/), '사회복지사')
   await user.type(screen.getByLabelText(/^소속 팀/), '정신건강팀')
   await user.type(screen.getByLabelText(/^가입 신청 메모/), '신규 입사자 계정 요청')
@@ -126,11 +127,15 @@ describe('auth signup request page', () => {
     expect(screen.getByRole('heading', { name: '회원가입 신청' })).toBeTruthy()
     expect(screen.getByLabelText(/^이름/)).toBeTruthy()
     expect(screen.getByLabelText(/^아이디/)).toBeTruthy()
-    expect(screen.getByLabelText(/^비밀번호/)).toBeTruthy()
+    expect(screen.getByLabelText(/^비밀번호/, { selector: 'input#signup-request-password' })).toBeTruthy()
+    expect(screen.getByLabelText(/^비밀번호 확인/, { selector: 'input#signup-request-passwordConfirm' })).toBeTruthy()
     expect(screen.getByLabelText(/^연락처/)).toBeTruthy()
     expect(screen.getByLabelText(/^직책 또는 역할/)).toBeTruthy()
     expect(screen.getByLabelText(/^소속 팀/)).toBeTruthy()
     expect(screen.getByLabelText(/^가입 신청 메모/)).toBeTruthy()
+    expect(document.querySelectorAll('.field-required-mark')).toHaveLength(7)
+    expect((screen.getByLabelText(/^이름/) as HTMLInputElement).required).toBe(true)
+    expect((screen.getByLabelText(/^가입 신청 메모/) as HTMLTextAreaElement).required).toBe(false)
     expect(screen.getByRole('link', { name: '로그인으로 돌아가기' }).getAttribute('href')).toBe('/login')
   })
 
@@ -155,9 +160,82 @@ describe('auth signup request page', () => {
     expect(screen.getByText('이름을 입력해주세요.')).toBeTruthy()
     expect(screen.getByText('아이디를 입력해주세요.')).toBeTruthy()
     expect(screen.getByText('비밀번호를 입력해주세요.')).toBeTruthy()
+    expect(screen.getByText('비밀번호 확인을 입력해주세요.')).toBeTruthy()
     expect(screen.getByText('연락처를 입력해주세요.')).toBeTruthy()
     expect(screen.getByText('직책 또는 역할을 입력해주세요.')).toBeTruthy()
     expect(screen.getByText('소속 팀을 입력해주세요.')).toBeTruthy()
+  })
+
+  it('prevents submission and shows a clear message when password confirmation does not match', async () => {
+    const user = userEvent.setup()
+
+    renderSignupRequestPage()
+
+    await user.type(screen.getByLabelText(/^이름/), '김지원')
+    await user.type(screen.getByLabelText(/^아이디/), 'jwkim')
+    await user.type(screen.getByLabelText(/^비밀번호/, { selector: 'input#signup-request-password' }), 'Test1234!')
+    await user.type(screen.getByLabelText(/^비밀번호 확인/, { selector: 'input#signup-request-passwordConfirm' }), 'Test9999!')
+    await user.type(screen.getByLabelText(/^연락처/), '01022223333')
+    await user.type(screen.getByLabelText(/^직책 또는 역할/), '사회복지사')
+    await user.type(screen.getByLabelText(/^소속 팀/), '정신건강팀')
+
+    await user.click(screen.getByRole('button', { name: '가입 신청' }))
+
+    expect(mockedCreateSignupRequest).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert').textContent).toBe('입력값을 다시 확인해주세요.')
+    expect(screen.getByText('비밀번호가 일치하지 않습니다.')).toBeTruthy()
+  })
+
+  it('toggles password visibility for each password field', async () => {
+    const user = userEvent.setup()
+
+    renderSignupRequestPage()
+
+    const passwordInput = screen.getByLabelText(/^비밀번호/, {
+      selector: 'input#signup-request-password',
+    }) as HTMLInputElement
+    const passwordConfirmInput = screen.getByLabelText(/^비밀번호 확인/, {
+      selector: 'input#signup-request-passwordConfirm',
+    }) as HTMLInputElement
+
+    expect(passwordInput.type).toBe('password')
+    expect(passwordConfirmInput.type).toBe('password')
+
+    await user.click(screen.getByRole('button', { name: '비밀번호 보기' }))
+    expect(passwordInput.type).toBe('text')
+    expect(passwordConfirmInput.type).toBe('password')
+
+    await user.click(screen.getByRole('button', { name: '비밀번호 확인 보기' }))
+    expect(passwordConfirmInput.type).toBe('text')
+
+    await user.click(screen.getByRole('button', { name: '비밀번호 숨기기' }))
+    await user.click(screen.getByRole('button', { name: '비밀번호 확인 숨기기' }))
+    expect(passwordInput.type).toBe('password')
+    expect(passwordConfirmInput.type).toBe('password')
+  })
+
+  it('formats the phone number as the user types and strips non-digit characters', async () => {
+    const user = userEvent.setup()
+
+    renderSignupRequestPage()
+
+    const phoneInput = screen.getByLabelText(/^연락처/) as HTMLInputElement
+
+    await user.type(phoneInput, '010abc2222!3333')
+
+    expect(phoneInput.value).toBe('010-2222-3333')
+  })
+
+  it('formats 02 phone numbers with a natural domestic pattern', async () => {
+    const user = userEvent.setup()
+
+    renderSignupRequestPage()
+
+    const phoneInput = screen.getByLabelText(/^연락처/) as HTMLInputElement
+
+    await user.type(phoneInput, '0212345678')
+
+    expect(phoneInput.value).toBe('02-1234-5678')
   })
 
   it('submits once and returns to /login?notice=signup-requested after success', async () => {

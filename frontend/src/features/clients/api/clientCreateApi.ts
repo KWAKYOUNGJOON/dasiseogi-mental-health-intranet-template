@@ -1,5 +1,6 @@
 import { isAxiosError } from 'axios'
 import type { ApiResponse } from '../../../shared/types/api'
+import { getTodayDateText, isValidDateText } from '../../../shared/utils/dateText'
 import { createClient, duplicateCheck } from './clientApi'
 
 const CLIENT_CREATE_GENDERS = ['MALE', 'FEMALE', 'OTHER', 'UNKNOWN'] as const
@@ -56,31 +57,6 @@ function normalizeFormValues(values: ClientCreateFormValues): ClientCreateFormVa
     phone: trimValue(values.phone),
     primaryWorkerId: values.primaryWorkerId,
   }
-}
-
-function getTodayDateText() {
-  const now = new Date()
-  const offset = now.getTimezoneOffset() * 60_000
-
-  return new Date(now.getTime() - offset).toISOString().slice(0, 10)
-}
-
-function isValidDateText(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false
-  }
-
-  const [yearText, monthText, dayText] = value.split('-')
-  const year = Number(yearText)
-  const month = Number(monthText)
-  const day = Number(dayText)
-  const parsedDate = new Date(Date.UTC(year, month - 1, day))
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return false
-  }
-
-  return parsedDate.getUTCFullYear() === year && parsedDate.getUTCMonth() === month - 1 && parsedDate.getUTCDate() === day
 }
 
 function isGenderValue(value: string): value is ClientGender {

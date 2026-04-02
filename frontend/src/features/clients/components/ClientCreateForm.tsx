@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../app/providers/AuthProvider'
+import { DateTextInput } from '../../../shared/components/DateTextInput'
 import {
   CLIENT_CREATE_FIELDS,
   CLIENT_CREATE_VALIDATION_MESSAGE,
@@ -20,14 +21,24 @@ import {
   type ClientCreateTouched,
 } from '../api/clientCreateApi'
 
-interface FieldDefinition {
-  name: Extract<ClientCreateFieldName, 'name' | 'birthDate' | 'phone'>
+interface BaseFieldDefinition {
   label: string
   autoComplete?: string
   inputMode?: 'tel' | 'text'
   maxLength?: number
-  type?: 'date' | 'text'
 }
+
+interface DateFieldDefinition extends BaseFieldDefinition {
+  name: 'birthDate'
+  type: 'date'
+}
+
+interface TextFieldDefinition extends BaseFieldDefinition {
+  name: Extract<ClientCreateFieldName, 'name' | 'phone'>
+  type?: 'text'
+}
+
+type FieldDefinition = DateFieldDefinition | TextFieldDefinition
 
 const FIELD_DEFINITIONS: ReadonlyArray<FieldDefinition> = [
   { name: 'name', label: '이름', autoComplete: 'name', maxLength: 50 },
@@ -101,6 +112,31 @@ export function ClientCreateForm() {
       if (field === 'name' || field === 'birthDate') {
         setDuplicateMessage(null)
       }
+
+      if (touched[field]) {
+        updateFieldError(field, nextForm)
+      }
+
+      if (formMessage === CLIENT_CREATE_VALIDATION_MESSAGE) {
+        const nextErrors = validateClientCreateForm(nextForm)
+
+        setFieldErrors(nextErrors)
+        setFormMessage(hasClientCreateErrors(nextErrors) ? CLIENT_CREATE_VALIDATION_MESSAGE : null)
+        return
+      }
+
+      if (formMessage) {
+        setFormMessage(null)
+      }
+    }
+  }
+
+  function handleDateFieldChange(field: Extract<ClientCreateFieldName, 'birthDate'>) {
+    return (value: string) => {
+      const nextForm = { ...form, [field]: value } as ClientCreateFormValues
+
+      setForm(nextForm)
+      setDuplicateMessage(null)
 
       if (touched[field]) {
         updateFieldError(field, nextForm)
@@ -248,19 +284,32 @@ export function ClientCreateForm() {
           return (
             <label className="field" htmlFor={getFieldInputId(field.name)} key={field.name}>
               <span>{field.label}</span>
-              <input
-                aria-describedby={getFieldDescribedBy(field.name, Boolean(errorMessage))}
-                aria-invalid={errorMessage ? 'true' : undefined}
-                autoComplete={field.autoComplete}
-                className={getFieldInputClassName(errorMessage)}
-                id={getFieldInputId(field.name)}
-                inputMode={field.inputMode}
-                maxLength={field.maxLength}
-                onBlur={handleBlur(field.name)}
-                onChange={handleFieldChange(field.name)}
-                type={field.type ?? 'text'}
-                value={form[field.name]}
-              />
+              {field.type === 'date' ? (
+                <DateTextInput
+                  aria-describedby={getFieldDescribedBy(field.name, Boolean(errorMessage))}
+                  aria-invalid={errorMessage ? 'true' : undefined}
+                  autoComplete={field.autoComplete}
+                  className={getFieldInputClassName(errorMessage)}
+                  id={getFieldInputId(field.name)}
+                  onBlur={handleBlur(field.name)}
+                  onChange={handleDateFieldChange(field.name)}
+                  value={form[field.name]}
+                />
+              ) : (
+                <input
+                  aria-describedby={getFieldDescribedBy(field.name, Boolean(errorMessage))}
+                  aria-invalid={errorMessage ? 'true' : undefined}
+                  autoComplete={field.autoComplete}
+                  className={getFieldInputClassName(errorMessage)}
+                  id={getFieldInputId(field.name)}
+                  inputMode={field.inputMode}
+                  maxLength={field.maxLength}
+                  onBlur={handleBlur(field.name)}
+                  onChange={handleFieldChange(field.name)}
+                  type={field.type ?? 'text'}
+                  value={form[field.name]}
+                />
+              )}
               {errorMessage ? (
                 <span className="field-error" id={getFieldErrorId(field.name)}>
                   {errorMessage}

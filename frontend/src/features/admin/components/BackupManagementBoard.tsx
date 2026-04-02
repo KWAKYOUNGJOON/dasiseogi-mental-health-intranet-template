@@ -1,8 +1,10 @@
 import { isAxiosError } from 'axios'
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
+import { DateTextInput } from '../../../shared/components/DateTextInput'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import type { ApiResponse } from '../../../shared/types/api'
+import { toValidDateText } from '../../../shared/utils/dateText'
 import {
   BACKUP_STATUS_OPTIONS,
   BACKUP_TYPE_OPTIONS,
@@ -118,17 +120,20 @@ function buildQuery(filters: FilterState): Omit<BackupHistoryQuery, 'page' | 'si
   return {
     backupType: filters.backupType || undefined,
     status: filters.status || undefined,
-    dateFrom: filters.dateFrom || undefined,
-    dateTo: filters.dateTo || undefined,
+    dateFrom: toValidDateText(filters.dateFrom) || undefined,
+    dateTo: toValidDateText(filters.dateTo) || undefined,
   }
 }
 
 function hasInvalidDateRange(filters: FilterState) {
-  if (!filters.dateFrom || !filters.dateTo) {
+  const dateFrom = toValidDateText(filters.dateFrom)
+  const dateTo = toValidDateText(filters.dateTo)
+
+  if (!dateFrom || !dateTo) {
     return false
   }
 
-  return filters.dateFrom > filters.dateTo
+  return dateFrom > dateTo
 }
 
 function getLatestBackupTimestamp(latestBackup: BackupHistoryItem | null) {
@@ -402,19 +407,17 @@ export function BackupManagementBoard() {
           </label>
           <label className="field">
             <span>시작일</span>
-            <input
+            <DateTextInput
               aria-label="시작일"
-              onChange={(event) => setFilters((prev) => ({ ...prev, dateFrom: event.target.value }))}
-              type="date"
+              onChange={(dateFrom) => setFilters((prev) => ({ ...prev, dateFrom }))}
               value={filters.dateFrom}
             />
           </label>
           <label className="field">
             <span>종료일</span>
-            <input
+            <DateTextInput
               aria-label="종료일"
-              onChange={(event) => setFilters((prev) => ({ ...prev, dateTo: event.target.value }))}
-              type="date"
+              onChange={(dateTo) => setFilters((prev) => ({ ...prev, dateTo }))}
               value={filters.dateTo}
             />
           </label>

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchClients, type ClientListPage } from '../../features/clients/api/clientApi'
+import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
+import { toValidDateText } from '../../shared/utils/dateText'
 
 const DEFAULT_PAGE_SIZE = 20
 
@@ -16,7 +18,13 @@ export function ClientListPage() {
   async function load(nextPage = page) {
     setLoading(true)
     try {
-      const data = await fetchClients({ name, birthDate, includeMisregistered, page: nextPage, size: DEFAULT_PAGE_SIZE })
+      const data = await fetchClients({
+        name,
+        birthDate: toValidDateText(birthDate) || undefined,
+        includeMisregistered,
+        page: nextPage,
+        size: DEFAULT_PAGE_SIZE,
+      })
       setClientPage(data)
       setPage(nextPage)
     } finally {
@@ -43,7 +51,11 @@ export function ClientListPage() {
       <div className="card">
         <div className="toolbar">
           <input onChange={(event) => setName(event.target.value)} placeholder="이름 검색" value={name} />
-          <input onChange={(event) => setBirthDate(event.target.value)} placeholder="YYYY-MM-DD" value={birthDate} />
+          <DateTextInput
+            aria-label="생년월일"
+            onChange={setBirthDate}
+            value={birthDate}
+          />
           <label className="option-item">
             <input checked={includeMisregistered} onChange={(event) => setIncludeMisregistered(event.target.checked)} type="checkbox" />
             오등록 포함
