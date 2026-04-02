@@ -70,17 +70,33 @@ function renderAssessmentInputPage(initialEntry = '/assessments/start/42/input')
 }
 
 function findQuestionLegend(questionText: string) {
-  return screen.getByText((content, element) => element?.tagName.toLowerCase() === 'legend' && content.includes(questionText))
+  const questionNode = screen.getByText(questionText)
+  const questionLegend = questionNode.closest('legend')
+
+  if (!questionLegend) {
+    throw new Error(`Question legend not found for: ${questionText}`)
+  }
+
+  return questionLegend
 }
 
-function selectAnswer(questionText: string, answerLabel: string) {
+function getAnswerOption(questionText: string, answerLabel: string) {
   const questionFieldset = findQuestionLegend(questionText).closest('fieldset')
 
   if (!questionFieldset) {
     throw new Error(`Question fieldset not found for: ${questionText}`)
   }
 
-  return within(questionFieldset).getByRole('radio', { name: answerLabel })
+  const label = within(questionFieldset).getByText(answerLabel).closest('label')
+
+  if (!label) {
+    throw new Error(`Answer label not found for: ${answerLabel}`)
+  }
+
+  return {
+    label,
+    radio: within(questionFieldset).getByLabelText(answerLabel) as HTMLInputElement,
+  }
 }
 
 beforeEach(() => {
@@ -136,6 +152,8 @@ describe('assessment input page', () => {
     expect(findQuestionLegend('흥미나 즐거움이 줄어들었다.')).toBeTruthy()
     expect(screen.getByText('1. PHQ9').getAttribute('aria-current')).toBe('step')
     expect(screen.getByText('2. GAD7').getAttribute('aria-current')).toBe(null)
+    expect(screen.getByText('응답 완료')).toBeTruthy()
+    expect(screen.getByRole('region', { name: '문항 이동' })).toBeTruthy()
   })
 
   it('allows answering questions and keeps next disabled until the current scale is complete', async () => {
@@ -149,19 +167,21 @@ describe('assessment input page', () => {
     expect(previousButton.hasAttribute('disabled')).toBe(true)
     expect(nextButton.hasAttribute('disabled')).toBe(true)
 
-    const firstAnswer = selectAnswer('기분이 가라앉거나 우울감을 느꼈다.', '며칠 동안') as HTMLInputElement
-    await user.click(firstAnswer)
+    const firstAnswer = getAnswerOption('기분이 가라앉거나 우울감을 느꼈다.', '며칠 동안')
+    await user.click(firstAnswer.label)
 
-    expect(firstAnswer.checked).toBe(true)
+    expect(firstAnswer.radio.checked).toBe(true)
     expect(useAssessmentDraftStore.getState().answersByScale.PHQ9?.[1]).toBe('1')
     expect(nextButton.hasAttribute('disabled')).toBe(true)
+    expect(screen.getAllByText(/1 \/ 2/).length).toBeGreaterThan(0)
 
-    const secondAnswer = selectAnswer('흥미나 즐거움이 줄어들었다.', '전혀 아니다') as HTMLInputElement
-    await user.click(secondAnswer)
+    const secondAnswer = getAnswerOption('흥미나 즐거움이 줄어들었다.', '전혀 아니다')
+    await user.click(secondAnswer.label)
 
-    expect(secondAnswer.checked).toBe(true)
+    expect(secondAnswer.radio.checked).toBe(true)
     expect(useAssessmentDraftStore.getState().answersByScale.PHQ9?.[2]).toBe('0')
     expect(nextButton.hasAttribute('disabled')).toBe(false)
+    expect(screen.getAllByText(/2 \/ 2/).length).toBeGreaterThan(0)
   })
 
   it('moves to the next scale after completion and preserves answers when navigating back', async () => {
@@ -172,8 +192,8 @@ describe('assessment input page', () => {
     await waitFor(() => {
       expect(findQuestionLegend('기분이 가라앉거나 우울감을 느꼈다.')).toBeTruthy()
     })
-    await user.click(selectAnswer('기분이 가라앉거나 우울감을 느꼈다.', '며칠 동안'))
-    await user.click(selectAnswer('흥미나 즐거움이 줄어들었다.', '전혀 아니다'))
+    await user.click(getAnswerOption('기분이 가라앉거나 우울감을 느꼈다.', '며칠 동안').label)
+    await user.click(getAnswerOption('흥미나 즐거움이 줄어들었다.', '전혀 아니다').label)
     await user.click(screen.getByRole('button', { name: '다음' }))
 
     await waitFor(() => {
@@ -188,8 +208,8 @@ describe('assessment input page', () => {
 
     expect(await screen.findByRole('heading', { name: 'PHQ-9 입력' })).toBeTruthy()
     expect(useAssessmentDraftStore.getState().currentScaleIndex).toBe(0)
-    expect((selectAnswer('기분이 가라앉거나 우울감을 느꼈다.', '며칠 동안') as HTMLInputElement).checked).toBe(true)
-    expect((selectAnswer('흥미나 즐거움이 줄어들었다.', '전혀 아니다') as HTMLInputElement).checked).toBe(true)
+    expect(getAnswerOption('기분이 가라앉거나 우울감을 느꼈다.', '며칠 동안').radio.checked).toBe(true)
+    expect(getAnswerOption('흥미나 즐거움이 줄어들었다.', '전혀 아니다').radio.checked).toBe(true)
   })
 
   it('moves to the summary route after the last scale is completed', async () => {
@@ -200,13 +220,13 @@ describe('assessment input page', () => {
     await waitFor(() => {
       expect(findQuestionLegend('기분이 가라앉거나 우울감을 느꼈다.')).toBeTruthy()
     })
-    await user.click(selectAnswer('기분이 가라앉거나 우울감을 느꼈다.', '며칠 동안'))
-    await user.click(selectAnswer('흥미나 즐거움이 줄어들었다.', '전혀 아니다'))
+    await user.click(getAnswerOption('기분이 가라앉거나 우울감을 느꼈다.', '며칠 동안').label)
+    await user.click(getAnswerOption('흥미나 즐거움이 줄어들었다.', '전혀 아니다').label)
     await user.click(screen.getByRole('button', { name: '다음' }))
 
     await screen.findByRole('heading', { name: 'GAD-7 입력' })
 
-    await user.click(selectAnswer('초조하거나 불안감을 느꼈다.', '며칠 동안'))
+    await user.click(getAnswerOption('초조하거나 불안감을 느꼈다.', '며칠 동안').label)
     await user.click(screen.getByRole('button', { name: '다음' }))
 
     await waitFor(() => {

@@ -10,30 +10,26 @@ export function AssessmentProgressHeader({
   const currentIndex = scaleCodes.findIndex((scaleCode) => scaleCode === currentScaleCode)
 
   return (
-    <div className="card stack">
-      <div className="actions" style={{ justifyContent: 'space-between' }}>
-        <strong>진행 상태</strong>
-        <span className="muted">
+    <div className="card assessment-progress-header">
+      <div className="assessment-progress-header__top">
+        <div className="assessment-progress-header__heading">
+          <strong>선택된 척도 순서</strong>
+          <span className="muted">현재 입력 중인 척도 위치를 빠르게 확인합니다.</span>
+        </div>
+        <span className="assessment-progress-header__badge">
           {currentIndex + 1} / {scaleCodes.length}
         </span>
       </div>
-      <div className="actions">
+      <div aria-label="선택된 척도 진행 순서" className="assessment-progress-header__steps" role="list">
         {scaleCodes.map((scaleCode, index) => {
           const isCurrent = scaleCode === currentScaleCode
 
           return (
             <span
               aria-current={isCurrent ? 'step' : undefined}
-              className="status-chip"
+              className={`status-chip assessment-progress-chip${isCurrent ? ' is-current' : ''}`}
               key={scaleCode}
-              style={
-                isCurrent
-                  ? {
-                      background: '#1d6a7d',
-                      color: '#fff',
-                    }
-                  : undefined
-              }
+              role="listitem"
             >
               {index + 1}. {scaleCode}
             </span>

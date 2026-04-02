@@ -127,34 +127,53 @@ export function AssessmentInputPage() {
   }
 
   return (
-    <div className="stack">
+    <div className="stack assessment-input-page">
       <PageHeader
+        actions={
+          scale ? (
+            <div aria-live="polite" className="assessment-page-header-meta">
+              <span className="assessment-page-header-meta__label">응답 완료</span>
+              <strong>
+                {answeredCount} / {scale.questionCount}
+              </strong>
+            </div>
+          ) : null
+        }
         description={`${currentScaleIndex + 1} / ${selectedScaleCodes.length} 단계`}
         title={scale ? `${scale.scaleName} 입력` : '척도 입력'}
       />
       <AssessmentProgressHeader currentScaleCode={currentScaleCode} scaleCodes={selectedScaleCodes} />
       {error ? <div className="error-text">{error}</div> : null}
       {scale ? (
-        <>
-          <div className="card">
-            <p className="muted">응답 완료: {answeredCount} / {scale.questionCount}</p>
-          </div>
-          <ScaleQuestionForm
-            answers={currentAnswers}
-            onSelect={(questionNo, value) => setAnswer(currentScaleCode, questionNo, value)}
-            scale={scale}
-          />
-        </>
+        <ScaleQuestionForm
+          answers={currentAnswers}
+          onSelect={(questionNo, value) => setAnswer(currentScaleCode, questionNo, value)}
+          scale={scale}
+        />
       ) : error ? null : (
         <div>척도 정보를 불러오는 중...</div>
       )}
-      <div className="actions" style={{ justifyContent: 'space-between' }}>
-        <button className="secondary-button" disabled={isFirstScale} onClick={handlePrevious}>
-          이전
-        </button>
-        <button className="primary-button" disabled={!canMoveNext} onClick={handleNext}>
-          다음
-        </button>
+      <div aria-label="문항 이동" className="assessment-action-bar" role="region">
+        <div className="assessment-action-bar__summary">
+          <span className="assessment-action-bar__eyebrow">
+            현재 단계 {currentScaleIndex + 1} / {selectedScaleCodes.length}
+          </span>
+          <strong className="assessment-action-bar__count">
+            {error
+              ? '입력 가능한 척도를 다시 확인해주세요.'
+              : scale
+                ? `응답 완료 ${answeredCount} / ${scale.questionCount}`
+                : '척도 정보를 불러오는 중...'}
+          </strong>
+        </div>
+        <div className="assessment-action-bar__buttons">
+          <button className="secondary-button" disabled={isFirstScale} onClick={handlePrevious}>
+            이전
+          </button>
+          <button className="primary-button" disabled={!canMoveNext} onClick={handleNext}>
+            다음
+          </button>
+        </div>
       </div>
     </div>
   )
