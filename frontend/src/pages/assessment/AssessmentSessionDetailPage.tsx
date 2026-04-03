@@ -22,6 +22,8 @@ const GENERIC_DETAIL_ERROR_MESSAGE = '잠시 후 다시 시도해주세요.'
 const GENERIC_MISENTERED_ERROR_MESSAGE = '오입력 처리에 실패했습니다. 잠시 후 다시 시도해주세요.'
 const HIGHLIGHT_SCALE_FALLBACK_MESSAGE = '강조할 척도를 찾지 못해 세션 전체를 표시합니다.'
 const DEFAULT_RECORD_LIST_PATH = '/assessment-records'
+const SAVED_NOTICE_MESSAGE = '세션이 저장되었습니다.'
+const NOTICE_AUTO_DISMISS_MS = 3000
 
 function getErrorResponse(error: unknown) {
   if (!isAxiosError<ApiResponse<unknown>>(error)) {
@@ -117,7 +119,7 @@ function getAssessmentRecordReturnTo(searchParams: URLSearchParams) {
 export function AssessmentSessionDetailPage() {
   const { sessionId } = useParams()
   const { user } = useAuth()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [session, setSession] = useState<SessionDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -130,6 +132,30 @@ export function AssessmentSessionDetailPage() {
   const [reason, setReason] = useState('')
   const requestedHighlightScaleCode = searchParams.get('highlightScaleCode')?.trim() || null
   const returnTo = getAssessmentRecordReturnTo(searchParams)
+
+  useEffect(() => {
+    if (searchParams.get('notice') !== 'saved') {
+      return
+    }
+
+    setNotice(SAVED_NOTICE_MESSAGE)
+
+    const nextSearchParams = new URLSearchParams(searchParams)
+    nextSearchParams.delete('notice')
+    setSearchParams(nextSearchParams, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (notice !== SAVED_NOTICE_MESSAGE) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setNotice((currentNotice) => (currentNotice === SAVED_NOTICE_MESSAGE ? null : currentNotice))
+    }, NOTICE_AUTO_DISMISS_MS)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [notice])
 
   useEffect(() => {
     if (!sessionId) {
@@ -332,7 +358,7 @@ export function AssessmentSessionDetailPage() {
                 onClick={handlePrint}
                 type="button"
               >
-                출력
+                출력 보기
               </button>
             ) : null}
             {session && canMarkMisentered && session.status !== 'MISENTERED' ? (

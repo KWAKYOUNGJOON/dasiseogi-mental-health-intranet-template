@@ -42,6 +42,10 @@ export function AssessmentSessionPrintPage() {
         </div>
       </div>
 
+      <p style={{ margin: 0 }}>
+        세션 상세의 출력용 화면입니다. 인쇄하려면 '인쇄'를 누르세요.
+      </p>
+
       <div className="card grid-2">
         <div className="field">
           <span className="muted">팀명</span>

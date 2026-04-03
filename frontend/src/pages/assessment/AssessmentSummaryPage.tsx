@@ -124,7 +124,7 @@ export function AssessmentSummaryPage() {
   const definitionsReady = hasValidDraft && selectedScaleCodes.every((code) => Boolean(definitions[code]))
 
   if (savedSessionId !== null) {
-    return <Navigate replace to={`/assessments/sessions/${savedSessionId}`} />
+    return <Navigate replace to={`/assessments/sessions/${savedSessionId}?notice=saved`} />
   }
 
   if (!clientId || !hasValidDraft) {
