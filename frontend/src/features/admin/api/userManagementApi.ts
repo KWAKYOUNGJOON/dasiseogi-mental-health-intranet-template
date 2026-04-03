@@ -5,11 +5,13 @@ import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 export const USER_MANAGEMENT_ROLE_OPTIONS = ['ADMIN', 'USER'] as const
 export const USER_MANAGEMENT_STATUS_OPTIONS = ['ACTIVE', 'PENDING', 'INACTIVE', 'REJECTED'] as const
 export const USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS = ['ACTIVE', 'INACTIVE'] as const
+export const USER_MANAGEMENT_POSITION_NAME_OPTIONS = ['팀장', '대리', '실무자'] as const
 export const USER_MANAGEMENT_PAGE_SIZE_OPTIONS = [20, 50] as const
 
 export type UserManagementRole = (typeof USER_MANAGEMENT_ROLE_OPTIONS)[number]
 export type UserManagementStatus = (typeof USER_MANAGEMENT_STATUS_OPTIONS)[number]
 export type UserManagementEditableStatus = (typeof USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS)[number]
+export type UserManagementPositionName = (typeof USER_MANAGEMENT_POSITION_NAME_OPTIONS)[number]
 export type UserManagementPageSize = (typeof USER_MANAGEMENT_PAGE_SIZE_OPTIONS)[number]
 
 interface UserManagementListItemResponse {
@@ -17,6 +19,7 @@ interface UserManagementListItemResponse {
   name: string | null
   loginId: string | null
   phone: string | null
+  positionName: string | null
   role: UserManagementRole
   status: UserManagementStatus
   approvedAt: string | null
@@ -39,6 +42,7 @@ export interface UpdateUserManagementRoleResponse {
   userId: number
   role: UserManagementRole
   status: UserManagementStatus
+  positionName: string | null
 }
 
 export interface UpdateUserManagementStatusRequest {
@@ -49,6 +53,18 @@ export interface UpdateUserManagementStatusResponse {
   userId: number
   role: UserManagementRole
   status: UserManagementStatus
+  positionName: string | null
+}
+
+export interface UpdateUserManagementPositionNameRequest {
+  positionName: UserManagementPositionName
+}
+
+export interface UpdateUserManagementPositionNameResponse {
+  userId: number
+  role: UserManagementRole
+  status: UserManagementStatus
+  positionName: string | null
 }
 
 export interface UserManagementListItem {
@@ -56,6 +72,7 @@ export interface UserManagementListItem {
   name: string
   loginId: string
   contact: string
+  positionName: string
   role: UserManagementRole
   status: UserManagementStatus
   approvedAt: string
@@ -82,6 +99,7 @@ export interface UserManagementChangeResult {
   userId: number
   role: UserManagementRole
   status: UserManagementStatus
+  positionName?: string
 }
 
 export const DEFAULT_USER_MANAGEMENT_PAGE_SIZE: UserManagementPageSize = 20
@@ -102,6 +120,7 @@ function mapUserManagementListItem(item: UserManagementListItemResponse): UserMa
     name: normalizeText(item.name),
     loginId: normalizeText(item.loginId),
     contact: normalizeText(item.phone),
+    positionName: normalizeText(item.positionName),
     role: item.role,
     status: item.status,
     approvedAt: normalizeText(formatSeoulDateTimeText(item.approvedAt)),
@@ -120,12 +139,13 @@ function mapUserManagementPage(page: UserManagementPageResponse): UserManagement
 }
 
 function mapUserManagementChangeResult(
-  response: UpdateUserManagementRoleResponse | UpdateUserManagementStatusResponse,
+  response: UpdateUserManagementRoleResponse | UpdateUserManagementStatusResponse | UpdateUserManagementPositionNameResponse,
 ): UserManagementChangeResult {
   return {
     userId: response.userId,
     role: response.role,
     status: response.status,
+    positionName: normalizeText(response.positionName),
   }
 }
 
@@ -149,5 +169,17 @@ export async function updateUserManagementStatus(
 ): Promise<UserManagementChangeResult> {
   const payload: UpdateUserManagementStatusRequest = { status }
   const response = await http.patch<ApiResponse<UpdateUserManagementStatusResponse>>(`/admin/users/${userId}/status`, payload)
+  return mapUserManagementChangeResult(response.data.data)
+}
+
+export async function updateUserManagementPositionName(
+  userId: number,
+  positionName: UserManagementPositionName,
+): Promise<UserManagementChangeResult> {
+  const payload: UpdateUserManagementPositionNameRequest = { positionName }
+  const response = await http.patch<ApiResponse<UpdateUserManagementPositionNameResponse>>(
+    `/admin/users/${userId}/position-name`,
+    payload,
+  )
   return mapUserManagementChangeResult(response.data.data)
 }

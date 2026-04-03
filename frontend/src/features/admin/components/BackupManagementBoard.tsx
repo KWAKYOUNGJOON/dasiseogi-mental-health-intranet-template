@@ -44,6 +44,14 @@ const GENERIC_VALIDATION_MESSAGE = '입력값을 다시 확인해주세요.'
 const GENERIC_LIST_ERROR_MESSAGE = '백업 이력을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
 const GENERIC_RUN_ERROR_MESSAGE = '수동 백업 실행에 실패했습니다. 잠시 후 다시 시도해주세요.'
 const BACKUP_PATH_GUIDE = '백업 저장 경로는 운영 설정(APP_BACKUP_ROOT_PATH)을 따릅니다.'
+const BACKUP_TYPE_FILTER_LABELS: Readonly<Partial<Record<BackupType, string>>> = {
+  AUTO: '자동 백업',
+  MANUAL: '수동 백업',
+}
+const BACKUP_STATUS_FILTER_LABELS: Readonly<Partial<Record<BackupStatus, string>>> = {
+  SUCCESS: '성공',
+  FAILED: '실패',
+}
 
 function getApiResponse(error: unknown) {
   if (!isAxiosError<ApiResponse<unknown>>(error)) {
@@ -114,6 +122,26 @@ function getStatusChipStyle(status: BackupStatus): CSSProperties {
     color: '#9d2f2f',
     background: '#f8e1e1',
   }
+}
+
+function formatBackupTypeFilterOptionLabel(backupType: string) {
+  const description = BACKUP_TYPE_FILTER_LABELS[backupType as BackupType]
+
+  if (!description) {
+    return backupType
+  }
+
+  return `${backupType} (${description})`
+}
+
+function formatBackupStatusFilterOptionLabel(status: string) {
+  const description = BACKUP_STATUS_FILTER_LABELS[status as BackupStatus]
+
+  if (!description) {
+    return status
+  }
+
+  return `${status} (${description})`
 }
 
 function buildQuery(filters: FilterState): Omit<BackupHistoryQuery, 'page' | 'size'> {
@@ -380,7 +408,7 @@ export function BackupManagementBoard() {
               <option value="">전체 유형</option>
               {BACKUP_TYPE_OPTIONS.map((backupType) => (
                 <option key={backupType} value={backupType}>
-                  {backupType}
+                  {formatBackupTypeFilterOptionLabel(backupType)}
                 </option>
               ))}
             </select>
@@ -400,7 +428,7 @@ export function BackupManagementBoard() {
               <option value="">전체 상태</option>
               {BACKUP_STATUS_OPTIONS.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {formatBackupStatusFilterOptionLabel(status)}
                 </option>
               ))}
             </select>

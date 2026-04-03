@@ -1,9 +1,9 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AuthUser } from '../src/features/auth/api/authApi'
 import { MemoryRouter } from 'react-router-dom'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppRouter } from '../src/app/router/AppRouter'
+import type { AuthUser } from '../src/features/auth/api/authApi'
 import { createSignupRequest, type CreateSignupRequestResponse } from '../src/features/auth/api/signupRequestApi'
 import type { ApiResponse } from '../src/shared/types/api'
 
@@ -99,7 +99,7 @@ async function fillSignupRequestForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^비밀번호/, { selector: 'input#signup-request-password' }), 'Test1234!')
   await user.type(screen.getByLabelText(/^비밀번호 확인/, { selector: 'input#signup-request-passwordConfirm' }), 'Test1234!')
   await user.type(screen.getByLabelText(/^연락처/), '01022223333')
-  await user.type(screen.getByLabelText(/^직책 또는 역할/), '사회복지사')
+  await user.selectOptions(screen.getByLabelText(/^직책 또는 역할/), '실무자')
   await user.type(screen.getByLabelText(/^소속 팀/), '정신건강팀')
   await user.type(screen.getByLabelText(/^가입 신청 메모/), '신규 입사자 계정 요청')
 }
@@ -130,11 +130,27 @@ describe('auth signup request page', () => {
     expect(screen.getByLabelText(/^비밀번호/, { selector: 'input#signup-request-password' })).toBeTruthy()
     expect(screen.getByLabelText(/^비밀번호 확인/, { selector: 'input#signup-request-passwordConfirm' })).toBeTruthy()
     expect(screen.getByLabelText(/^연락처/)).toBeTruthy()
-    expect(screen.getByLabelText(/^직책 또는 역할/)).toBeTruthy()
+
+    const positionSelect = screen.getByLabelText(/^직책 또는 역할/) as HTMLSelectElement
+    expect(positionSelect).toBeTruthy()
+    expect(
+      Array.from(positionSelect.options).map((option) => ({
+        label: option.text,
+        value: option.value,
+      })),
+    ).toEqual([
+      { label: '선택해주세요.', value: '' },
+      { label: '팀장', value: '팀장' },
+      { label: '대리', value: '대리' },
+      { label: '실무자', value: '실무자' },
+    ])
+    expect(positionSelect.value).toBe('')
+
     expect(screen.getByLabelText(/^소속 팀/)).toBeTruthy()
     expect(screen.getByLabelText(/^가입 신청 메모/)).toBeTruthy()
     expect(document.querySelectorAll('.field-required-mark')).toHaveLength(7)
     expect((screen.getByLabelText(/^이름/) as HTMLInputElement).required).toBe(true)
+    expect(positionSelect.required).toBe(true)
     expect((screen.getByLabelText(/^가입 신청 메모/) as HTMLTextAreaElement).required).toBe(false)
     expect(screen.getByRole('link', { name: '로그인으로 돌아가기' }).getAttribute('href')).toBe('/login')
   })
@@ -162,7 +178,7 @@ describe('auth signup request page', () => {
     expect(screen.getByText('비밀번호를 입력해주세요.')).toBeTruthy()
     expect(screen.getByText('비밀번호 확인을 입력해주세요.')).toBeTruthy()
     expect(screen.getByText('연락처를 입력해주세요.')).toBeTruthy()
-    expect(screen.getByText('직책 또는 역할을 입력해주세요.')).toBeTruthy()
+    expect(screen.getByText('직책 또는 역할은 팀장, 대리, 실무자 중에서 선택해주세요.')).toBeTruthy()
     expect(screen.getByText('소속 팀을 입력해주세요.')).toBeTruthy()
   })
 
@@ -176,7 +192,7 @@ describe('auth signup request page', () => {
     await user.type(screen.getByLabelText(/^비밀번호/, { selector: 'input#signup-request-password' }), 'Test1234!')
     await user.type(screen.getByLabelText(/^비밀번호 확인/, { selector: 'input#signup-request-passwordConfirm' }), 'Test9999!')
     await user.type(screen.getByLabelText(/^연락처/), '01022223333')
-    await user.type(screen.getByLabelText(/^직책 또는 역할/), '사회복지사')
+    await user.selectOptions(screen.getByLabelText(/^직책 또는 역할/), '팀장')
     await user.type(screen.getByLabelText(/^소속 팀/), '정신건강팀')
 
     await user.click(screen.getByRole('button', { name: '가입 신청' }))
@@ -257,7 +273,7 @@ describe('auth signup request page', () => {
         loginId: 'jwkim',
         password: 'Test1234!',
         phone: '010-2222-3333',
-        positionName: '사회복지사',
+        positionName: '실무자',
         teamName: '정신건강팀',
         requestMemo: '신규 입사자 계정 요청',
       })

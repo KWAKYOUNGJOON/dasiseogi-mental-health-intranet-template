@@ -21,7 +21,6 @@ export interface LoginResponse {
 export interface UpdateMyProfilePayload {
   name: string
   phone?: string
-  positionName?: string
   teamName?: string
 }
 

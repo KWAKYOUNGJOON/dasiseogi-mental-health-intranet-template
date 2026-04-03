@@ -206,7 +206,6 @@ class CoreWorkflowIntegrationTest {
                         .content(json(Map.of(
                                 "name", "수정사용자",
                                 "phone", "010-9999-8888",
-                                "positionName", "선임 상담사",
                                 "teamName", "통합지원팀"
                         ))))
                 .andExpect(status().isOk())
@@ -214,7 +213,7 @@ class CoreWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.loginId").value("usera"))
                 .andExpect(jsonPath("$.data.name").value("수정사용자"))
                 .andExpect(jsonPath("$.data.phone").value("010-9999-8888"))
-                .andExpect(jsonPath("$.data.positionName").value("선임 상담사"))
+                .andExpect(jsonPath("$.data.positionName").value(beforeUpdate.getPositionName()))
                 .andExpect(jsonPath("$.data.teamName").value("통합지원팀"))
                 .andExpect(jsonPath("$.data.role").value(beforeUpdate.getRole().name()))
                 .andExpect(jsonPath("$.data.status").value(beforeUpdate.getStatus().name()));
@@ -224,7 +223,7 @@ class CoreWorkflowIntegrationTest {
         assertThat(updated.getLoginId()).isEqualTo("usera");
         assertThat(updated.getName()).isEqualTo("수정사용자");
         assertThat(updated.getPhone()).isEqualTo("010-9999-8888");
-        assertThat(updated.getPositionName()).isEqualTo("선임 상담사");
+        assertThat(updated.getPositionName()).isEqualTo(beforeUpdate.getPositionName());
         assertThat(updated.getTeamName()).isEqualTo("통합지원팀");
         assertThat(updated.getRole()).isEqualTo(beforeUpdate.getRole());
         assertThat(updated.getStatus()).isEqualTo(beforeUpdate.getStatus());
@@ -239,9 +238,11 @@ class CoreWorkflowIntegrationTest {
     @Test
     void updateMyProfileRejectsProtectedFieldsFromPayload() throws Exception {
         MockHttpSession session = login("usera", "Test1234!");
+        User beforeUpdate = findUser("usera");
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("name", "사용자A");
+        payload.put("positionName", "대리");
         payload.put("role", "ADMIN");
         payload.put("status", "INACTIVE");
         payload.put("loginId", "changed-login-id");
@@ -256,12 +257,13 @@ class CoreWorkflowIntegrationTest {
                 .andReturn();
 
         assertThat(textValues(body(result).path("fieldErrors"), "field"))
-                .contains("loginId", "role", "status");
+                .contains("loginId", "positionName", "role", "status");
 
         User unchanged = findUser("usera");
         assertThat(unchanged.getLoginId()).isEqualTo("usera");
-        assertThat(unchanged.getRole().name()).isEqualTo("USER");
-        assertThat(unchanged.getStatus().name()).isEqualTo("ACTIVE");
+        assertThat(unchanged.getPositionName()).isEqualTo(beforeUpdate.getPositionName());
+        assertThat(unchanged.getRole()).isEqualTo(beforeUpdate.getRole());
+        assertThat(unchanged.getStatus()).isEqualTo(beforeUpdate.getStatus());
     }
 
     @Test
@@ -283,6 +285,30 @@ class CoreWorkflowIntegrationTest {
     }
 
     @Test
+    void updateMyProfileRejectsPositionNameFromPayload() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+        User beforeUpdate = findUser("usera");
+
+        mockMvc.perform(patch("/api/v1/auth/me")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "name", "사용자A",
+                                "phone", "010-1234-5678",
+                                "positionName", "대리",
+                                "teamName", "정신건강팀"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode").value("USER_PROFILE_UPDATE_FIELD_NOT_ALLOWED"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("positionName"))
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("수정할 수 없는 항목입니다."));
+
+        User unchanged = findUser("usera");
+        assertThat(unchanged.getPositionName()).isEqualTo(beforeUpdate.getPositionName());
+    }
+
+    @Test
     void signupRequestCreatesUserApprovalRequest() throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/signup-requests")
                         .header("X-Forwarded-For", "198.51.100.20")
@@ -296,7 +322,7 @@ class CoreWorkflowIntegrationTest {
                                 "loginId", "newsignup",
                                 "password", "Test1234!",
                                 "phone", "010-3333-4444",
-                                "positionName", "사회복지사",
+                                "positionName", "실무자",
                                 "teamName", "정신건강팀",
                                 "requestMemo", "신규 입사"
                         ))))
@@ -317,6 +343,26 @@ class CoreWorkflowIntegrationTest {
         assertThat(approvalRequest.getRequestMemo()).isEqualTo("신규 입사");
         assertThat(hasActivityLog(ActivityActionType.SIGNUP_REQUEST, requestId)).isTrue();
         assertThat(latestActivityLog(ActivityActionType.SIGNUP_REQUEST).getIpAddress()).isEqualTo("127.0.0.77");
+    }
+
+    @Test
+    void signupRequestRejectsInvalidPositionName() throws Exception {
+        mockMvc.perform(post("/api/v1/signup-requests")
+                        .contentType(APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "name", "신규신청자",
+                                "loginId", "newsignupinvalid",
+                                "password", "Test1234!",
+                                "phone", "010-3333-4444",
+                                "positionName", "사회복지사",
+                                "teamName", "정신건강팀",
+                                "requestMemo", "신규 입사"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("positionName"))
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("직책 또는 역할은 팀장, 대리, 실무자 중에서 선택해주세요."));
     }
 
     @Test
@@ -1337,7 +1383,7 @@ class CoreWorkflowIntegrationTest {
                                 "loginId", "rejectcandidate",
                                 "password", "Test1234!",
                                 "phone", "010-4444-5555",
-                                "positionName", "사회복지사",
+                                "positionName", "팀장",
                                 "teamName", "정신건강팀",
                                 "requestMemo", "확인 필요"
                         ))))

@@ -5,45 +5,45 @@ import { updateMyProfile, type AuthUser, type UpdateMyProfilePayload } from '../
 import { PageHeader } from '../../shared/components/PageHeader'
 import type { ApiResponse } from '../../shared/types/api'
 
-const MY_INFO_FIELDS = ['name', 'phone', 'positionName', 'teamName'] as const
+const MY_INFO_EDITABLE_FIELDS = ['name', 'phone', 'teamName'] as const
 const PHONE_PATTERN = /^\d{2,3}-?\d{3,4}-?\d{4}$/
 const VALIDATION_MESSAGE = '입력값을 다시 확인해주세요.'
 const DEFAULT_UPDATE_ERROR_MESSAGE = '내 정보 수정에 실패했습니다. 잠시 후 다시 시도해주세요.'
+const POSITION_NAME_HINT_MESSAGE = '회원가입/승인 시 결정되는 항목으로 내 정보에서 수정할 수 없습니다.'
 const UPDATE_SUCCESS_MESSAGE = '회원정보가 수정되었습니다.'
-const SERVER_FIELD_ALIASES: Readonly<Record<string, MyInfoFieldName>> = {
+const SERVER_FIELD_ALIASES: Readonly<Record<string, MyInfoEditableFieldName>> = {
   contact: 'phone',
   name: 'name',
   phone: 'phone',
-  position: 'positionName',
-  positionName: 'positionName',
   team: 'teamName',
   teamName: 'teamName',
 }
 
-type MyInfoFieldName = (typeof MY_INFO_FIELDS)[number]
-type MyInfoFieldErrors = Partial<Record<MyInfoFieldName, string>>
-type MyInfoTouched = Partial<Record<MyInfoFieldName, boolean>>
+type MyInfoEditableFieldName = (typeof MY_INFO_EDITABLE_FIELDS)[number]
+type MyInfoDisplayFieldName = 'name' | 'phone' | 'positionName' | 'teamName'
+type MyInfoFieldErrors = Partial<Record<MyInfoEditableFieldName, string>>
+type MyInfoTouched = Partial<Record<MyInfoEditableFieldName, boolean>>
 
 interface MyInfoFormValues {
   name: string
   phone: string
-  positionName: string
   teamName: string
 }
 
 interface MyInfoFieldDefinition {
-  name: MyInfoFieldName
+  name: MyInfoDisplayFieldName
   label: string
   autoComplete?: string
   inputMode?: 'text' | 'tel'
   maxLength?: number
   required?: boolean
+  readOnly?: boolean
 }
 
 const FIELD_DEFINITIONS: ReadonlyArray<MyInfoFieldDefinition> = [
   { name: 'name', label: '이름', autoComplete: 'name', maxLength: 50, required: true },
   { name: 'phone', label: '연락처', autoComplete: 'tel', inputMode: 'tel', maxLength: 20 },
-  { name: 'positionName', label: '직책 또는 역할', maxLength: 50 },
+  { name: 'positionName', label: '직책 또는 역할', readOnly: true },
   { name: 'teamName', label: '소속 팀', maxLength: 100 },
 ]
 
@@ -89,7 +89,6 @@ function mapUserToForm(user: AuthUser): MyInfoFormValues {
   return {
     name: user.name ?? '',
     phone: user.phone ?? '',
-    positionName: user.positionName ?? '',
     teamName: user.teamName ?? '',
   }
 }
@@ -98,12 +97,15 @@ function normalizeFormValues(values: MyInfoFormValues): MyInfoFormValues {
   return {
     name: trimValue(values.name),
     phone: formatPhoneNumber(values.phone),
-    positionName: trimValue(values.positionName),
     teamName: trimValue(values.teamName),
   }
 }
 
-function validateField(field: MyInfoFieldName, values: MyInfoFormValues) {
+function isEditableField(field: MyInfoDisplayFieldName): field is MyInfoEditableFieldName {
+  return field !== 'positionName'
+}
+
+function validateField(field: MyInfoEditableFieldName, values: MyInfoFormValues) {
   const normalized = normalizeFormValues(values)
   const value = normalized[field]
 
@@ -124,11 +126,6 @@ function validateField(field: MyInfoFieldName, values: MyInfoFormValues) {
         return '연락처 형식을 확인해주세요.'
       }
       return undefined
-    case 'positionName':
-      if (value.length > 50) {
-        return '직책 또는 역할은 50자 이하로 입력해주세요.'
-      }
-      return undefined
     case 'teamName':
       if (value.length > 100) {
         return '소속 팀은 100자 이하로 입력해주세요.'
@@ -138,7 +135,7 @@ function validateField(field: MyInfoFieldName, values: MyInfoFormValues) {
 }
 
 function validateForm(values: MyInfoFormValues) {
-  return MY_INFO_FIELDS.reduce<MyInfoFieldErrors>((errors, field) => {
+  return MY_INFO_EDITABLE_FIELDS.reduce<MyInfoFieldErrors>((errors, field) => {
     const message = validateField(field, values)
 
     if (message) {
@@ -153,7 +150,7 @@ function hasErrors(errors: MyInfoFieldErrors) {
   return Object.keys(errors).length > 0
 }
 
-function getNextFieldValue(field: MyInfoFieldName, value: string) {
+function getNextFieldValue(field: MyInfoEditableFieldName, value: string) {
   if (field === 'phone') {
     return formatPhoneNumber(value)
   }
@@ -167,7 +164,6 @@ function buildPayload(values: MyInfoFormValues): UpdateMyProfilePayload {
   return {
     name: normalized.name,
     phone: normalized.phone || undefined,
-    positionName: normalized.positionName || undefined,
     teamName: normalized.teamName || undefined,
   }
 }
@@ -209,16 +205,24 @@ function getFieldInputClassName(error: string | undefined) {
   return error ? 'input-error' : undefined
 }
 
-function getFieldInputId(field: MyInfoFieldName) {
+function getFieldInputId(field: MyInfoDisplayFieldName) {
   return `my-info-${field}`
 }
 
-function getFieldErrorId(field: MyInfoFieldName) {
+function getFieldErrorId(field: MyInfoDisplayFieldName) {
   return `my-info-${field}-error`
 }
 
-function getFieldDescribedBy(field: MyInfoFieldName, hasError: boolean) {
-  return hasError ? getFieldErrorId(field) : undefined
+function getFieldHintId(field: MyInfoDisplayFieldName) {
+  return `my-info-${field}-hint`
+}
+
+function getFieldDescribedBy(field: MyInfoDisplayFieldName, hasHint: boolean, hasError: boolean) {
+  const ids = [hasHint ? getFieldHintId(field) : undefined, hasError ? getFieldErrorId(field) : undefined].filter(
+    Boolean,
+  )
+
+  return ids.length > 0 ? ids.join(' ') : undefined
 }
 
 function getRoleLabel(role: AuthUser['role']) {
@@ -246,7 +250,6 @@ export function MyInfoPage() {
       : {
           name: '',
           phone: '',
-          positionName: '',
           teamName: '',
         },
   )
@@ -262,9 +265,9 @@ export function MyInfoPage() {
     }
 
     setForm(mapUserToForm(user))
-  }, [user?.id, user?.name, user?.phone, user?.positionName, user?.teamName])
+  }, [user])
 
-  function updateFieldError(field: MyInfoFieldName, nextForm: MyInfoFormValues) {
+  function updateFieldError(field: MyInfoEditableFieldName, nextForm: MyInfoFormValues) {
     setFieldErrors((current) => {
       const nextErrors = { ...current }
       const message = validateField(field, nextForm)
@@ -279,7 +282,7 @@ export function MyInfoPage() {
     })
   }
 
-  function handleChange(field: MyInfoFieldName) {
+  function handleChange(field: MyInfoEditableFieldName) {
     return (event: ChangeEvent<HTMLInputElement>) => {
       const value = getNextFieldValue(field, event.target.value)
       const nextForm = { ...form, [field]: value }
@@ -305,7 +308,7 @@ export function MyInfoPage() {
     }
   }
 
-  function handleBlur(field: MyInfoFieldName) {
+  function handleBlur(field: MyInfoEditableFieldName) {
     return () => {
       setTouched((current) => ({ ...current, [field]: true }))
       updateFieldError(field, form)
@@ -319,7 +322,7 @@ export function MyInfoPage() {
       return
     }
 
-    const nextTouched = MY_INFO_FIELDS.reduce<MyInfoTouched>((current, field) => {
+    const nextTouched = MY_INFO_EDITABLE_FIELDS.reduce<MyInfoTouched>((current, field) => {
       current[field] = true
       return current
     }, {})
@@ -392,40 +395,61 @@ export function MyInfoPage() {
           </div>
         ) : null}
         <div className="grid-2">
-          {FIELD_DEFINITIONS.map((field) => (
-            <label className="field" htmlFor={getFieldInputId(field.name)} key={field.name}>
-              <span className="field-label">
-                <span>{field.label}</span>
-                {field.required ? (
-                  <>
-                    <span aria-hidden="true" className="field-required-mark">
-                      *
-                    </span>
-                    <span className="visually-hidden">필수 입력</span>
-                  </>
-                ) : null}
-              </span>
-              <input
-                aria-describedby={getFieldDescribedBy(field.name, Boolean(fieldErrors[field.name]))}
-                aria-invalid={fieldErrors[field.name] ? 'true' : undefined}
-                aria-required={field.required ? 'true' : undefined}
-                autoComplete={field.autoComplete}
-                className={getFieldInputClassName(fieldErrors[field.name])}
-                id={getFieldInputId(field.name)}
-                inputMode={field.inputMode}
-                maxLength={field.maxLength}
-                onBlur={handleBlur(field.name)}
-                onChange={handleChange(field.name)}
-                required={field.required}
-                value={form[field.name]}
-              />
-              {fieldErrors[field.name] ? (
-                <span className="field-error" id={getFieldErrorId(field.name)}>
-                  {fieldErrors[field.name]}
+          {FIELD_DEFINITIONS.map((field) => {
+            if (!isEditableField(field.name)) {
+              const describedBy = getFieldDescribedBy(field.name, true, false)
+
+              return (
+                <label className="field" htmlFor={getFieldInputId(field.name)} key={field.name}>
+                  <span className="field-label">
+                    <span>{field.label}</span>
+                  </span>
+                  <input aria-describedby={describedBy} disabled id={getFieldInputId(field.name)} value={user.positionName ?? ''} />
+                  <span className="field-hint" id={getFieldHintId(field.name)}>
+                    {POSITION_NAME_HINT_MESSAGE}
+                  </span>
+                </label>
+              )
+            }
+
+            const errorMessage = fieldErrors[field.name]
+            const describedBy = getFieldDescribedBy(field.name, false, Boolean(errorMessage))
+
+            return (
+              <label className="field" htmlFor={getFieldInputId(field.name)} key={field.name}>
+                <span className="field-label">
+                  <span>{field.label}</span>
+                  {field.required ? (
+                    <>
+                      <span aria-hidden="true" className="field-required-mark">
+                        *
+                      </span>
+                      <span className="visually-hidden">필수 입력</span>
+                    </>
+                  ) : null}
                 </span>
-              ) : null}
-            </label>
-          ))}
+                <input
+                  aria-describedby={describedBy}
+                  aria-invalid={errorMessage ? 'true' : undefined}
+                  aria-required={field.required ? 'true' : undefined}
+                  autoComplete={field.autoComplete}
+                  className={getFieldInputClassName(errorMessage)}
+                  id={getFieldInputId(field.name)}
+                  inputMode={field.inputMode}
+                  maxLength={field.maxLength}
+                  onBlur={handleBlur(field.name)}
+                  onChange={handleChange(field.name)}
+                  required={field.required}
+                  value={form[field.name]}
+                />
+                {errorMessage ? (
+                  <span className="field-error" id={getFieldErrorId(field.name)}>
+                    {errorMessage}
+                  </span>
+                ) : null}
+              </label>
+            )
+          })}
         </div>
         <div className="actions">
           <button className="primary-button" disabled={saving} type="submit">

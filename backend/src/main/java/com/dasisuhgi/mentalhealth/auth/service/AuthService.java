@@ -81,12 +81,10 @@ public class AuthService {
     @Transactional
     public AuthUserResponse updateCurrentUser(UpdateMyProfileRequest request, HttpSession session) {
         SessionUser sessionUser = getRequiredSessionUser(session);
-        validateProfileUpdateRequest(request);
-
         User user = getCurrentUserEntity(sessionUser);
+        validateProfileUpdateRequest(request);
         user.setName(request.getName().trim());
         user.setPhone(blankToNull(request.getPhone()));
-        user.setPositionName(blankToNull(request.getPositionName()));
         user.setTeamName(blankToNull(request.getTeamName()));
 
         session.setAttribute(SessionConstants.USER, SessionUser.from(user));
@@ -139,11 +137,6 @@ public class AuthService {
             fieldErrors.add(new FieldErrorItem("phone", "연락처는 30자 이하로 입력해주세요."));
         } else if (normalizedPhone != null && !PHONE_PATTERN.matcher(normalizedPhone).matches()) {
             fieldErrors.add(new FieldErrorItem("phone", "연락처 형식을 확인해주세요."));
-        }
-
-        String normalizedPositionName = blankToNull(request.getPositionName());
-        if (normalizedPositionName != null && normalizedPositionName.length() > 50) {
-            fieldErrors.add(new FieldErrorItem("positionName", "직책 또는 역할은 50자 이하로 입력해주세요."));
         }
 
         String normalizedTeamName = blankToNull(request.getTeamName());

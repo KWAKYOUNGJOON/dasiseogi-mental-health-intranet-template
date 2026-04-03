@@ -5,6 +5,7 @@ public record AdminUserListItemResponse(
         String name,
         String loginId,
         String phone,
+        String positionName,
         String role,
         String status,
         String approvedAt,

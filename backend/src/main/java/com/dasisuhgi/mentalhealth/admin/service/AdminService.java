@@ -5,12 +5,14 @@ import com.dasisuhgi.mentalhealth.admin.dto.AdminUserUpdateResponse;
 import com.dasisuhgi.mentalhealth.admin.dto.SignupRequestListItemResponse;
 import com.dasisuhgi.mentalhealth.admin.dto.SignupRequestProcessRequest;
 import com.dasisuhgi.mentalhealth.admin.dto.SignupRequestProcessResponse;
+import com.dasisuhgi.mentalhealth.admin.dto.UserPositionNameUpdateRequest;
 import com.dasisuhgi.mentalhealth.admin.dto.UserRoleUpdateRequest;
 import com.dasisuhgi.mentalhealth.admin.dto.UserStatusUpdateRequest;
 import com.dasisuhgi.mentalhealth.audit.entity.ActivityActionType;
 import com.dasisuhgi.mentalhealth.audit.entity.ActivityTargetType;
 import com.dasisuhgi.mentalhealth.audit.service.ActivityLogService;
 import com.dasisuhgi.mentalhealth.common.api.PageResponse;
+import com.dasisuhgi.mentalhealth.common.api.FieldErrorItem;
 import com.dasisuhgi.mentalhealth.common.error.AppException;
 import com.dasisuhgi.mentalhealth.common.security.AccessPolicyService;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
@@ -23,6 +25,7 @@ import com.dasisuhgi.mentalhealth.user.entity.User;
 import com.dasisuhgi.mentalhealth.user.entity.UserRole;
 import com.dasisuhgi.mentalhealth.user.entity.UserStatus;
 import com.dasisuhgi.mentalhealth.user.repository.UserRepository;
+import com.dasisuhgi.mentalhealth.user.support.PositionNamePolicy;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -184,6 +187,7 @@ public class AdminService {
                                 user.getName(),
                                 user.getLoginId(),
                                 user.getPhone(),
+                                user.getPositionName(),
                                 user.getRole().name(),
                                 user.getStatus().name(),
                                 formatDateTime(user.getApprovedAt()),
@@ -214,7 +218,7 @@ public class AdminService {
                 target.getLoginId(),
                 "사용자 역할 변경: " + nextRole.name()
         );
-        return new AdminUserUpdateResponse(target.getId(), target.getRole().name(), target.getStatus().name());
+        return new AdminUserUpdateResponse(target.getId(), target.getRole().name(), target.getStatus().name(), target.getPositionName());
     }
 
     @Transactional
@@ -234,7 +238,26 @@ public class AdminService {
                 target.getLoginId(),
                 "사용자 상태 변경: " + nextStatus.name()
         );
-        return new AdminUserUpdateResponse(target.getId(), target.getRole().name(), target.getStatus().name());
+        return new AdminUserUpdateResponse(target.getId(), target.getRole().name(), target.getStatus().name(), target.getPositionName());
+    }
+
+    @Transactional
+    public AdminUserUpdateResponse updateUserPositionName(Long userId, UserPositionNameUpdateRequest request, SessionUser sessionUser) {
+        User currentUser = accessPolicyService.getCurrentUser(sessionUser);
+        accessPolicyService.assertAdmin(currentUser);
+
+        User target = getUser(userId);
+        String nextPositionName = parsePositionName(request.positionName());
+        target.setPositionName(nextPositionName);
+        activityLogService.log(
+                currentUser,
+                ActivityActionType.USER_POSITION_NAME_CHANGE,
+                ActivityTargetType.USER,
+                target.getId(),
+                target.getLoginId(),
+                "사용자 직책 변경: " + nextPositionName
+        );
+        return new AdminUserUpdateResponse(target.getId(), target.getRole().name(), target.getStatus().name(), target.getPositionName());
     }
 
     private void ensureLastActiveAdminWillRemain(User target, UserRole nextRole, UserStatus nextStatus) {
@@ -294,6 +317,20 @@ public class AdminService {
             throw new AppException(HttpStatus.BAD_REQUEST, "INVALID_USER_STATUS", "허용되지 않은 사용자 상태입니다.");
         }
         return parsedStatus;
+    }
+
+    private String parsePositionName(String positionName) {
+        String normalizedPositionName = PositionNamePolicy.normalize(positionName);
+        if (PositionNamePolicy.isAllowed(normalizedPositionName)) {
+            return normalizedPositionName;
+        }
+
+        throw new AppException(
+                HttpStatus.BAD_REQUEST,
+                "INVALID_POSITION_NAME",
+                PositionNamePolicy.INVALID_SELECTION_MESSAGE,
+                List.of(new FieldErrorItem(PositionNamePolicy.FIELD_NAME, PositionNamePolicy.INVALID_SELECTION_MESSAGE))
+        );
     }
 
     private UserStatus parseUserStatus(String status, UserStatus defaultValue) {

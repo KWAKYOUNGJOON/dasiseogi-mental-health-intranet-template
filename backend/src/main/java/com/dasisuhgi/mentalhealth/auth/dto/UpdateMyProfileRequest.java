@@ -19,8 +19,6 @@ public class UpdateMyProfileRequest {
 
     private String phone;
 
-    private String positionName;
-
     private String teamName;
 
     @JsonIgnore

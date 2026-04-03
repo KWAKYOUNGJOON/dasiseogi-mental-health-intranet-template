@@ -12,7 +12,9 @@ vi.mock('../src/app/providers/AuthProvider', () => ({
 vi.mock('../src/features/admin/api/userManagementApi', () => ({
   DEFAULT_USER_MANAGEMENT_PAGE_SIZE: 20,
   USER_MANAGEMENT_PAGE_SIZE_OPTIONS: [20, 50],
+  USER_MANAGEMENT_POSITION_NAME_OPTIONS: ['팀장', '대리', '실무자'],
   fetchUserManagementPage: vi.fn(),
+  updateUserManagementPositionName: vi.fn(),
   updateUserManagementRole: vi.fn(),
   updateUserManagementStatus: vi.fn(),
 }))
@@ -25,11 +27,13 @@ import { AppRouter } from '../src/app/router/AppRouter'
 import { AdminUsersPage } from '../src/pages/admin/AdminUsersPage'
 import {
   fetchUserManagementPage,
+  updateUserManagementPositionName,
   updateUserManagementRole,
   updateUserManagementStatus,
 } from '../src/features/admin/api/userManagementApi'
 
 const mockedFetchUserManagementPage = vi.mocked(fetchUserManagementPage)
+const mockedUpdateUserManagementPositionName = vi.mocked(updateUserManagementPositionName)
 const mockedUpdateUserManagementRole = vi.mocked(updateUserManagementRole)
 const mockedUpdateUserManagementStatus = vi.mocked(updateUserManagementStatus)
 
@@ -54,6 +58,7 @@ function createManagedUserItem(
     name: '홍길동',
     loginId: 'honggildong',
     contact: '010-1111-2222',
+    positionName: '실무자',
     role: 'USER' as const,
     status: 'ACTIVE' as const,
     approvedAt: '2026-03-25 09:00',
@@ -93,6 +98,7 @@ beforeEach(() => {
     refresh: vi.fn().mockResolvedValue(undefined),
   })
   mockedFetchUserManagementPage.mockReset()
+  mockedUpdateUserManagementPositionName.mockReset()
   mockedUpdateUserManagementRole.mockReset()
   mockedUpdateUserManagementStatus.mockReset()
 })
@@ -121,8 +127,74 @@ describe('admin users', () => {
     expect(screen.getByText('홍길동')).toBeTruthy()
     expect(screen.getByText('honggildong')).toBeTruthy()
     expect(screen.getByText('010-1111-2222')).toBeTruthy()
+    expect(screen.getByText('실무자')).toBeTruthy()
     expect(screen.getByText('2026-03-25 09:00')).toBeTruthy()
     expect(screen.getByText('2026-03-29 15:40')).toBeTruthy()
+  })
+
+  it('renders the admin position dropdown with only 팀장, 대리, 실무자 options', async () => {
+    mockedFetchUserManagementPage.mockResolvedValue(
+      createManagedUserPage([createManagedUserItem({ positionName: '대리' })]),
+    )
+
+    renderAdminUsersPage()
+
+    const positionSelect = (await screen.findByLabelText('홍길동 직책 변경 값')) as HTMLSelectElement
+
+    expect(Array.from(positionSelect.options).map((option) => option.value)).toEqual(['팀장', '대리', '실무자'])
+    expect(positionSelect.value).toBe('대리')
+  })
+
+  it('keeps a legacy saved position visible until the admin selects a supported option', async () => {
+    mockedFetchUserManagementPage.mockResolvedValue(
+      createManagedUserPage([createManagedUserItem({ positionName: '상담사' })]),
+    )
+
+    renderAdminUsersPage()
+
+    const positionSelect = (await screen.findByLabelText('홍길동 직책 변경 값')) as HTMLSelectElement
+
+    expect(positionSelect.value).toBe('상담사')
+    expect(Array.from(positionSelect.options).find((option) => option.value === '상담사')?.disabled).toBe(true)
+    expect(Array.from(positionSelect.options).filter((option) => !option.disabled).map((option) => option.value)).toEqual([
+      '팀장',
+      '대리',
+      '실무자',
+    ])
+  })
+
+  it('calls the position patch API and refreshes the list after a position change', async () => {
+    const user = userEvent.setup()
+
+    mockedFetchUserManagementPage
+      .mockResolvedValueOnce(createManagedUserPage([createManagedUserItem({ positionName: '실무자' })]))
+      .mockResolvedValueOnce(createManagedUserPage([createManagedUserItem({ positionName: '팀장' })]))
+    mockedUpdateUserManagementPositionName.mockResolvedValue({
+      userId: 7,
+      role: 'USER',
+      status: 'ACTIVE',
+      positionName: '팀장',
+    })
+
+    renderAdminUsersPage()
+
+    const row = (await screen.findByText('홍길동')).closest('tr')
+    if (!row) {
+      throw new Error('사용자 행을 찾을 수 없습니다.')
+    }
+
+    await user.selectOptions(within(row).getByLabelText('홍길동 직책 변경 값'), '팀장')
+    await user.click(within(row).getByRole('button', { name: '직책 변경' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '변경 적용' }))
+
+    await waitFor(() => {
+      expect(mockedUpdateUserManagementPositionName).toHaveBeenCalledWith(7, '팀장')
+    })
+    await waitFor(() => {
+      expect(mockedFetchUserManagementPage).toHaveBeenCalledTimes(2)
+    })
+
+    expect(screen.getByText('홍길동 사용자의 직책을 팀장(으)로 변경했습니다.')).toBeTruthy()
   })
 
   it('applies filters on search and restores defaults on reset', async () => {

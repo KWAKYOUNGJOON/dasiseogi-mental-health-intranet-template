@@ -82,7 +82,7 @@ afterEach(() => {
 })
 
 describe('my info page', () => {
-  it('renders the current user information and keeps protected fields read-only', () => {
+  it('renders the current user information and shows the position field as read-only', () => {
     render(<MyInfoPage />)
 
     expect(screen.getByRole('heading', { name: '내 정보' })).toBeTruthy()
@@ -90,18 +90,22 @@ describe('my info page', () => {
     expect((screen.getByLabelText('권한') as HTMLInputElement).value).toBe('일반 사용자')
     expect((screen.getByLabelText('계정 상태') as HTMLInputElement).value).toBe('활성')
     expect((screen.getByLabelText(/^이름/) as HTMLInputElement).value).toBe('김지원')
-    expect((screen.getByLabelText(/^직책 또는 역할/) as HTMLInputElement).value).toBe('상담사')
     expect((screen.getByLabelText(/^소속 팀/) as HTMLInputElement).value).toBe('정신건강팀')
+
+    expect(screen.queryByRole('combobox', { name: /^직책 또는 역할/ })).toBeNull()
+    expect(screen.getByLabelText(/^직책 또는 역할/)).toBeDisabled()
+    expect((screen.getByLabelText(/^직책 또는 역할/) as HTMLInputElement).value).toBe('상담사')
+    expect(screen.getByText('회원가입/승인 시 결정되는 항목으로 내 정보에서 수정할 수 없습니다.')).toBeTruthy()
   })
 
-  it('submits the whitelisted fields only and shows a success message', async () => {
+  it('submits editable fields without including positionName in the payload', async () => {
     const user = userEvent.setup()
 
     mockedUpdateMyProfile.mockResolvedValue(
       createUser({
         name: '김지원 수정',
         phone: '010-9999-8888',
-        positionName: '선임 상담사',
+        positionName: '상담사',
         teamName: '통합지원팀',
       }),
     )
@@ -110,15 +114,12 @@ describe('my info page', () => {
 
     const nameInput = screen.getByLabelText(/^이름/) as HTMLInputElement
     const phoneInput = screen.getByLabelText(/^연락처/) as HTMLInputElement
-    const positionInput = screen.getByLabelText(/^직책 또는 역할/) as HTMLInputElement
     const teamInput = screen.getByLabelText(/^소속 팀/) as HTMLInputElement
 
     await user.clear(nameInput)
     await user.type(nameInput, '김지원 수정')
     await user.clear(phoneInput)
     await user.type(phoneInput, '01099998888')
-    await user.clear(positionInput)
-    await user.type(positionInput, '선임 상담사')
     await user.clear(teamInput)
     await user.type(teamInput, '통합지원팀')
     await user.click(screen.getByRole('button', { name: '저장' }))
@@ -127,10 +128,10 @@ describe('my info page', () => {
       expect(mockedUpdateMyProfile).toHaveBeenCalledWith({
         name: '김지원 수정',
         phone: '010-9999-8888',
-        positionName: '선임 상담사',
         teamName: '통합지원팀',
       })
     })
+    expect(mockedUpdateMyProfile.mock.calls[0]?.[0]).not.toHaveProperty('positionName')
 
     expect(phoneInput.value).toBe('010-9999-8888')
     expect(mockRefresh).toHaveBeenCalledTimes(1)

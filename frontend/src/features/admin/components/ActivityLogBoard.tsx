@@ -4,6 +4,7 @@ import { DateTextInput } from '../../../shared/components/DateTextInput'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import type { ApiResponse } from '../../../shared/types/api'
 import { toValidDateText } from '../../../shared/utils/dateText'
+import { formatActivityLogActionLabel } from '../utils/activityLogActionLabels'
 import {
   ACTIVITY_LOG_ACTION_OPTIONS,
   ACTIVITY_LOG_PAGE_SIZE_OPTIONS,
@@ -224,7 +225,7 @@ export function ActivityLogBoard() {
               <option value="">전체 기능</option>
               {ACTIVITY_LOG_ACTION_OPTIONS.map((actionType) => (
                 <option key={actionType} value={actionType}>
-                  {actionType}
+                  {formatActivityLogActionLabel(actionType)}
                 </option>
               ))}
             </select>
@@ -322,7 +323,7 @@ export function ActivityLogBoard() {
                   <td>{item.occurredAt}</td>
                   <td>{item.userLabel}</td>
                   <td>{item.ipAddress}</td>
-                  <td>{item.actionType}</td>
+                  <td>{formatActivityLogActionLabel(item.actionType)}</td>
                   <td>
                     <div
                       style={{

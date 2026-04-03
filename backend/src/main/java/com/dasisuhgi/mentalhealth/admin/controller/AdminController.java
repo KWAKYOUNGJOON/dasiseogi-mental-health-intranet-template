@@ -5,6 +5,7 @@ import com.dasisuhgi.mentalhealth.admin.dto.AdminUserUpdateResponse;
 import com.dasisuhgi.mentalhealth.admin.dto.SignupRequestListItemResponse;
 import com.dasisuhgi.mentalhealth.admin.dto.SignupRequestProcessRequest;
 import com.dasisuhgi.mentalhealth.admin.dto.SignupRequestProcessResponse;
+import com.dasisuhgi.mentalhealth.admin.dto.UserPositionNameUpdateRequest;
 import com.dasisuhgi.mentalhealth.admin.dto.UserRoleUpdateRequest;
 import com.dasisuhgi.mentalhealth.admin.dto.UserStatusUpdateRequest;
 import com.dasisuhgi.mentalhealth.admin.service.AdminService;
@@ -114,6 +115,16 @@ public class AdminController {
     ) {
         SessionUser currentUser = authService.getRequiredSessionUser(session);
         return ApiResponse.success(adminService.updateUserStatus(userId, request, currentUser));
+    }
+
+    @PatchMapping("/users/{userId}/position-name")
+    public ApiResponse<AdminUserUpdateResponse> updateUserPositionName(
+            @PathVariable Long userId,
+            @RequestBody UserPositionNameUpdateRequest request,
+            HttpSession session
+    ) {
+        SessionUser currentUser = authService.getRequiredSessionUser(session);
+        return ApiResponse.success(adminService.updateUserPositionName(userId, request, currentUser));
     }
 
     @GetMapping("/activity-logs")

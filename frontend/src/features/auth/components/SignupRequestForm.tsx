@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import type { ApiResponse } from '../../../shared/types/api'
 import { createSignupRequest, type CreateSignupRequestPayload } from '../api/signupRequestApi'
 
+const POSITION_NAME_OPTIONS = ['팀장', '대리', '실무자'] as const
 const SIGNUP_REQUEST_FIELDS = [
   'name',
   'loginId',
@@ -35,6 +36,7 @@ interface SignupRequestFieldDefinition {
   name: SignupRequestFieldName
   label: string
   autoComplete?: string
+  control?: 'select'
   hint?: string
   inputMode?: 'text' | 'tel'
   maxLength?: number
@@ -83,7 +85,7 @@ const FIELD_DEFINITIONS: ReadonlyArray<SignupRequestFieldDefinition> = [
     type: 'password',
   },
   { name: 'phone', label: '연락처', autoComplete: 'tel', inputMode: 'tel', maxLength: 20, required: true },
-  { name: 'positionName', label: '직책 또는 역할', maxLength: 50, required: true },
+  { name: 'positionName', label: '직책 또는 역할', control: 'select', required: true },
   { name: 'teamName', label: '소속 팀', maxLength: 100, required: true },
   { name: 'requestMemo', label: '가입 신청 메모', hint: '0/500', maxLength: 500, rows: 4 },
 ]
@@ -93,6 +95,7 @@ const DUPLICATED_LOGIN_ID_MESSAGE = '이미 사용 중인 아이디입니다.'
 const GENERIC_SIGNUP_ERROR_MESSAGE = '회원가입 신청에 실패했습니다. 잠시 후 다시 시도해주세요.'
 const LOGIN_ID_PATTERN = /^[a-z0-9_-]+$/
 const PHONE_PATTERN = /^\d{2,3}-?\d{3,4}-?\d{4}$/
+const POSITION_NAME_VALIDATION_MESSAGE = '직책 또는 역할은 팀장, 대리, 실무자 중에서 선택해주세요.'
 const SERVER_FIELD_ALIASES: Readonly<Record<string, SignupRequestFieldName>> = {
   contact: 'phone',
   loginId: 'loginId',
@@ -158,6 +161,10 @@ function formatPhoneNumber(value: string) {
   }
 
   return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
+}
+
+function isAllowedPositionName(value: string) {
+  return POSITION_NAME_OPTIONS.includes(value as (typeof POSITION_NAME_OPTIONS)[number])
 }
 
 function isPasswordField(field: SignupRequestFieldName): field is PasswordFieldName {
@@ -232,11 +239,8 @@ function validateField(field: SignupRequestFieldName, values: SignupRequestFormV
       }
       return undefined
     case 'positionName':
-      if (!value) {
-        return '직책 또는 역할을 입력해주세요.'
-      }
-      if (value.length > 50) {
-        return '직책 또는 역할은 50자 이하로 입력해주세요.'
+      if (!isAllowedPositionName(value)) {
+        return POSITION_NAME_VALIDATION_MESSAGE
       }
       return undefined
     case 'teamName':
@@ -440,19 +444,29 @@ export function SignupRequestForm() {
       'aria-describedby': string | undefined
       'aria-invalid': 'true' | undefined
       'aria-required': 'true' | undefined
-      autoComplete: string | undefined
       className: string | undefined
       id: string
-      inputMode: 'text' | 'tel' | undefined
-      maxLength: number | undefined
       name: SignupRequestFieldName
       onBlur: () => void
-      onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
+      onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void
       required: boolean | undefined
     },
   ) {
     if (field.rows) {
-      return <textarea {...commonProps} rows={field.rows} value={form[field.name]} />
+      return <textarea {...commonProps} autoComplete={field.autoComplete} maxLength={field.maxLength} rows={field.rows} value={form[field.name]} />
+    }
+
+    if (field.control === 'select') {
+      return (
+        <select {...commonProps} value={form[field.name]}>
+          <option value="">선택해주세요.</option>
+          {POSITION_NAME_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      )
     }
 
     if (isPasswordField(field.name)) {
@@ -460,7 +474,14 @@ export function SignupRequestForm() {
 
       return (
         <div className="field-control-row">
-          <input {...commonProps} type={getInputType(field)} value={form[field.name]} />
+          <input
+            {...commonProps}
+            autoComplete={field.autoComplete}
+            inputMode={field.inputMode}
+            maxLength={field.maxLength}
+            type={getInputType(field)}
+            value={form[field.name]}
+          />
           <button
             aria-label={`${field.label} ${toggleLabel}`}
             className="field-inline-button"
@@ -473,11 +494,20 @@ export function SignupRequestForm() {
       )
     }
 
-    return <input {...commonProps} type={field.type ?? 'text'} value={form[field.name]} />
+    return (
+      <input
+        {...commonProps}
+        autoComplete={field.autoComplete}
+        inputMode={field.inputMode}
+        maxLength={field.maxLength}
+        type={field.type ?? 'text'}
+        value={form[field.name]}
+      />
+    )
   }
 
   function handleChange(field: SignupRequestFieldName) {
-    return (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    return (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
       const value = getNextFieldValue(field, event.target.value)
       const nextForm = { ...form, [field]: value }
       const nextValidationTargets = getValidationTargets(field).filter((target) => touched[target])
@@ -562,11 +592,8 @@ export function SignupRequestForm() {
           'aria-describedby': describedBy,
           'aria-invalid': errorMessage ? 'true' : undefined,
           'aria-required': field.required ? 'true' : undefined,
-          autoComplete: field.autoComplete,
           className: getFieldInputClassName(errorMessage),
           id: inputId,
-          inputMode: field.inputMode,
-          maxLength: field.maxLength,
           name: field.name,
           onBlur: handleBlur(field.name),
           onChange: handleChange(field.name),

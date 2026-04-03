@@ -75,7 +75,6 @@ describe('auth api', () => {
       updateMyProfile({
         name: '수정 사용자',
         phone: '010-9999-8888',
-        positionName: '선임 상담사',
         teamName: '통합지원팀',
       }),
     ).resolves.toMatchObject({
@@ -86,7 +85,6 @@ describe('auth api', () => {
     expect(mockPatch).toHaveBeenCalledWith('/auth/me', {
       name: '수정 사용자',
       phone: '010-9999-8888',
-      positionName: '선임 상담사',
       teamName: '통합지원팀',
     })
   })

@@ -7,20 +7,23 @@ import type { ApiResponse } from '../../../shared/types/api'
 import {
   DEFAULT_USER_MANAGEMENT_PAGE_SIZE,
   USER_MANAGEMENT_PAGE_SIZE_OPTIONS,
+  USER_MANAGEMENT_POSITION_NAME_OPTIONS,
   fetchUserManagementPage,
+  updateUserManagementPositionName,
   updateUserManagementRole,
   updateUserManagementStatus,
   type UserManagementEditableStatus,
   type UserManagementListItem,
   type UserManagementPage,
   type UserManagementPageSize,
+  type UserManagementPositionName,
   type UserManagementQuery,
   type UserManagementRole,
   type UserManagementStatus,
 } from '../api/userManagementApi'
 
 type Notice = { type: 'success' | 'error'; text: string } | null
-type ActionFieldErrors = Partial<Record<'role' | 'status', string>>
+type ActionFieldErrors = Partial<Record<'role' | 'status' | 'positionName', string>>
 
 interface FilterState {
   keyword: string
@@ -41,7 +44,13 @@ interface StatusDialogState {
   nextStatus: UserManagementEditableStatus
 }
 
-type DialogState = RoleDialogState | StatusDialogState
+interface PositionNameDialogState {
+  action: 'positionName'
+  user: UserManagementListItem
+  nextPositionName: UserManagementPositionName
+}
+
+type DialogState = RoleDialogState | StatusDialogState | PositionNameDialogState
 type UserManagementAction = DialogState['action']
 
 const EMPTY_STATE_MESSAGE = '조건에 맞는 사용자가 없습니다.'
@@ -49,6 +58,7 @@ const GENERIC_VALIDATION_MESSAGE = '입력값을 다시 확인해주세요.'
 const GENERIC_LIST_ERROR_MESSAGE = '사용자 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
 const GENERIC_ROLE_ERROR_MESSAGE = '사용자 역할 변경 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
 const GENERIC_STATUS_ERROR_MESSAGE = '사용자 상태 변경 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+const GENERIC_POSITION_NAME_ERROR_MESSAGE = '사용자 직책 변경 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
 
 function createDefaultFilters(): FilterState {
   return {
@@ -137,6 +147,26 @@ function getStatusActionErrorMessage(response: ApiResponse<unknown> | undefined)
   }
 }
 
+function getPositionNameActionErrorMessage(response: ApiResponse<unknown> | undefined) {
+  if (!response) {
+    return GENERIC_POSITION_NAME_ERROR_MESSAGE
+  }
+
+  if (isNotFoundError(response.errorCode)) {
+    return getFallbackMessage(response.message, '사용자 정보를 찾을 수 없습니다.')
+  }
+
+  switch (response.errorCode) {
+    case 'FORBIDDEN':
+      return getFallbackMessage(response.message, '관리자 권한이 필요합니다.')
+    case 'INVALID_POSITION_NAME':
+    case 'VALIDATION_ERROR':
+      return getFallbackMessage(response.message, GENERIC_VALIDATION_MESSAGE)
+    default:
+      return GENERIC_POSITION_NAME_ERROR_MESSAGE
+  }
+}
+
 function mapActionFieldErrors(
   response: ApiResponse<unknown> | undefined,
   action: UserManagementAction,
@@ -148,6 +178,10 @@ function mapActionFieldErrors(
 
     if (action === 'status' && fieldError.field === 'status') {
       errors.status = fieldError.reason
+    }
+
+    if (action === 'positionName' && fieldError.field === 'positionName') {
+      errors.positionName = fieldError.reason
     }
 
     return errors
@@ -232,12 +266,24 @@ function getStatusSuccessMessage(user: UserManagementListItem, nextStatus: UserM
   return `${user.name} 사용자의 상태를 ${nextStatusText} 변경했습니다.`
 }
 
+function getPositionNameSuccessMessage(user: UserManagementListItem, nextPositionName: UserManagementPositionName) {
+  return `${user.name} 사용자의 직책을 ${nextPositionName}(으)로 변경했습니다.`
+}
+
 function getDialogTitle(dialog: DialogState | null) {
   if (!dialog) {
     return ''
   }
 
-  return dialog.action === 'role' ? '사용자 역할 변경 확인' : '사용자 상태 변경 확인'
+  if (dialog.action === 'role') {
+    return '사용자 역할 변경 확인'
+  }
+
+  if (dialog.action === 'status') {
+    return '사용자 상태 변경 확인'
+  }
+
+  return '사용자 직책 변경 확인'
 }
 
 function getDialogDescription(dialog: DialogState | null) {
@@ -249,7 +295,31 @@ function getDialogDescription(dialog: DialogState | null) {
     return '선택한 사용자의 역할을 변경합니다. 변경 내용을 확인한 뒤 적용해주세요.'
   }
 
-  return '선택한 사용자의 상태를 변경합니다. 변경 내용을 확인한 뒤 적용해주세요.'
+  if (dialog.action === 'status') {
+    return '선택한 사용자의 상태를 변경합니다. 변경 내용을 확인한 뒤 적용해주세요.'
+  }
+
+  return '선택한 사용자의 직책을 변경합니다. 변경 내용을 확인한 뒤 적용해주세요.'
+}
+
+function isAllowedPositionName(value: string): value is UserManagementPositionName {
+  return USER_MANAGEMENT_POSITION_NAME_OPTIONS.includes(value as UserManagementPositionName)
+}
+
+function getSelectablePositionNameOptions(currentPositionName: string) {
+  if (isAllowedPositionName(currentPositionName)) {
+    return USER_MANAGEMENT_POSITION_NAME_OPTIONS
+  }
+
+  return [currentPositionName, ...USER_MANAGEMENT_POSITION_NAME_OPTIONS] as const
+}
+
+function getPositionNameOptionLabel(positionName: string) {
+  if (!positionName || positionName === '-') {
+    return '현재 직책 없음'
+  }
+
+  return positionName
 }
 
 function parsePageSize(value: string): UserManagementPageSize {
@@ -283,6 +353,7 @@ export function UserManagementBoard() {
   const [processing, setProcessing] = useState(false)
   const [roleDrafts, setRoleDrafts] = useState<Record<number, UserManagementRole>>({})
   const [statusDrafts, setStatusDrafts] = useState<Record<number, UserManagementEditableStatus | ''>>({})
+  const [positionNameDrafts, setPositionNameDrafts] = useState<Record<number, string>>({})
 
   const loadUsers = useCallback(async () => {
     setLoading(true)
@@ -297,10 +368,12 @@ export function UserManagementBoard() {
       setListError(null)
       setRoleDrafts(Object.fromEntries(response.items.map((item) => [item.id, item.role])))
       setStatusDrafts(Object.fromEntries(response.items.map((item) => [item.id, getDefaultStatusDraft(item.status)])))
+      setPositionNameDrafts(Object.fromEntries(response.items.map((item) => [item.id, item.positionName])))
     } catch (error) {
       setUserPage(null)
       setRoleDrafts({})
       setStatusDrafts({})
+      setPositionNameDrafts({})
       setListError(getListErrorMessage(getApiResponse(error)))
     } finally {
       setLoading(false)
@@ -400,6 +473,27 @@ export function UserManagementBoard() {
     setDialogFieldErrors({})
   }
 
+  function openPositionNameDialog(user: UserManagementListItem) {
+    if (processing) {
+      return
+    }
+
+    const nextPositionName = positionNameDrafts[user.id] ?? user.positionName
+
+    if (!isAllowedPositionName(nextPositionName) || nextPositionName === user.positionName) {
+      return
+    }
+
+    setNotice(null)
+    setDialog({
+      action: 'positionName',
+      user,
+      nextPositionName,
+    })
+    setDialogError(null)
+    setDialogFieldErrors({})
+  }
+
   function closeDialog() {
     if (processing) {
       return
@@ -421,14 +515,18 @@ export function UserManagementBoard() {
     try {
       if (dialog.action === 'role') {
         await updateUserManagementRole(dialog.user.id, dialog.nextRole)
-      } else {
+      } else if (dialog.action === 'status') {
         await updateUserManagementStatus(dialog.user.id, dialog.nextStatus)
+      } else {
+        await updateUserManagementPositionName(dialog.user.id, dialog.nextPositionName)
       }
 
       const successMessage =
         dialog.action === 'role'
           ? getRoleSuccessMessage(dialog.user, dialog.nextRole)
-          : getStatusSuccessMessage(dialog.user, dialog.nextStatus)
+          : dialog.action === 'status'
+            ? getStatusSuccessMessage(dialog.user, dialog.nextStatus)
+            : getPositionNameSuccessMessage(dialog.user, dialog.nextPositionName)
 
       resetDialog()
       setNotice({ type: 'success', text: successMessage })
@@ -437,7 +535,12 @@ export function UserManagementBoard() {
     } catch (error) {
       const response = getApiResponse(error)
       const errorCode = response?.errorCode
-      const errorMessage = dialog.action === 'role' ? getRoleActionErrorMessage(response) : getStatusActionErrorMessage(response)
+      const errorMessage =
+        dialog.action === 'role'
+          ? getRoleActionErrorMessage(response)
+          : dialog.action === 'status'
+            ? getStatusActionErrorMessage(response)
+            : getPositionNameActionErrorMessage(response)
 
       if (errorCode === 'FORBIDDEN' || isNotFoundError(errorCode) || errorCode === 'USER_STATUS_ALREADY_SET') {
         resetDialog()
@@ -557,7 +660,7 @@ export function UserManagementBoard() {
       <div className="card stack">
         <div className="toolbar" style={{ marginBottom: 0 }}>
           <strong>총 {userPage?.totalItems ?? 0}명</strong>
-          <span className="muted">역할과 상태 변경은 각각 확인 모달에서 최종 적용됩니다.</span>
+          <span className="muted">직책, 역할, 상태 변경은 각각 확인 모달에서 최종 적용됩니다.</span>
           <button className="secondary-button" disabled={loading || processing} onClick={() => void loadUsers()} type="button">
             재조회
           </button>
@@ -580,6 +683,7 @@ export function UserManagementBoard() {
               <th>이름</th>
               <th>아이디</th>
               <th>연락처</th>
+              <th>직책</th>
               <th>권한</th>
               <th>상태</th>
               <th>승인일시</th>
@@ -590,19 +694,19 @@ export function UserManagementBoard() {
           <tbody>
             {loading ? (
               <tr>
-                <td className="muted" colSpan={8}>
+                <td className="muted" colSpan={9}>
                   사용자 목록을 불러오는 중입니다.
                 </td>
               </tr>
             ) : listError ? (
               <tr>
-                <td className="muted" colSpan={8}>
+                <td className="muted" colSpan={9}>
                   사용자 목록 조회에 실패했습니다.
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td className="muted" colSpan={8}>
+                <td className="muted" colSpan={9}>
                   {EMPTY_STATE_MESSAGE}
                 </td>
               </tr>
@@ -611,12 +715,17 @@ export function UserManagementBoard() {
                 const roleDraft = roleDrafts[item.id] ?? item.role
                 const canEditStatus = isStatusEditable(item.status)
                 const statusDraft = statusDrafts[item.id] ?? getDefaultStatusDraft(item.status)
+                const positionNameDraft = positionNameDrafts[item.id] ?? item.positionName
+                const selectablePositionNameOptions = getSelectablePositionNameOptions(item.positionName)
+                const canSubmitPositionNameChange =
+                  isAllowedPositionName(positionNameDraft) && positionNameDraft !== item.positionName
 
                 return (
                   <tr key={item.id}>
                     <td>{item.name}</td>
                     <td>{item.loginId}</td>
                     <td>{item.contact}</td>
+                    <td>{item.positionName}</td>
                     <td>
                       <span className="status-chip" style={getRoleChipStyle(item.role)}>
                         {getRoleLabel(item.role)}
@@ -631,6 +740,41 @@ export function UserManagementBoard() {
                     <td>{item.lastLoginAt}</td>
                     <td>
                       <div className="stack" style={{ gap: 12, minWidth: 220 }}>
+                        <div className="management-action-panel">
+                          <span className="management-action-label">직책 변경</span>
+                          <select
+                            aria-label={`${item.name} 직책 변경 값`}
+                            disabled={processing}
+                            onChange={(event) =>
+                              setPositionNameDrafts((prev) => ({
+                                ...prev,
+                                [item.id]: event.target.value,
+                              }))
+                            }
+                            value={positionNameDraft}
+                          >
+                            {selectablePositionNameOptions.map((positionNameOption) => {
+                              const isCurrentLegacyOption =
+                                positionNameOption === item.positionName &&
+                                !isAllowedPositionName(positionNameOption)
+
+                              return (
+                                <option disabled={isCurrentLegacyOption} key={positionNameOption} value={positionNameOption}>
+                                  {getPositionNameOptionLabel(positionNameOption)}
+                                </option>
+                              )
+                            })}
+                          </select>
+                          <button
+                            className="primary-button"
+                            disabled={processing || !canSubmitPositionNameChange}
+                            onClick={() => openPositionNameDialog(item)}
+                            type="button"
+                          >
+                            직책 변경
+                          </button>
+                        </div>
+
                         <div className="management-action-panel">
                           <span className="management-action-label">역할 변경</span>
                           <select
@@ -773,6 +917,20 @@ export function UserManagementBoard() {
                 <strong>{getStatusLabel(dialog.nextStatus)}</strong>
               </div>
               {dialogFieldErrors.status ? <span className="field-error">{dialogFieldErrors.status}</span> : null}
+            </div>
+          ) : null}
+
+          {dialog?.action === 'positionName' ? (
+            <div className="stack" style={{ gap: 8 }}>
+              <div className="management-dialog-summary">
+                <span className="muted">변경 전</span>
+                <strong>{getPositionNameOptionLabel(dialog.user.positionName)}</strong>
+              </div>
+              <div className="management-dialog-summary">
+                <span className="muted">변경 후</span>
+                <strong>{dialog.nextPositionName}</strong>
+              </div>
+              {dialogFieldErrors.positionName ? <span className="field-error">{dialogFieldErrors.positionName}</span> : null}
             </div>
           ) : null}
         </div>
