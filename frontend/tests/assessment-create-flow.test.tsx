@@ -472,7 +472,7 @@ describe('assessment create flow regression', () => {
     })
 
     expect(await screen.findByText('오입력 처리되었습니다.')).toBeTruthy()
-    expect(screen.getByText('MISENTERED')).toBeTruthy()
+    expect(screen.getByText('오입력')).toBeTruthy()
     expect(screen.getByText('잘못된 대상자 입력')).toBeTruthy()
     expect(screen.getByText('2026-03-31 10:05:00')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '오입력 처리' })).toBeNull()

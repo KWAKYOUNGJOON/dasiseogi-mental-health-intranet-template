@@ -199,8 +199,11 @@ describe('assessment session detail page', () => {
     expect(screen.getByText('CL-00042')).toBeTruthy()
     expect(screen.getByText('김대상')).toBeTruthy()
     expect(screen.getByText('세션 참고 메모')).toBeTruthy()
+    expect(screen.getByText('[GAD-7] 불안 수준 확인 필요')).toBeTruthy()
     expect(screen.getAllByText('불안 수준 확인 필요').length).toBeGreaterThan(0)
     expect(screen.getByText('최근 2주 동안 불안했다.')).toBeTruthy()
+    expect(screen.getByText('남성')).toBeTruthy()
+    expect(screen.getByText('완료')).toBeTruthy()
     expect(screen.getByText('2026-03-31 09:20:00')).toBeTruthy()
     expect(screen.queryByText('2026-03-31T09:20:00')).toBeNull()
   })
@@ -396,7 +399,7 @@ describe('assessment session detail page', () => {
     await user.click(within(dialog).getByRole('button', { name: '오입력 처리' }))
 
     expect(await screen.findByText('오입력 처리되었습니다.')).toBeTruthy()
-    expect(screen.getByText('MISENTERED')).toBeTruthy()
+    expect(screen.getByText('오입력')).toBeTruthy()
     expect(screen.getByText('2026-03-31 10:05:00')).toBeTruthy()
     expect(screen.getAllByText('김담당').length).toBeGreaterThan(0)
     expect(screen.getByText('잘못된 대상자 입력')).toBeTruthy()
@@ -427,7 +430,7 @@ describe('assessment session detail page', () => {
 
     renderAssessmentSessionDetailPage()
 
-    await user.click(await screen.findByRole('button', { name: '출력' }))
+    await user.click(await screen.findByRole('button', { name: '출력 보기' }))
 
     expect(windowOpenSpy).toHaveBeenCalledWith(
       '/assessments/sessions/501/print',

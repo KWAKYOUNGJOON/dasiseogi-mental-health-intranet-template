@@ -3,6 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { fetchSessionPrintData, type SessionPrintData } from '../../features/assessment/api/assessmentApi'
 import { formatAssessmentLocalDateTimeText } from '../../shared/utils/dateText'
 
+const CLIENT_GENDER_LABELS: Record<string, string> = {
+  MALE: '남성',
+  FEMALE: '여성',
+}
+
+function getClientGenderLabel(gender: SessionPrintData['client']['gender']) {
+  return CLIENT_GENDER_LABELS[gender] ?? gender
+}
+
 export function AssessmentSessionPrintPage() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
@@ -69,7 +78,7 @@ export function AssessmentSessionPrintPage() {
         </div>
         <div className="field">
           <span className="muted">성별</span>
-          <strong>{data.client.gender}</strong>
+          <strong>{getClientGenderLabel(data.client.gender)}</strong>
         </div>
         <div className="field">
           <span className="muted">세션 번호</span>

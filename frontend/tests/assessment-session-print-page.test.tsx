@@ -60,6 +60,7 @@ describe('assessment session print page', () => {
   it('renders the completed datetime with a blank separator instead of T', async () => {
     renderPrintPage()
 
+    expect(await screen.findByText('남성')).toBeTruthy()
     expect(await screen.findByText('2026-03-31 09:20:00')).toBeTruthy()
     expect(screen.queryByText('2026-03-31T09:20:00')).toBeNull()
   })
