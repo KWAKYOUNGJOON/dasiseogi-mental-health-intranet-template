@@ -4,6 +4,7 @@ import {
   formatAssessmentLocalDateTimeText,
   formatCompactDateInput,
   formatOffsetDateTimeTextToSeoul,
+  getDefaultStatisticsSeoulDateRange,
   formatSeoulDateText,
   formatSeoulDateTimeText,
   getCurrentSeoulWeekRange,
@@ -55,6 +56,20 @@ describe('date text utilities', () => {
 
   it('keeps already formatted Seoul datetime text stable for display', () => {
     expect(formatSeoulDateTimeText('2026-03-31 09:20:00')).toBe('2026-03-31 09:20:00')
+  })
+
+  it('calculates the default statistics range from seven days ago to today in Asia/Seoul', () => {
+    expect(getDefaultStatisticsSeoulDateRange(new Date('2026-04-02T15:00:00Z'))).toEqual({
+      dateFrom: '2026-03-27',
+      dateTo: '2026-04-03',
+    })
+  })
+
+  it('keeps late UTC hours inside the same Seoul day for the default statistics range', () => {
+    expect(getDefaultStatisticsSeoulDateRange(new Date('2026-04-03T14:59:59Z'))).toEqual({
+      dateFrom: '2026-03-27',
+      dateTo: '2026-04-03',
+    })
   })
 
   it('calculates the default statistics week range from Monday to Sunday in Asia/Seoul', () => {

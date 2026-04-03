@@ -12,17 +12,66 @@ import {
 } from '../../features/statistics/api/statisticsApi'
 import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
-import { getCurrentSeoulWeekRange, toValidDateText } from '../../shared/utils/dateText'
+import { getDefaultStatisticsSeoulDateRange, toValidDateText } from '../../shared/utils/dateText'
 
 const DEFAULT_ALERT_PAGE_SIZE = 10
 const ALERT_TYPE_OPTIONS = ['HIGH_RISK', 'CAUTION', 'CRITICAL_ITEM', 'COMPOSITE_RULE']
+const ALERT_TYPE_LABEL_BY_VALUE: Record<string, string> = {
+  HIGH_RISK: '고위험',
+  CAUTION: '주의',
+  CRITICAL_ITEM: '개별 위험 항목',
+  COMPOSITE_RULE: '복합 위험',
+}
+const STATISTICS_SCALE_NAME_BY_CODE: Record<string, string> = {
+  PHQ9: 'PHQ-9',
+  GAD7: 'GAD-7',
+  MKPQ16: 'mKPQ-16',
+  KMDQ: 'K-MDQ',
+  PSS10: 'PSS-10',
+  ISIK: 'ISI-K',
+  AUDITK: 'AUDIT-K',
+  IESR: 'IES-R',
+}
+const STATISTICS_SCALE_DESCRIPTION_BY_CODE: Record<string, string> = {
+  PHQ9: '우울',
+  GAD7: '불안',
+  MKPQ16: '정신증 위험',
+  KMDQ: '양극성(조울증)',
+  PSS10: '스트레스',
+  ISIK: '불면',
+  AUDITK: '알코올 사용',
+  IESR: '외상 후 스트레스(PTSD)',
+}
+
+function formatStatisticsScaleLabel(scaleCode: string, scaleName?: string) {
+  const resolvedScaleName = scaleName ?? STATISTICS_SCALE_NAME_BY_CODE[scaleCode]
+  const description = STATISTICS_SCALE_DESCRIPTION_BY_CODE[scaleCode]
+
+  if (resolvedScaleName && description) {
+    return `${resolvedScaleName} (${description})`
+  }
+
+  return resolvedScaleName ?? scaleCode
+}
+
+function formatStatisticsScaleOptionLabel(item: StatisticsScaleResponse['items'][number]) {
+  const displayLabel = STATISTICS_SCALE_DESCRIPTION_BY_CODE[item.scaleCode]
+    ? formatStatisticsScaleLabel(item.scaleCode, item.scaleName)
+    : `${item.scaleName} (${item.scaleCode})`
+
+  return `${displayLabel}${item.isActive ? '' : ' - 비활성'}`
+}
+
+function formatAlertTypeLabel(alertType: string) {
+  return ALERT_TYPE_LABEL_BY_VALUE[alertType] ?? alertType
+}
 
 export function StatisticsPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const defaultWeekRange = getCurrentSeoulWeekRange()
-  const [dateFrom, setDateFrom] = useState(defaultWeekRange.dateFrom)
-  const [dateTo, setDateTo] = useState(defaultWeekRange.dateTo)
+  const defaultDateRange = getDefaultStatisticsSeoulDateRange()
+  const [dateFrom, setDateFrom] = useState(defaultDateRange.dateFrom)
+  const [dateTo, setDateTo] = useState(defaultDateRange.dateTo)
   const [alertScaleCode, setAlertScaleCode] = useState('')
   const [alertType, setAlertType] = useState('')
   const [summary, setSummary] = useState<StatisticsSummary | null>(null)
@@ -71,6 +120,7 @@ export function StatisticsPage() {
   const alertScaleOptions = [...currentScaleItems, ...legacyScaleItems]
   const exportDateFrom = toValidDateText(dateFrom) || undefined
   const exportDateTo = toValidDateText(dateTo) || undefined
+  const selectedAlertScaleLabel = alertScaleCode ? formatStatisticsScaleLabel(alertScaleCode) : '전체 척도'
 
   return (
     <div className="stack">
@@ -110,7 +160,7 @@ export function StatisticsPage() {
             <option value="">전체 척도</option>
             {alertScaleOptions.map((item) => (
               <option key={item.scaleCode} value={item.scaleCode}>
-                {item.scaleName} ({item.scaleCode}){item.isActive ? '' : ' - 비활성'}
+                {formatStatisticsScaleOptionLabel(item)}
               </option>
             ))}
           </select>
@@ -118,7 +168,7 @@ export function StatisticsPage() {
             <option value="">전체 경고유형</option>
             {ALERT_TYPE_OPTIONS.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {formatAlertTypeLabel(option)}
               </option>
             ))}
           </select>
@@ -191,7 +241,7 @@ export function StatisticsPage() {
                 <tbody>
                   {currentScaleItems.map((item) => (
                     <tr key={item.scaleCode}>
-                      <td>{item.scaleName}</td>
+                      <td>{formatStatisticsScaleLabel(item.scaleCode, item.scaleName)}</td>
                       <td>{item.totalCount}</td>
                       <td>{item.alertCount}</td>
                     </tr>
@@ -213,7 +263,7 @@ export function StatisticsPage() {
                       {legacyScaleItems.map((item) => (
                         <tr key={item.scaleCode}>
                           <td>
-                            {item.scaleName} <span className="muted">(비활성)</span>
+                            {formatStatisticsScaleLabel(item.scaleCode, item.scaleName)} <span className="muted">(비활성)</span>
                           </td>
                           <td>{item.totalCount}</td>
                           <td>{item.alertCount}</td>
@@ -229,7 +279,7 @@ export function StatisticsPage() {
               <div className="actions" style={{ justifyContent: 'space-between' }}>
                 <h3 style={{ margin: 0 }}>경고 기록</h3>
                 <span className="muted">
-                  필터: {alertScaleCode || '전체 척도'} / {alertType || '전체 유형'}
+                  필터: {selectedAlertScaleLabel} / {alertType ? formatAlertTypeLabel(alertType) : '전체 유형'}
                 </span>
               </div>
               {alerts && alerts.items.length > 0 ? (
@@ -255,8 +305,8 @@ export function StatisticsPage() {
                           <td>{alert.sessionCompletedAt}</td>
                           <td>{alert.clientName}</td>
                           <td>{alert.performedByName}</td>
-                          <td>{alert.scaleCode}</td>
-                          <td>{alert.alertType}</td>
+                          <td>{formatStatisticsScaleLabel(alert.scaleCode)}</td>
+                          <td>{formatAlertTypeLabel(alert.alertType)}</td>
                           <td>{alert.alertMessage}</td>
                         </tr>
                       ))}

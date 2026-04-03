@@ -25,6 +25,20 @@ vi.mock('../src/app/providers/AuthProvider', () => ({
   useAuth: () => mockUseAuth(),
 }))
 
+const mockGetDefaultStatisticsSeoulDateRange = vi.fn(() => ({
+  dateFrom: '2026-03-27',
+  dateTo: '2026-04-03',
+}))
+
+vi.mock('../src/shared/utils/dateText', async () => {
+  const actual = await vi.importActual<typeof import('../src/shared/utils/dateText')>('../src/shared/utils/dateText')
+
+  return {
+    ...actual,
+    getDefaultStatisticsSeoulDateRange: () => mockGetDefaultStatisticsSeoulDateRange(),
+  }
+})
+
 vi.mock('../src/features/statistics/api/statisticsApi', () => ({
   downloadStatisticsExport: vi.fn(),
   fetchStatisticsAlerts: vi.fn(),
@@ -39,6 +53,7 @@ import {
   fetchStatisticsScales,
   fetchStatisticsSummary,
 } from '../src/features/statistics/api/statisticsApi'
+import { formatSeoulDateTimeText } from '../src/shared/utils/dateText'
 
 const mockedDownloadStatisticsExport = vi.mocked(downloadStatisticsExport)
 const mockedFetchStatisticsSummary = vi.mocked(fetchStatisticsSummary)
@@ -140,7 +155,10 @@ function createStatisticsAlertPage(
   overrides?: Partial<Awaited<ReturnType<typeof fetchStatisticsAlerts>>>,
 ) {
   return {
-    items,
+    items: items.map((item) => ({
+      ...item,
+      sessionCompletedAt: formatSeoulDateTimeText(item.sessionCompletedAt),
+    })),
     page: 1,
     size: 10,
     totalItems: items.length,
@@ -162,6 +180,7 @@ beforeEach(() => {
   mockLogin.mockReset()
   mockLogout.mockReset()
   mockRefresh.mockReset()
+  mockGetDefaultStatisticsSeoulDateRange.mockClear()
   mockedDownloadStatisticsExport.mockReset()
   mockedFetchStatisticsSummary.mockReset()
   mockedFetchStatisticsScales.mockReset()
@@ -171,6 +190,10 @@ beforeEach(() => {
   mockLogout.mockResolvedValue(undefined)
   mockRefresh.mockResolvedValue(undefined)
   mockUseAuth.mockReturnValue(createAuthValue())
+  mockGetDefaultStatisticsSeoulDateRange.mockReturnValue({
+    dateFrom: '2026-03-27',
+    dateTo: '2026-04-03',
+  })
   mockedDownloadStatisticsExport.mockResolvedValue(undefined)
 
   mockedFetchStatisticsSummary.mockImplementation(async () => createStatisticsSummary())
@@ -207,6 +230,10 @@ describe('statistics page', () => {
 
     const initialDateRange = mockedFetchStatisticsSummary.mock.calls[0]?.[0]
 
+    expect(initialDateRange).toEqual({
+      dateFrom: '2026-03-27',
+      dateTo: '2026-04-03',
+    })
     expect(await screen.findByRole('heading', { level: 2, name: '통계' })).toBeTruthy()
     const summaryCsvButton = screen.getByRole('button', { name: '요약 CSV' })
 
@@ -294,8 +321,8 @@ describe('statistics page', () => {
     const initialParams = mockedFetchStatisticsSummary.mock.calls[0]?.[0]
 
     expect(initialParams).toEqual({
-      dateFrom: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      dateTo: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      dateFrom: '2026-03-27',
+      dateTo: '2026-04-03',
     })
     expect(mockedFetchStatisticsScales).toHaveBeenCalledWith(initialParams)
     expect(mockedFetchStatisticsAlerts).toHaveBeenCalledWith({
@@ -313,7 +340,8 @@ describe('statistics page', () => {
     const alertSessionCard = screen.getByText('경고 세션').closest('div')
     const alertScaleCard = screen.getByText('경고 척도').closest('div')
     const performedByCard = screen.getByRole('heading', { level: 3, name: '담당자별 세션 수' }).closest('.card')
-    const activeScaleRow = screen.getByText('PHQ-9').closest('tr')
+    const currentScaleCard = screen.getByRole('heading', { level: 3, name: '현재 운영 척도' }).closest('.card')
+    const activeScaleRow = within(currentScaleCard as HTMLDivElement).getByRole('cell', { name: 'PHQ-9 (우울)' }).closest('tr')
     const initialAlertRow = (await screen.findByText('우울 주의')).closest('tr')
 
     expect(totalSessionCard).toBeTruthy()
@@ -321,6 +349,12 @@ describe('statistics page', () => {
     expect(alertSessionCard).toBeTruthy()
     expect(alertScaleCard).toBeTruthy()
     expect(performedByCard).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'PHQ-9 (우울)' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'GAD-7 (불안)' })).toBeTruthy()
+    expect((screen.getByRole('option', { name: '고위험' }) as HTMLOptionElement).value).toBe('HIGH_RISK')
+    expect((screen.getByRole('option', { name: '주의' }) as HTMLOptionElement).value).toBe('CAUTION')
+    expect((screen.getByRole('option', { name: '개별 위험 항목' }) as HTMLOptionElement).value).toBe('CRITICAL_ITEM')
+    expect((screen.getByRole('option', { name: '복합 위험' }) as HTMLOptionElement).value).toBe('COMPOSITE_RULE')
     expect(activeScaleRow).toBeTruthy()
     expect(initialAlertRow).toBeTruthy()
 
@@ -334,8 +368,8 @@ describe('statistics page', () => {
     expect(within(activeScaleRow as HTMLTableRowElement).getByText('6')).toBeTruthy()
     expect(within(initialAlertRow as HTMLTableRowElement).getByText('김대상')).toBeTruthy()
     expect(within(initialAlertRow as HTMLTableRowElement).getByText('2026-03-31 09:10:00')).toBeTruthy()
-    expect(within(initialAlertRow as HTMLTableRowElement).getByText('PHQ9')).toBeTruthy()
-    expect(within(initialAlertRow as HTMLTableRowElement).getByText('CAUTION')).toBeTruthy()
+    expect(within(initialAlertRow as HTMLTableRowElement).getByText('PHQ-9 (우울)')).toBeTruthy()
+    expect(within(initialAlertRow as HTMLTableRowElement).getByText('주의')).toBeTruthy()
     expect(screen.queryByText('경고 기록이 없습니다.')).toBeNull()
     expect(screen.queryByText('통계 정보를 불러오지 못했습니다.')).toBeNull()
 
@@ -356,6 +390,7 @@ describe('statistics page', () => {
     expect(secondPageAlertRow).toBeTruthy()
     expect(within(secondPageAlertRow as HTMLTableRowElement).getByText('박대상')).toBeTruthy()
     expect(within(secondPageAlertRow as HTMLTableRowElement).getByText('2026-03-31 10:00:00')).toBeTruthy()
+    expect(within(secondPageAlertRow as HTMLTableRowElement).getByText('GAD-7 (불안)')).toBeTruthy()
     expect(screen.getByText('2건 / 2페이지')).toBeTruthy()
 
     await user.selectOptions(screen.getByLabelText('경고 척도'), 'PHQ9')
@@ -380,7 +415,9 @@ describe('statistics page', () => {
 
     expect(filteredAlertRow).toBeTruthy()
     expect(within(filteredAlertRow as HTMLTableRowElement).getByText('최대상')).toBeTruthy()
-    expect(within(filteredAlertRow as HTMLTableRowElement).getByText('HIGH_RISK')).toBeTruthy()
+    expect(within(filteredAlertRow as HTMLTableRowElement).getByText('PHQ-9 (우울)')).toBeTruthy()
+    expect(within(filteredAlertRow as HTMLTableRowElement).getByText('고위험')).toBeTruthy()
+    expect(screen.getByText('필터: PHQ-9 (우울) / 고위험')).toBeTruthy()
     expect(screen.getByText('1건 / 1페이지')).toBeTruthy()
     expect(screen.queryByText('불안 주의')).toBeNull()
     expect(screen.queryByText('경고 기록이 없습니다.')).toBeNull()

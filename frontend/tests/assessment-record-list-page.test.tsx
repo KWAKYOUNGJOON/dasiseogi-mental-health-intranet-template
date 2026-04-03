@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthUser } from '../src/features/auth/api/authApi'
 import {
   fetchAssessmentRecords,
+  fetchScales,
   fetchSessionDetail,
   markSessionMisentered,
   type AssessmentRecordPage,
+  type ScaleListItem,
   type SessionDetail,
 } from '../src/features/assessment/api/assessmentApi'
 import { AssessmentRecordListPage } from '../src/pages/assessment/AssessmentRecordListPage'
@@ -30,6 +32,7 @@ vi.mock('../src/features/assessment/api/assessmentApi', () => ({
 }))
 
 const mockedFetchAssessmentRecords = vi.mocked(fetchAssessmentRecords)
+const mockedFetchScales = vi.mocked(fetchScales)
 const mockedFetchSessionDetail = vi.mocked(fetchSessionDetail)
 const mockedMarkSessionMisentered = vi.mocked(markSessionMisentered)
 
@@ -78,6 +81,17 @@ function createAssessmentRecordPage(
     size: 20,
     totalItems: items.length,
     totalPages: items.length > 0 ? 1 : 0,
+    ...overrides,
+  }
+}
+
+function createScaleListItem(overrides?: Partial<ScaleListItem>): ScaleListItem {
+  return {
+    scaleCode: 'PHQ9',
+    scaleName: 'PHQ-9',
+    displayOrder: 1,
+    isActive: true,
+    implemented: true,
     ...overrides,
   }
 }
@@ -205,12 +219,51 @@ function renderAssessmentRecordFlow(initialEntry = '/assessment-records') {
 
 beforeEach(() => {
   mockedFetchAssessmentRecords.mockReset()
+  mockedFetchScales.mockReset()
   mockedFetchSessionDetail.mockReset()
   mockedMarkSessionMisentered.mockReset()
   mockUseAuth.mockReset()
 
   mockUseAuth.mockReturnValue({ user: createUser() })
   mockedFetchAssessmentRecords.mockResolvedValue(createAssessmentRecordPage([createRecord()]))
+  mockedFetchScales.mockResolvedValue([
+    createScaleListItem(),
+    createScaleListItem({
+      scaleCode: 'GAD7',
+      scaleName: 'GAD-7',
+      displayOrder: 2,
+    }),
+    createScaleListItem({
+      scaleCode: 'MKPQ16',
+      scaleName: 'mKPQ-16',
+      displayOrder: 3,
+    }),
+    createScaleListItem({
+      scaleCode: 'KMDQ',
+      scaleName: 'K-MDQ',
+      displayOrder: 4,
+    }),
+    createScaleListItem({
+      scaleCode: 'PSS10',
+      scaleName: 'PSS-10',
+      displayOrder: 5,
+    }),
+    createScaleListItem({
+      scaleCode: 'ISIK',
+      scaleName: 'ISI-K',
+      displayOrder: 6,
+    }),
+    createScaleListItem({
+      scaleCode: 'AUDITK',
+      scaleName: 'AUDIT-K',
+      displayOrder: 7,
+    }),
+    createScaleListItem({
+      scaleCode: 'IESR',
+      scaleName: 'IES-R',
+      displayOrder: 8,
+    }),
+  ])
   mockedFetchSessionDetail.mockResolvedValue(createSessionDetail())
 })
 
@@ -255,6 +308,40 @@ describe('assessment record list page', () => {
     expect(screen.getAllByRole('link', { name: '상세 보기' }).length).toBe(2)
     expect(screen.getAllByText('2026-03-31 09:20:00').length).toBeGreaterThan(0)
     expect(screen.queryByText('2026-03-31T09:20:00')).toBeNull()
+  })
+
+  it('shows friendly scale labels in the dropdown while keeping the filter value as the scale code', async () => {
+    const user = userEvent.setup()
+
+    renderAssessmentRecordFlow()
+
+    expect(await screen.findByRole('option', { name: 'PHQ-9 (우울)' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'GAD-7 (불안)' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'mKPQ-16 (정신증 위험)' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'K-MDQ (양극성(조울증))' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'PSS-10 (스트레스)' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'ISI-K (불면)' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'AUDIT-K (알코올 사용)' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'IES-R (외상 후 스트레스(PTSD))' })).toBeTruthy()
+
+    const scaleSelect = screen.getByRole('combobox')
+    await user.selectOptions(scaleSelect, 'PHQ9')
+
+    expect(screen.getByRole('option', { name: 'PHQ-9 (우울)' })).toHaveProperty('selected', true)
+
+    await user.click(screen.getByRole('button', { name: '조회' }))
+
+    await waitFor(() => {
+      expect(mockedFetchAssessmentRecords).toHaveBeenLastCalledWith({
+        dateFrom: undefined,
+        dateTo: undefined,
+        clientName: undefined,
+        scaleCode: 'PHQ9',
+        includeMisentered: false,
+        page: 1,
+        size: 20,
+      })
+    })
   })
 
   it('moves to the session detail route with highlightScaleCode and returns to the same filtered list state', async () => {

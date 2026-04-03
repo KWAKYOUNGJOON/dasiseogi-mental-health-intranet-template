@@ -11,6 +11,16 @@ import { PageHeader } from '../../shared/components/PageHeader'
 import { formatAssessmentLocalDateTimeText, toValidDateText } from '../../shared/utils/dateText'
 
 const DEFAULT_SIZE = 20
+const ASSESSMENT_RECORD_SCALE_DESCRIPTION_BY_CODE: Record<string, string> = {
+  PHQ9: '우울',
+  GAD7: '불안',
+  MKPQ16: '정신증 위험',
+  KMDQ: '양극성(조울증)',
+  PSS10: '스트레스',
+  ISIK: '불면',
+  AUDITK: '알코올 사용',
+  IESR: '외상 후 스트레스(PTSD)',
+}
 
 interface RecordFilters {
   dateFrom: string
@@ -81,6 +91,16 @@ function buildSessionDetailPath(
   return search
     ? `/assessments/sessions/${record.sessionId}?${search}`
     : `/assessments/sessions/${record.sessionId}`
+}
+
+function formatAssessmentRecordScaleOptionLabel(item: ScaleListItem) {
+  const description = ASSESSMENT_RECORD_SCALE_DESCRIPTION_BY_CODE[item.scaleCode]
+
+  if (description) {
+    return `${item.scaleName} (${description})`
+  }
+
+  return `${item.scaleName} (${item.scaleCode})`
 }
 
 export function AssessmentRecordListPage() {
@@ -224,7 +244,7 @@ export function AssessmentRecordListPage() {
             <option value="">{scaleLoading ? '척도 목록 불러오는 중...' : '전체 척도'}</option>
             {sortedScaleItems.map((item) => (
               <option key={item.scaleCode} value={item.scaleCode}>
-                {item.scaleName} ({item.scaleCode})
+                {formatAssessmentRecordScaleOptionLabel(item)}
               </option>
             ))}
           </select>

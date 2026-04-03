@@ -164,6 +164,17 @@ export function formatSeoulDateText(value: Date) {
   return `${year}-${month}-${day}`
 }
 
+export function getDefaultStatisticsSeoulDateRange(now = new Date()) {
+  const todayInSeoul = toUtcDateFromSeoulParts(getSeoulDateTimeParts(now))
+  const sevenDaysAgoInSeoul = new Date(todayInSeoul)
+  sevenDaysAgoInSeoul.setUTCDate(todayInSeoul.getUTCDate() - 7)
+
+  return {
+    dateFrom: formatUtcDateText(sevenDaysAgoInSeoul),
+    dateTo: formatUtcDateText(todayInSeoul),
+  }
+}
+
 export function getCurrentSeoulWeekRange(now = new Date()) {
   const todayInSeoul = toUtcDateFromSeoulParts(getSeoulDateTimeParts(now))
   const dayOfWeek = todayInSeoul.getUTCDay()
