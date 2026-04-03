@@ -313,7 +313,8 @@ describe('statistics page', () => {
     const alertSessionCard = screen.getByText('경고 세션').closest('div')
     const alertScaleCard = screen.getByText('경고 척도').closest('div')
     const performedByCard = screen.getByRole('heading', { level: 3, name: '담당자별 세션 수' }).closest('.card')
-    const activeScaleRow = screen.getByText('PHQ-9').closest('tr')
+    const currentScaleCard = screen.getByRole('heading', { level: 3, name: '현재 운영 척도' }).closest('.card')
+    const activeScaleRow = within(currentScaleCard as HTMLDivElement).getByRole('cell', { name: 'PHQ-9 (우울)' }).closest('tr')
     const initialAlertRow = (await screen.findByText('우울 주의')).closest('tr')
 
     expect(totalSessionCard).toBeTruthy()
@@ -321,6 +322,8 @@ describe('statistics page', () => {
     expect(alertSessionCard).toBeTruthy()
     expect(alertScaleCard).toBeTruthy()
     expect(performedByCard).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'PHQ-9 (우울)' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'GAD-7 (불안)' })).toBeTruthy()
     expect(activeScaleRow).toBeTruthy()
     expect(initialAlertRow).toBeTruthy()
 
@@ -334,7 +337,7 @@ describe('statistics page', () => {
     expect(within(activeScaleRow as HTMLTableRowElement).getByText('6')).toBeTruthy()
     expect(within(initialAlertRow as HTMLTableRowElement).getByText('김대상')).toBeTruthy()
     expect(within(initialAlertRow as HTMLTableRowElement).getByText('2026-03-31 09:10:00')).toBeTruthy()
-    expect(within(initialAlertRow as HTMLTableRowElement).getByText('PHQ9')).toBeTruthy()
+    expect(within(initialAlertRow as HTMLTableRowElement).getByText('PHQ-9 (우울)')).toBeTruthy()
     expect(within(initialAlertRow as HTMLTableRowElement).getByText('CAUTION')).toBeTruthy()
     expect(screen.queryByText('경고 기록이 없습니다.')).toBeNull()
     expect(screen.queryByText('통계 정보를 불러오지 못했습니다.')).toBeNull()
@@ -356,6 +359,7 @@ describe('statistics page', () => {
     expect(secondPageAlertRow).toBeTruthy()
     expect(within(secondPageAlertRow as HTMLTableRowElement).getByText('박대상')).toBeTruthy()
     expect(within(secondPageAlertRow as HTMLTableRowElement).getByText('2026-03-31 10:00:00')).toBeTruthy()
+    expect(within(secondPageAlertRow as HTMLTableRowElement).getByText('GAD-7 (불안)')).toBeTruthy()
     expect(screen.getByText('2건 / 2페이지')).toBeTruthy()
 
     await user.selectOptions(screen.getByLabelText('경고 척도'), 'PHQ9')
@@ -380,7 +384,9 @@ describe('statistics page', () => {
 
     expect(filteredAlertRow).toBeTruthy()
     expect(within(filteredAlertRow as HTMLTableRowElement).getByText('최대상')).toBeTruthy()
+    expect(within(filteredAlertRow as HTMLTableRowElement).getByText('PHQ-9 (우울)')).toBeTruthy()
     expect(within(filteredAlertRow as HTMLTableRowElement).getByText('HIGH_RISK')).toBeTruthy()
+    expect(screen.getByText('필터: PHQ-9 (우울) / HIGH_RISK')).toBeTruthy()
     expect(screen.getByText('1건 / 1페이지')).toBeTruthy()
     expect(screen.queryByText('불안 주의')).toBeNull()
     expect(screen.queryByText('경고 기록이 없습니다.')).toBeNull()
