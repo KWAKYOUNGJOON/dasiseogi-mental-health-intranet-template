@@ -1,5 +1,6 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useEffect } from 'react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppRouter } from '../src/app/router/AppRouter'
@@ -269,26 +270,39 @@ function createSessionPrintData(overrides?: Partial<SessionPrintData>): SessionP
   }
 }
 
-function LocationDisplay() {
+function LocationDisplay({ onChange }: { onChange: (locationText: string) => void }) {
   const location = useLocation()
+  const locationText = `${location.pathname}${location.search}`
 
-  return <div data-testid="location-display">{`${location.pathname}${location.search}`}</div>
+  useEffect(() => {
+    onChange(locationText)
+  }, [locationText, onChange])
+
+  return <div data-testid="location-display">{locationText}</div>
 }
 
 function renderAssessmentCreateFlow(initialEntry = '/clients') {
-  return render(
+  return renderAssessmentCreateFlowWithLocationHistory(initialEntry)
+}
+
+function renderAssessmentCreateFlowWithLocationHistory(initialEntry = '/clients') {
+  const locationHistory: string[] = []
+  const view = render(
     <MemoryRouter initialEntries={[initialEntry]}>
-      <LocationDisplay />
+      <LocationDisplay onChange={(locationText) => locationHistory.push(locationText)} />
       <AppRouter />
     </MemoryRouter>,
   )
+
+  return {
+    ...view,
+    locationHistory,
+  }
 }
 
 function selectAnswer(questionText: string, answerLabel: string) {
-  const questionLegend = screen.getByText(
-    (content, element) => element?.tagName.toLowerCase() === 'legend' && content.includes(questionText),
-  )
-  const questionFieldset = questionLegend.closest('fieldset')
+  const questionTitle = screen.getByText(questionText)
+  const questionFieldset = questionTitle.closest('fieldset')
 
   if (!questionFieldset) {
     throw new Error(`Question fieldset not found for: ${questionText}`)
@@ -388,6 +402,7 @@ beforeEach(() => {
 afterEach(() => {
   useAssessmentDraftStore.getState().reset()
   cleanup()
+  vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
@@ -430,7 +445,9 @@ describe('assessment create flow regression', () => {
 
     const misenteredButton = await screen.findByRole('button', { name: '오입력 처리' })
 
-    expect(screen.getByTestId('location-display').textContent).toBe('/assessments/sessions/901')
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe('/assessments/sessions/901')
+    })
     expect(mockedFetchSessionDetail).toHaveBeenCalledWith(901, undefined)
 
     await user.click(misenteredButton)
@@ -457,15 +474,35 @@ describe('assessment create flow regression', () => {
     expect(await screen.findByText('오입력 처리되었습니다.')).toBeTruthy()
     expect(screen.getByText('MISENTERED')).toBeTruthy()
     expect(screen.getByText('잘못된 대상자 입력')).toBeTruthy()
-    expect(screen.getByText('2026-03-31T10:05:00')).toBeTruthy()
+    expect(screen.getByText('2026-03-31 10:05:00')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '오입력 처리' })).toBeNull()
   })
 
-  it('keeps the PHQ-9 flow stable through saved session detail and print rendering', async () => {
+  it('keeps the PHQ-9 flow stable through saved session detail notice dismissal and print entry', async () => {
     const user = userEvent.setup()
     const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const originalSetTimeout = window.setTimeout.bind(window)
+    const scheduledDismissCallbacks = new Map<number, () => void>()
+    let nextTimeoutId = 1
 
-    const view = renderAssessmentCreateFlow()
+    vi.spyOn(window, 'setTimeout').mockImplementation(((handler, timeout, ...args) => {
+      if (timeout === 3000 && typeof handler === 'function') {
+        const timeoutId = nextTimeoutId++
+        scheduledDismissCallbacks.set(timeoutId, () => {
+          handler(...args)
+        })
+
+        return timeoutId
+      }
+
+      return originalSetTimeout(handler, timeout, ...args)
+    }) as typeof window.setTimeout)
+
+    vi.spyOn(window, 'clearTimeout').mockImplementation(((timeoutId) => {
+      scheduledDismissCallbacks.delete(Number(timeoutId))
+    }) as typeof window.clearTimeout)
+
+    const view = renderAssessmentCreateFlowWithLocationHistory()
 
     expect(await screen.findByRole('heading', { level: 2, name: '대상자 목록' })).toBeTruthy()
     await user.click(screen.getByRole('link', { name: '상세보기' }))
@@ -525,15 +562,41 @@ describe('assessment create flow regression', () => {
     })
 
     const scaleCard = await screen.findByTestId('session-scale-PHQ9')
+    const savedNotice = await screen.findByText('세션이 저장되었습니다.')
+    const printButton = screen.getByRole('button', { name: '출력 보기' })
 
-    expect(screen.getByTestId('location-display').textContent).toBe('/assessments/sessions/901')
+    await waitFor(() => {
+      expect(view.locationHistory).toContain('/assessments/sessions/901?notice=saved')
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe('/assessments/sessions/901')
+    })
     expect(mockedFetchSessionDetail).toHaveBeenCalledWith(901, undefined)
     expect(screen.getByText('AS-20260331-0001')).toBeTruthy()
+    expect(savedNotice).toBeTruthy()
     expect(within(scaleCard).getByText('PHQ-9')).toBeTruthy()
     expect(within(scaleCard).getByText('총점 3 / 경도')).toBeTruthy()
     expect(screen.queryByTestId('session-scale-GAD7')).toBeNull()
+    expect(printButton).toBeTruthy()
 
-    await user.click(screen.getByRole('button', { name: '출력' }))
+    const dismissSavedNotice = Array.from(scheduledDismissCallbacks.values()).at(-1)
+
+    expect(dismissSavedNotice).toBeTypeOf('function')
+
+    act(() => {
+      dismissSavedNotice?.()
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByText('세션이 저장되었습니다.')).toBeNull()
+    })
+
+    expect(screen.queryByText('세션이 저장되었습니다.')).toBeNull()
+    expect(screen.getByTestId('location-display').textContent).toBe('/assessments/sessions/901')
+    expect(screen.getByTestId('location-display').textContent).not.toContain('notice=')
+
+    await user.click(printButton)
 
     expect(windowOpenSpy).toHaveBeenCalledWith(
       '/assessments/sessions/901/print',
@@ -557,7 +620,8 @@ describe('assessment create flow regression', () => {
     expect(phq9Row).toBeTruthy()
     expect(screen.getByText('김대상')).toBeTruthy()
     expect(screen.getByText('AS-20260331-0001')).toBeTruthy()
-    expect(screen.getByText('2026-03-31T09:20:00')).toBeTruthy()
+    expect(screen.getByText("세션 상세의 출력용 화면입니다. 인쇄하려면 '인쇄'를 누르세요.")).toBeTruthy()
+    expect(screen.getByText('2026-03-31 09:20:00')).toBeTruthy()
     expect(screen.getByText('총 1개 척도 결과, 경고 없음.')).toBeTruthy()
     expect(screen.queryByText('출력 데이터를 불러오지 못했습니다.')).toBeNull()
     expect(screen.queryByText('출력 데이터를 불러오는 중...')).toBeNull()
