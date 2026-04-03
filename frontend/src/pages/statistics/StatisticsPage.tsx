@@ -12,7 +12,7 @@ import {
 } from '../../features/statistics/api/statisticsApi'
 import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
-import { formatSeoulDateTimeText, toValidDateText } from '../../shared/utils/dateText'
+import { getCurrentSeoulWeekRange, toValidDateText } from '../../shared/utils/dateText'
 
 const DEFAULT_ALERT_PAGE_SIZE = 10
 const ALERT_TYPE_OPTIONS = ['HIGH_RISK', 'CAUTION', 'CRITICAL_ITEM', 'COMPOSITE_RULE']
@@ -20,8 +20,9 @@ const ALERT_TYPE_OPTIONS = ['HIGH_RISK', 'CAUTION', 'CRITICAL_ITEM', 'COMPOSITE_
 export function StatisticsPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [dateFrom, setDateFrom] = useState(getCurrentWeekRange().dateFrom)
-  const [dateTo, setDateTo] = useState(getCurrentWeekRange().dateTo)
+  const defaultWeekRange = getCurrentSeoulWeekRange()
+  const [dateFrom, setDateFrom] = useState(defaultWeekRange.dateFrom)
+  const [dateTo, setDateTo] = useState(defaultWeekRange.dateTo)
   const [alertScaleCode, setAlertScaleCode] = useState('')
   const [alertType, setAlertType] = useState('')
   const [summary, setSummary] = useState<StatisticsSummary | null>(null)
@@ -251,7 +252,7 @@ export function StatisticsPage() {
                           key={`${alert.sessionId}-${alert.scaleCode}-${index}`}
                           onClick={() => navigate(`/assessments/sessions/${alert.sessionId}?highlightScaleCode=${alert.scaleCode}`)}
                         >
-                          <td>{formatSeoulDateTimeText(alert.sessionCompletedAt)}</td>
+                          <td>{alert.sessionCompletedAt}</td>
                           <td>{alert.clientName}</td>
                           <td>{alert.performedByName}</td>
                           <td>{alert.scaleCode}</td>
@@ -288,28 +289,4 @@ export function StatisticsPage() {
       </div>
     </div>
   )
-}
-
-function getCurrentWeekRange() {
-  const today = new Date()
-  const day = today.getDay()
-  const mondayOffset = day === 0 ? -6 : 1 - day
-  const monday = new Date(today)
-  monday.setDate(today.getDate() + mondayOffset)
-  monday.setHours(0, 0, 0, 0)
-
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-
-  return {
-    dateFrom: formatDate(monday),
-    dateTo: formatDate(sunday),
-  }
-}
-
-function formatDate(value: Date) {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }

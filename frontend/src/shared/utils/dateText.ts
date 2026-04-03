@@ -26,25 +26,24 @@ function getSeoulDateTimeParts(value: Date) {
   }
 }
 
-function toSeoulDateTimeText(value: Date) {
+function toUtcDateFromSeoulParts(parts: { year: string; month: string; day: string }) {
+  return new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)))
+}
+
+function formatUtcDateText(value: Date) {
+  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`
+}
+
+function toSeoulDateTimePayloadText(value: Date) {
   const { year, month, day, hour, minute, second } = getSeoulDateTimeParts(value)
 
   return `${year}-${month}-${day}T${hour}:${minute}:${second}`
 }
 
 function toSeoulDisplayDateTimeText(value: Date) {
-  return toSeoulDateTimeText(value).replace('T', ' ')
-}
+  const { year, month, day, hour, minute, second } = getSeoulDateTimeParts(value)
 
-function toLocalDateTimeText(parts: {
-  year: number
-  month: number
-  day: number
-  hour: number
-  minute: number
-  second: number
-}) {
-  return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}T${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}:${String(parts.second).padStart(2, '0')}`
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`
 }
 
 function toLocalDisplayDateTimeText(parts: {
@@ -55,7 +54,7 @@ function toLocalDisplayDateTimeText(parts: {
   minute: number
   second: number
 }) {
-  return toLocalDateTimeText(parts).replace('T', ' ')
+  return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')} ${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}:${String(parts.second).padStart(2, '0')}`
 }
 
 function parseLocalDateTimeText(value: string) {
@@ -76,7 +75,7 @@ function parseLocalDateTimeText(value: string) {
 }
 
 export function getTodayDateText() {
-  return createCurrentSeoulDateTimeText().slice(0, 10)
+  return formatSeoulDateText(new Date())
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -156,7 +155,29 @@ export function toValidDateText(value: string) {
 }
 
 export function createCurrentSeoulDateTimeText(now = new Date()) {
-  return toSeoulDateTimeText(now)
+  return toSeoulDateTimePayloadText(now)
+}
+
+export function formatSeoulDateText(value: Date) {
+  const { year, month, day } = getSeoulDateTimeParts(value)
+
+  return `${year}-${month}-${day}`
+}
+
+export function getCurrentSeoulWeekRange(now = new Date()) {
+  const todayInSeoul = toUtcDateFromSeoulParts(getSeoulDateTimeParts(now))
+  const dayOfWeek = todayInSeoul.getUTCDay()
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const monday = new Date(todayInSeoul)
+  monday.setUTCDate(todayInSeoul.getUTCDate() + mondayOffset)
+
+  const sunday = new Date(monday)
+  sunday.setUTCDate(monday.getUTCDate() + 6)
+
+  return {
+    dateFrom: formatUtcDateText(monday),
+    dateTo: formatUtcDateText(sunday),
+  }
 }
 
 function hasExplicitTimeZoneOffset(value: string) {

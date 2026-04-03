@@ -8,7 +8,16 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "npm run test:verify",
+    "test:verify": "npm run test:node:quick",
+    "test:run": "npm run test:dom",
+    "test:node": "npm run test:node:full",
+    "test:node:quick": "vitest run tests/date-text.test.ts --config vitest.node.config.ts",
+    "test:node:full": "vitest run --config vitest.node.config.ts",
+    "test:date-text": "npm run test:node:quick",
+    "test:dom": "node ./scripts/run-vitest-dom.mjs --run",
+    "test:dom:watch": "node ./scripts/run-vitest-dom.mjs --watch",
+    "test:statistics-page": "node ./scripts/run-vitest-dom.mjs --run tests/statistics-page.test.tsx"
   },
   "dependencies": {
     "axios": "^1.13.2",
