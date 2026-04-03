@@ -1,5 +1,6 @@
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
+import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 
 export const ACTIVITY_LOG_ACTION_OPTIONS = [
   'LOGIN',
@@ -134,7 +135,7 @@ function formatTargetLabel(item: ActivityLogListItemResponse) {
 function mapActivityLogItem(item: ActivityLogListItemResponse): ActivityLogListItem {
   return {
     id: item.id,
-    occurredAt: normalizeText(item.createdAt),
+    occurredAt: normalizeText(formatSeoulDateTimeText(item.createdAt)),
     userLabel: formatUserLabel(item.userId, item.userNameSnapshot),
     ipAddress: normalizeText(item.ipAddress),
     actionType: item.actionType,

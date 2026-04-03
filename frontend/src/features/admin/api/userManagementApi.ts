@@ -1,5 +1,6 @@
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
+import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 
 export const USER_MANAGEMENT_ROLE_OPTIONS = ['ADMIN', 'USER'] as const
 export const USER_MANAGEMENT_STATUS_OPTIONS = ['ACTIVE', 'PENDING', 'INACTIVE', 'REJECTED'] as const
@@ -103,8 +104,8 @@ function mapUserManagementListItem(item: UserManagementListItemResponse): UserMa
     contact: normalizeText(item.phone),
     role: item.role,
     status: item.status,
-    approvedAt: normalizeText(item.approvedAt),
-    lastLoginAt: normalizeText(item.lastLoginAt),
+    approvedAt: normalizeText(formatSeoulDateTimeText(item.approvedAt)),
+    lastLoginAt: normalizeText(formatSeoulDateTimeText(item.lastLoginAt)),
   }
 }
 

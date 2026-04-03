@@ -1,5 +1,6 @@
 package com.dasisuhgi.mentalhealth.signup.entity;
 
+import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -77,7 +78,7 @@ public class UserApprovalRequest {
 
     @PrePersist
     void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = SeoulDateTimeSupport.now();
         createdAt = now;
         updatedAt = now;
         if (requestedAt == null) {
@@ -87,6 +88,6 @@ public class UserApprovalRequest {
 
     @PreUpdate
     void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        updatedAt = SeoulDateTimeSupport.now();
     }
 }

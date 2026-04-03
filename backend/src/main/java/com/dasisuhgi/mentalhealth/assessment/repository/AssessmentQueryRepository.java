@@ -5,6 +5,7 @@ import com.dasisuhgi.mentalhealth.assessment.entity.AlertType;
 import com.dasisuhgi.mentalhealth.assessment.entity.AssessmentSessionStatus;
 import com.dasisuhgi.mentalhealth.client.entity.ClientStatus;
 import com.dasisuhgi.mentalhealth.common.api.PageResponse;
+import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import com.dasisuhgi.mentalhealth.statistics.dto.PerformedByStatResponse;
 import com.dasisuhgi.mentalhealth.statistics.dto.StatisticsAlertItemResponse;
 import com.dasisuhgi.mentalhealth.statistics.dto.StatisticsScaleItemResponse;
@@ -14,7 +15,6 @@ import jakarta.persistence.TypedQuery;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,8 +22,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class AssessmentQueryRepository {
-    private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
-
     private final EntityManager entityManager;
 
     public AssessmentQueryRepository(EntityManager entityManager) {
@@ -89,7 +87,7 @@ public class AssessmentQueryRepository {
                         row.sessionId(),
                         row.sessionScaleId(),
                         row.sessionNo(),
-                        DATETIME_FORMAT.format(row.sessionCompletedAt()),
+                        SeoulDateTimeSupport.formatDateTime(row.sessionCompletedAt()),
                         row.clientId(),
                         row.clientName(),
                         row.performedByName(),
@@ -249,7 +247,7 @@ public class AssessmentQueryRepository {
         List<StatisticsAlertItemResponse> items = query.getResultList().stream()
                 .map(row -> new StatisticsAlertItemResponse(
                         row.clientName(),
-                        DATETIME_FORMAT.format(row.sessionCompletedAt()),
+                        SeoulDateTimeSupport.formatDateTime(row.sessionCompletedAt()),
                         row.performedByName(),
                         row.scaleCode(),
                         row.alertType().name(),

@@ -27,12 +27,12 @@ import com.dasisuhgi.mentalhealth.common.error.AppException;
 import com.dasisuhgi.mentalhealth.common.security.AccessPolicyService;
 import com.dasisuhgi.mentalhealth.common.sequence.IdentifierGeneratorService;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
+import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import com.dasisuhgi.mentalhealth.user.entity.User;
 import com.dasisuhgi.mentalhealth.user.entity.UserStatus;
 import com.dasisuhgi.mentalhealth.user.repository.UserRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -43,8 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ClientService {
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
-    private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+    private static final java.time.format.DateTimeFormatter DATE_FORMAT = java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final ClientRepository clientRepository;
     private final ClientQueryRepository clientQueryRepository;
@@ -124,7 +123,7 @@ public class ClientService {
         }
 
         Client client = new Client();
-        client.setClientNo(identifierGeneratorService.nextClientNo(LocalDateTime.now().toLocalDate()));
+        client.setClientNo(identifierGeneratorService.nextClientNo(SeoulDateTimeSupport.today()));
         client.setName(request.name().trim());
         client.setGender(parseGender(request.gender()));
         client.setBirthDate(request.birthDate());
@@ -165,7 +164,7 @@ public class ClientService {
                 client.getGender().name(),
                 DATE_FORMAT.format(client.getBirthDate()),
                 client.getPhone(),
-                DATETIME_FORMAT.format(client.getRegisteredAt()),
+                formatDateTime(client.getRegisteredAt()),
                 client.getCreatedBy().getId(),
                 client.getCreatedBy().getName(),
                 client.getPrimaryWorker().getId(),
@@ -221,7 +220,7 @@ public class ClientService {
         }
 
         client.setStatus(ClientStatus.MISREGISTERED);
-        client.setMisregisteredAt(LocalDateTime.now());
+        client.setMisregisteredAt(SeoulDateTimeSupport.now());
         client.setMisregisteredBy(currentUser);
         client.setMisregisteredReason(request.reason().trim());
         activityLogService.logBestEffort(
@@ -236,7 +235,7 @@ public class ClientService {
         return new ClientStatusChangeResponse(
                 client.getId(),
                 client.getStatus().name(),
-                DATETIME_FORMAT.format(client.getMisregisteredAt())
+                formatDateTime(client.getMisregisteredAt())
         );
     }
 
@@ -244,7 +243,7 @@ public class ClientService {
         return new RecentSessionSummaryResponse(
                 session.id(),
                 session.sessionNo(),
-                DATETIME_FORMAT.format(session.sessionCompletedAt()),
+                formatDateTime(session.sessionCompletedAt()),
                 session.performedByName(),
                 session.scaleCount(),
                 session.hasAlert(),
@@ -261,7 +260,7 @@ public class ClientService {
     }
 
     private String formatDateTime(LocalDateTime value) {
-        return value == null ? null : DATETIME_FORMAT.format(value);
+        return SeoulDateTimeSupport.formatDateTime(value);
     }
 
     private String blankToNull(String value) {

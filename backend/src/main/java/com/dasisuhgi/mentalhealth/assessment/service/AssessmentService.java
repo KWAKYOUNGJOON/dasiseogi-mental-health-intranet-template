@@ -25,6 +25,7 @@ import com.dasisuhgi.mentalhealth.assessment.repository.AssessmentSessionReposit
 import com.dasisuhgi.mentalhealth.assessment.repository.SessionAlertRepository;
 import com.dasisuhgi.mentalhealth.assessment.repository.SessionAnswerRepository;
 import com.dasisuhgi.mentalhealth.assessment.repository.SessionScaleRepository;
+import com.dasisuhgi.mentalhealth.assessment.support.AssessmentDateTimePolicy;
 import com.dasisuhgi.mentalhealth.audit.entity.ActivityActionType;
 import com.dasisuhgi.mentalhealth.audit.entity.ActivityTargetType;
 import com.dasisuhgi.mentalhealth.audit.service.ActivityLogService;
@@ -36,6 +37,7 @@ import com.dasisuhgi.mentalhealth.common.error.AppException;
 import com.dasisuhgi.mentalhealth.common.security.AccessPolicyService;
 import com.dasisuhgi.mentalhealth.common.sequence.IdentifierGeneratorService;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
+import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import com.dasisuhgi.mentalhealth.scale.registry.InterpretationRule;
 import com.dasisuhgi.mentalhealth.scale.registry.ScaleAlertRule;
 import com.dasisuhgi.mentalhealth.scale.registry.ScaleDefinition;
@@ -66,7 +68,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AssessmentService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
-    private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
     private final AssessmentSessionRepository assessmentSessionRepository;
     private final SessionScaleRepository sessionScaleRepository;
@@ -262,8 +263,8 @@ public class AssessmentService {
                 session.getSessionNo(),
                 session.getStatus().name(),
                 DATE_FORMAT.format(session.getSessionDate()),
-                DATETIME_FORMAT.format(session.getSessionStartedAt()),
-                DATETIME_FORMAT.format(session.getSessionCompletedAt()),
+                formatDateTime(session.getSessionStartedAt()),
+                formatDateTime(session.getSessionCompletedAt()),
                 session.getPerformedBy().getId(),
                 session.getPerformedBy().getName(),
                 session.getClient().getId(),
@@ -324,8 +325,8 @@ public class AssessmentService {
                 session.getPerformedBy().getTeamName(),
                 session.getPerformedBy().getName(),
                 session.getSessionNo(),
-                DATETIME_FORMAT.format(session.getSessionStartedAt()),
-                DATETIME_FORMAT.format(session.getSessionCompletedAt()),
+                formatDateTime(session.getSessionStartedAt()),
+                formatDateTime(session.getSessionCompletedAt()),
                 new AssessmentSessionPrintClientResponse(
                         session.getClient().getId(),
                         session.getClient().getClientNo(),
@@ -352,7 +353,7 @@ public class AssessmentService {
         }
 
         session.setStatus(AssessmentSessionStatus.MISENTERED);
-        session.setMisenteredAt(LocalDateTime.now());
+        session.setMisenteredAt(AssessmentDateTimePolicy.now());
         session.setMisenteredBy(currentUser);
         session.setUpdatedBy(currentUser);
         session.setMisenteredReason(request.reason().trim());
@@ -368,7 +369,7 @@ public class AssessmentService {
         return new SessionStatusChangeResponse(
                 session.getId(),
                 session.getStatus().name(),
-                DATETIME_FORMAT.format(session.getMisenteredAt())
+                formatDateTime(session.getMisenteredAt())
         );
     }
 
@@ -528,7 +529,7 @@ public class AssessmentService {
     }
 
     private String formatDateTime(LocalDateTime value) {
-        return value == null ? null : DATETIME_FORMAT.format(value);
+        return SeoulDateTimeSupport.formatDateTime(value);
     }
 
     private String blankToNull(String value) {

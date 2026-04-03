@@ -1,5 +1,6 @@
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
+import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 
 export type SignupRequestApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 export type SignupRequestApprovalUserStatus = 'ACTIVE' | 'PENDING' | 'INACTIVE' | 'REJECTED'
@@ -67,7 +68,7 @@ function normalizeText(value: string | null | undefined) {
 function mapSignupRequestApprovalItem(item: SignupRequestApprovalItemResponse): SignupRequestApprovalItem {
   return {
     id: item.requestId,
-    submittedAt: item.requestedAt,
+    submittedAt: formatSeoulDateTimeText(item.requestedAt),
     applicantName: item.name,
     loginId: item.loginId,
     contact: normalizeText(item.phone),

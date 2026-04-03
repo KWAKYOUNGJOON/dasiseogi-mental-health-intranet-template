@@ -1,5 +1,6 @@
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
+import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 
 export const BACKUP_TYPE_OPTIONS = ['AUTO', 'MANUAL'] as const
 export const BACKUP_STATUS_OPTIONS = ['SUCCESS', 'FAILED'] as const
@@ -109,8 +110,8 @@ function mapBackupHistoryItem(item: BackupHistoryListItemResponse): BackupHistor
     fileName: normalizeText(item.fileName),
     filePath: normalizeText(item.filePath),
     fileSizeLabel: formatFileSize(item.fileSizeBytes),
-    startedAt: normalizeText(item.startedAt),
-    completedAt: normalizeText(item.completedAt),
+    startedAt: normalizeText(formatSeoulDateTimeText(item.startedAt)),
+    completedAt: normalizeText(formatSeoulDateTimeText(item.completedAt)),
     executedByName: normalizeText(item.executedByName),
     failureReason: normalizeText(item.failureReason),
   }

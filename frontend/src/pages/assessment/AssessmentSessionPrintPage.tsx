@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { fetchSessionPrintData, type SessionPrintData } from '../../features/assessment/api/assessmentApi'
+import { formatAssessmentLocalDateTimeText } from '../../shared/utils/dateText'
 
 export function AssessmentSessionPrintPage() {
   const { sessionId } = useParams()
@@ -72,7 +73,7 @@ export function AssessmentSessionPrintPage() {
         </div>
         <div className="field">
           <span className="muted">검사 완료</span>
-          <strong>{data.sessionCompletedAt}</strong>
+          <strong>{formatAssessmentLocalDateTimeText(data.sessionCompletedAt)}</strong>
         </div>
       </div>
 

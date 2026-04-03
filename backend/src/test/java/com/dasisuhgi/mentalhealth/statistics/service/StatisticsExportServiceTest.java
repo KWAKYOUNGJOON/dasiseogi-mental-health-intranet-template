@@ -6,6 +6,7 @@ import com.dasisuhgi.mentalhealth.common.config.ExportProperties;
 import com.dasisuhgi.mentalhealth.common.error.AppException;
 import com.dasisuhgi.mentalhealth.common.security.AccessPolicyService;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
+import com.dasisuhgi.mentalhealth.statistics.dto.StatisticsAlertItemResponse;
 import com.dasisuhgi.mentalhealth.statistics.dto.PerformedByStatResponse;
 import com.dasisuhgi.mentalhealth.statistics.dto.StatisticsSummaryResponse;
 import com.dasisuhgi.mentalhealth.user.entity.User;
@@ -121,6 +122,51 @@ class StatisticsExportServiceTest {
         assertThat(exception.getErrorCode()).isEqualTo("EXPORT_TEMP_PATH_UNAVAILABLE");
         assertThat(exception.getMessage()).isEqualTo("export 임시 경로를 사용할 수 없습니다.");
         verify(activityLogService, never()).log(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void exportAlertListKeepsSessionCompletedAtInUnifiedDisplayFormat(@TempDir Path tempDir) {
+        Path exportRoot = tempDir.resolve("exports");
+        TrackingExportTempFileService exportTempFileService = new TrackingExportTempFileService(exportProperties(exportRoot));
+        StatisticsExportService service = new StatisticsExportService(
+                statisticsService,
+                assessmentQueryRepository,
+                accessPolicyService,
+                activityLogService,
+                exportTempFileService
+        );
+        SessionUser sessionUser = new SessionUser(1L, "admin", "관리자", UserRole.ADMIN, UserStatus.ACTIVE);
+        User currentUser = adminUser();
+
+        when(accessPolicyService.getCurrentUser(sessionUser)).thenReturn(currentUser);
+        when(accessPolicyService.isAdmin(currentUser)).thenReturn(true);
+        when(assessmentQueryRepository.findStatisticsAlerts(eq(LocalDate.of(2026, 3, 1)), eq(LocalDate.of(2026, 3, 31)), eq(null), eq(null), eq(1), eq(10000)))
+                .thenReturn(new com.dasisuhgi.mentalhealth.common.api.PageResponse<>(
+                        List.of(new StatisticsAlertItemResponse(
+                                "김대상",
+                                "2026-03-31 09:10:00",
+                                "김담당",
+                                "PHQ9",
+                                "CAUTION",
+                                "우울 주의",
+                                101L
+                        )),
+                        1,
+                        10000,
+                        1,
+                        1
+                ));
+
+        StatisticsExportService.StatisticsExportFile exportFile = service.export(
+                LocalDate.of(2026, 3, 1),
+                LocalDate.of(2026, 3, 31),
+                "ALERT_LIST",
+                sessionUser
+        );
+
+        String csv = new String(exportFile.content(), StandardCharsets.UTF_8);
+        assertThat(csv).contains("\"2026-03-31 09:10:00\"");
+        assertThat(csv).doesNotContain("T09:10:00");
     }
 
     private ExportProperties exportProperties(Path exportRoot) {

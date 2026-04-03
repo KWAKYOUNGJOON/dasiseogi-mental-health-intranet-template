@@ -9,6 +9,7 @@ import {
 } from '../../features/assessment/api/assessmentApi'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { PageHeader } from '../../shared/components/PageHeader'
+import { formatAssessmentLocalDateTimeText } from '../../shared/utils/dateText'
 import type { ApiResponse } from '../../shared/types/api'
 
 interface SessionDetailLoadError {
@@ -397,7 +398,7 @@ export function AssessmentSessionDetailPage() {
             </div>
             <div className="field">
               <span className="muted">검사일시</span>
-              <strong>{session.sessionCompletedAt}</strong>
+              <strong>{formatAssessmentLocalDateTimeText(session.sessionCompletedAt)}</strong>
             </div>
             <div className="field">
               <span className="muted">담당자</span>
@@ -425,7 +426,7 @@ export function AssessmentSessionDetailPage() {
             <div className="card grid-2">
               <div className="field">
                 <span className="muted">오입력 처리 시각</span>
-                <strong>{session.misenteredAt ?? '-'}</strong>
+                <strong>{session.misenteredAt ? formatAssessmentLocalDateTimeText(session.misenteredAt) : '-'}</strong>
               </div>
               <div className="field">
                 <span className="muted">처리자</span>

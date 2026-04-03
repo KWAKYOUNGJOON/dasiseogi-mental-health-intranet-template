@@ -8,7 +8,7 @@ import {
 } from '../../features/assessment/api/assessmentApi'
 import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
-import { toValidDateText } from '../../shared/utils/dateText'
+import { formatAssessmentLocalDateTimeText, toValidDateText } from '../../shared/utils/dateText'
 
 const DEFAULT_SIZE = 20
 
@@ -279,7 +279,7 @@ export function AssessmentRecordListPage() {
               <tbody>
                 {records.items.map((record) => (
                   <tr key={record.sessionScaleId}>
-                    <td>{record.sessionCompletedAt}</td>
+                    <td>{formatAssessmentLocalDateTimeText(record.sessionCompletedAt)}</td>
                     <td>{record.clientName}</td>
                     <td>{record.performedByName}</td>
                     <td>{record.scaleName}</td>

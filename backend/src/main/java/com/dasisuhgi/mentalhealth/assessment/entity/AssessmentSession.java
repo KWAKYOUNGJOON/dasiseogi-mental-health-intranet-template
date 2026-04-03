@@ -1,5 +1,6 @@
 package com.dasisuhgi.mentalhealth.assessment.entity;
 
+import com.dasisuhgi.mentalhealth.assessment.support.AssessmentDateTimePolicy;
 import com.dasisuhgi.mentalhealth.client.entity.Client;
 import com.dasisuhgi.mentalhealth.user.entity.User;
 import jakarta.persistence.Column;
@@ -96,13 +97,13 @@ public class AssessmentSession {
         if (updatedBy == null) {
             updatedBy = createdBy != null ? createdBy : performedBy;
         }
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = AssessmentDateTimePolicy.now();
         createdAt = now;
         updatedAt = now;
     }
 
     @PreUpdate
     void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        updatedAt = AssessmentDateTimePolicy.now();
     }
 }

@@ -11,11 +11,11 @@ import com.dasisuhgi.mentalhealth.common.api.FieldErrorItem;
 import com.dasisuhgi.mentalhealth.common.error.AppException;
 import com.dasisuhgi.mentalhealth.common.session.SessionConstants;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
+import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import com.dasisuhgi.mentalhealth.user.entity.User;
 import com.dasisuhgi.mentalhealth.user.entity.UserStatus;
 import com.dasisuhgi.mentalhealth.user.repository.UserRepository;
 import jakarta.servlet.http.HttpSession;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -59,7 +59,7 @@ public class AuthService {
             throw new AppException(HttpStatus.UNAUTHORIZED, "USER_REJECTED", "반려된 계정입니다.");
         }
 
-        user.setLastLoginAt(LocalDateTime.now());
+        user.setLastLoginAt(SeoulDateTimeSupport.now());
         session.setAttribute(SessionConstants.USER, SessionUser.from(user));
         activityLogService.log(
                 user,

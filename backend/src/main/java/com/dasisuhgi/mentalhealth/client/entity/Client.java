@@ -1,5 +1,6 @@
 package com.dasisuhgi.mentalhealth.client.entity;
 
+import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import com.dasisuhgi.mentalhealth.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -78,7 +79,7 @@ public class Client {
 
     @PrePersist
     void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = SeoulDateTimeSupport.now();
         registeredAt = now;
         createdAt = now;
         updatedAt = now;
@@ -86,6 +87,6 @@ public class Client {
 
     @PreUpdate
     void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        updatedAt = SeoulDateTimeSupport.now();
     }
 }

@@ -3,11 +3,11 @@ package com.dasisuhgi.mentalhealth.audit.repository;
 import com.dasisuhgi.mentalhealth.audit.dto.ActivityLogListItemResponse;
 import com.dasisuhgi.mentalhealth.audit.entity.ActivityActionType;
 import com.dasisuhgi.mentalhealth.common.api.PageResponse;
+import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,8 +15,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class ActivityLogQueryRepository {
-    private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
-
     private final EntityManager entityManager;
 
     public ActivityLogQueryRepository(EntityManager entityManager) {
@@ -85,7 +83,7 @@ public class ActivityLogQueryRepository {
                         row.targetLabel(),
                         row.description(),
                         row.ipAddress(),
-                        DATETIME_FORMAT.format(row.createdAt())
+                        SeoulDateTimeSupport.formatDateTime(row.createdAt())
                 ))
                 .toList();
 

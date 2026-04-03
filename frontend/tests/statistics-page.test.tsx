@@ -333,6 +333,7 @@ describe('statistics page', () => {
     expect(within(activeScaleRow as HTMLTableRowElement).getByText('18')).toBeTruthy()
     expect(within(activeScaleRow as HTMLTableRowElement).getByText('6')).toBeTruthy()
     expect(within(initialAlertRow as HTMLTableRowElement).getByText('김대상')).toBeTruthy()
+    expect(within(initialAlertRow as HTMLTableRowElement).getByText('2026-03-31 09:10:00')).toBeTruthy()
     expect(within(initialAlertRow as HTMLTableRowElement).getByText('PHQ9')).toBeTruthy()
     expect(within(initialAlertRow as HTMLTableRowElement).getByText('CAUTION')).toBeTruthy()
     expect(screen.queryByText('경고 기록이 없습니다.')).toBeNull()
@@ -354,6 +355,7 @@ describe('statistics page', () => {
 
     expect(secondPageAlertRow).toBeTruthy()
     expect(within(secondPageAlertRow as HTMLTableRowElement).getByText('박대상')).toBeTruthy()
+    expect(within(secondPageAlertRow as HTMLTableRowElement).getByText('2026-03-31 10:00:00')).toBeTruthy()
     expect(screen.getByText('2건 / 2페이지')).toBeTruthy()
 
     await user.selectOptions(screen.getByLabelText('경고 척도'), 'PHQ9')
@@ -383,5 +385,20 @@ describe('statistics page', () => {
     expect(screen.queryByText('불안 주의')).toBeNull()
     expect(screen.queryByText('경고 기록이 없습니다.')).toBeNull()
     expect(screen.queryByText('통계 정보를 불러오지 못했습니다.')).toBeNull()
+  })
+
+  it('renders alert datetimes without exposing the raw T separator', async () => {
+    mockedFetchStatisticsAlerts.mockResolvedValue(
+      createStatisticsAlertPage([
+        createStatisticsAlertItem({
+          sessionCompletedAt: '2026-03-31T00:10:00Z',
+        }),
+      ]),
+    )
+
+    renderStatisticsRoute()
+
+    expect(await screen.findByText('2026-03-31 09:10:00')).toBeTruthy()
+    expect(screen.queryByText('2026-03-31T00:10:00Z')).toBeNull()
   })
 })

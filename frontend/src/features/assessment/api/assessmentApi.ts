@@ -1,5 +1,6 @@
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
+import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 
 export interface ScaleListItem {
   scaleCode: string
@@ -167,12 +168,25 @@ export async function fetchSessionDetail(sessionId: number, options?: { highligh
   const response = await http.get<ApiResponse<SessionDetail>>(`/assessment-sessions/${sessionId}`, {
     params: options?.highlightScaleCode ? { highlightScaleCode: options.highlightScaleCode } : undefined,
   })
-  return response.data.data
+  const session = response.data.data
+
+  return {
+    ...session,
+    sessionStartedAt: formatSeoulDateTimeText(session.sessionStartedAt),
+    sessionCompletedAt: formatSeoulDateTimeText(session.sessionCompletedAt),
+    misenteredAt: session.misenteredAt ? formatSeoulDateTimeText(session.misenteredAt) : null,
+  }
 }
 
 export async function fetchSessionPrintData(sessionId: number) {
   const response = await http.get<ApiResponse<SessionPrintData>>(`/assessment-sessions/${sessionId}/print-data`)
-  return response.data.data
+  const data = response.data.data
+
+  return {
+    ...data,
+    sessionStartedAt: formatSeoulDateTimeText(data.sessionStartedAt),
+    sessionCompletedAt: formatSeoulDateTimeText(data.sessionCompletedAt),
+  }
 }
 
 export async function markSessionMisentered(sessionId: number, reason: string) {
@@ -196,5 +210,13 @@ export async function fetchAssessmentRecords(params: {
   size?: number
 }) {
   const response = await http.get<ApiResponse<AssessmentRecordPage>>('/assessment-records', { params })
-  return response.data.data
+  const page = response.data.data
+
+  return {
+    ...page,
+    items: page.items.map((item) => ({
+      ...item,
+      sessionCompletedAt: formatSeoulDateTimeText(item.sessionCompletedAt),
+    })),
+  }
 }

@@ -1,5 +1,6 @@
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
+import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 
 export interface ClientListItem {
   id: number
@@ -62,7 +63,17 @@ export async function fetchClients(params?: {
 
 export async function fetchClientDetail(clientId: number) {
   const response = await http.get<ApiResponse<ClientDetail>>(`/clients/${clientId}`)
-  return response.data.data
+  const client = response.data.data
+
+  return {
+    ...client,
+    registeredAt: formatSeoulDateTimeText(client.registeredAt),
+    misregisteredAt: client.misregisteredAt ? formatSeoulDateTimeText(client.misregisteredAt) : null,
+    recentSessions: client.recentSessions.map((session) => ({
+      ...session,
+      sessionCompletedAt: formatSeoulDateTimeText(session.sessionCompletedAt),
+    })),
+  }
 }
 
 export async function createClient(payload: {

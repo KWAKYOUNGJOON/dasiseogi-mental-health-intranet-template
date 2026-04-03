@@ -4,6 +4,7 @@ import { Navigate, useParams } from 'react-router-dom'
 import { createAssessmentSession, fetchScaleDetail, type ScaleDetail } from '../../features/assessment/api/assessmentApi'
 import { useAssessmentDraftStore } from '../../features/assessment/store/assessmentDraftStore'
 import { PageHeader } from '../../shared/components/PageHeader'
+import { createCurrentSeoulDateTimeText } from '../../shared/utils/dateText'
 import type { ApiResponse } from '../../shared/types/api'
 
 const SESSION_MEMO_MAX_LENGTH = 1000
@@ -218,7 +219,7 @@ export function AssessmentSummaryPage() {
       const response = await createAssessmentSession({
         clientId: parsedClientId,
         sessionStartedAt: startedAtValue,
-        sessionCompletedAt: new Date().toISOString().slice(0, 19),
+        sessionCompletedAt: createCurrentSeoulDateTimeText(),
         memo,
         selectedScales: selectedScaleCodes.map((code) => ({
           scaleCode: code,

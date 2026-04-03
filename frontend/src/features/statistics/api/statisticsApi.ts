@@ -1,5 +1,6 @@
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
+import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 
 export interface StatisticsSummary {
   dateFrom: string
@@ -62,7 +63,15 @@ export async function fetchStatisticsAlerts(params: {
   size?: number
 }) {
   const response = await http.get<ApiResponse<StatisticsAlertPage>>('/statistics/alerts', { params })
-  return response.data.data
+  const page = response.data.data
+
+  return {
+    ...page,
+    items: page.items.map((item) => ({
+      ...item,
+      sessionCompletedAt: formatSeoulDateTimeText(item.sessionCompletedAt),
+    })),
+  }
 }
 
 export async function downloadStatisticsExport(params: { dateFrom?: string; dateTo?: string; type: 'SUMMARY' | 'SCALE_COMPARE' | 'ALERT_LIST' }) {

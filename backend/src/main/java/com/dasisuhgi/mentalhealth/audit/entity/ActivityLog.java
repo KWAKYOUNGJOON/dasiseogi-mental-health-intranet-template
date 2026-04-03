@@ -1,5 +1,6 @@
 package com.dasisuhgi.mentalhealth.audit.entity;
 
+import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -53,6 +54,6 @@ public class ActivityLog {
 
     @PrePersist
     void onCreate() {
-        createdAt = LocalDateTime.now();
+        createdAt = SeoulDateTimeSupport.now();
     }
 }

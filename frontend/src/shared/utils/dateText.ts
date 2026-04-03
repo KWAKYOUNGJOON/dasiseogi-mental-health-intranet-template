@@ -1,8 +1,82 @@
-export function getTodayDateText() {
-  const now = new Date()
-  const offset = now.getTimezoneOffset() * 60_000
+const SEOUL_TIME_ZONE = 'Asia/Seoul'
+const LOCAL_DATETIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?$/
 
-  return new Date(now.getTime() - offset).toISOString().slice(0, 10)
+const seoulDateTimeFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: SEOUL_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+})
+
+function getSeoulDateTimeParts(value: Date) {
+  const parts = seoulDateTimeFormatter.formatToParts(value)
+  const lookup = new Map(parts.map((part) => [part.type, part.value]))
+
+  return {
+    year: lookup.get('year') ?? '',
+    month: lookup.get('month') ?? '',
+    day: lookup.get('day') ?? '',
+    hour: lookup.get('hour') ?? '',
+    minute: lookup.get('minute') ?? '',
+    second: lookup.get('second') ?? '',
+  }
+}
+
+function toSeoulDateTimeText(value: Date) {
+  const { year, month, day, hour, minute, second } = getSeoulDateTimeParts(value)
+
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}`
+}
+
+function toSeoulDisplayDateTimeText(value: Date) {
+  return toSeoulDateTimeText(value).replace('T', ' ')
+}
+
+function toLocalDateTimeText(parts: {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+  second: number
+}) {
+  return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}T${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}:${String(parts.second).padStart(2, '0')}`
+}
+
+function toLocalDisplayDateTimeText(parts: {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+  second: number
+}) {
+  return toLocalDateTimeText(parts).replace('T', ' ')
+}
+
+function parseLocalDateTimeText(value: string) {
+  const match = value.trim().match(LOCAL_DATETIME_PATTERN)
+
+  if (!match) {
+    return null
+  }
+
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+    hour: Number(match[4]),
+    minute: Number(match[5]),
+    second: Number(match[6] ?? '00'),
+  }
+}
+
+export function getTodayDateText() {
+  return createCurrentSeoulDateTimeText().slice(0, 10)
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -79,4 +153,53 @@ export function toValidDateText(value: string) {
   const formattedValue = formatCompactDateInput(value)
 
   return isValidDateText(formattedValue) ? formattedValue : ''
+}
+
+export function createCurrentSeoulDateTimeText(now = new Date()) {
+  return toSeoulDateTimeText(now)
+}
+
+function hasExplicitTimeZoneOffset(value: string) {
+  return /(?:Z|[+-]\d{2}:\d{2})$/i.test(value.trim())
+}
+
+function formatLocalDateTimeTextInSeoul(value: string) {
+  const localDateTime = parseLocalDateTimeText(value)
+
+  if (!localDateTime) {
+    return value
+  }
+
+  return toLocalDisplayDateTimeText(localDateTime)
+}
+
+function formatOffsetDateTimeTextInSeoul(value: string) {
+  const parsedValue = new Date(value)
+
+  if (Number.isNaN(parsedValue.getTime())) {
+    return value
+  }
+
+  return toSeoulDisplayDateTimeText(parsedValue)
+}
+
+export function formatSeoulDateTimeText(value: string | null | undefined) {
+  if (!value) {
+    return ''
+  }
+
+  if (hasExplicitTimeZoneOffset(value)) {
+    return formatOffsetDateTimeTextInSeoul(value)
+  }
+
+  return formatLocalDateTimeTextInSeoul(value)
+}
+
+// Assessment APIs currently return timezone-less local datetime text in KST.
+export function formatAssessmentLocalDateTimeText(value: string | null | undefined) {
+  return formatSeoulDateTimeText(value)
+}
+
+export function formatOffsetDateTimeTextToSeoul(value: string | null | undefined) {
+  return formatSeoulDateTimeText(value)
 }

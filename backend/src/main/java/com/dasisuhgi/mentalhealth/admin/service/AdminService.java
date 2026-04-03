@@ -14,6 +14,7 @@ import com.dasisuhgi.mentalhealth.common.api.PageResponse;
 import com.dasisuhgi.mentalhealth.common.error.AppException;
 import com.dasisuhgi.mentalhealth.common.security.AccessPolicyService;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
+import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import com.dasisuhgi.mentalhealth.signup.entity.ApprovalRequestStatus;
 import com.dasisuhgi.mentalhealth.signup.entity.UserApprovalRequest;
 import com.dasisuhgi.mentalhealth.signup.repository.UserApprovalRequestRepository;
@@ -23,7 +24,6 @@ import com.dasisuhgi.mentalhealth.user.entity.UserRole;
 import com.dasisuhgi.mentalhealth.user.entity.UserStatus;
 import com.dasisuhgi.mentalhealth.user.repository.UserRepository;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -36,8 +36,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AdminService {
-    private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
-
     private final UserRepository userRepository;
     private final UserApprovalRequestRepository userApprovalRequestRepository;
     private final SignupRequestService signupRequestService;
@@ -102,7 +100,7 @@ public class AdminService {
         ensurePending(approvalRequest, target);
 
         target.setStatus(UserStatus.ACTIVE);
-        target.setApprovedAt(LocalDateTime.now());
+        target.setApprovedAt(SeoulDateTimeSupport.now());
         target.setApprovedById(currentUser.getId());
         target.setRejectedAt(null);
         target.setRejectedById(null);
@@ -136,7 +134,7 @@ public class AdminService {
         }
 
         target.setStatus(UserStatus.REJECTED);
-        target.setRejectedAt(LocalDateTime.now());
+        target.setRejectedAt(SeoulDateTimeSupport.now());
         target.setRejectedById(currentUser.getId());
         target.setRejectionReason(request.processNote().trim());
         approvalRequest.setRequestStatus(ApprovalRequestStatus.REJECTED);
@@ -334,7 +332,7 @@ public class AdminService {
     }
 
     private String formatDateTime(LocalDateTime value) {
-        return value == null ? null : DATETIME_FORMAT.format(value);
+        return SeoulDateTimeSupport.formatDateTime(value);
     }
 
     private String blankToNull(String value) {

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { createCurrentSeoulDateTimeText } from '../../../shared/utils/dateText'
 
 interface AssessmentDraftState {
   clientId: number | null
@@ -33,7 +34,7 @@ export const useAssessmentDraftStore = create<AssessmentDraftState>((set) => ({
       currentScaleIndex: 0,
       answersByScale: {},
       memo: '',
-      startedAt: new Date().toISOString().slice(0, 19),
+      startedAt: createCurrentSeoulDateTimeText(),
     }),
   setAnswer: (scaleCode, questionNo, value) =>
     set((state) => ({

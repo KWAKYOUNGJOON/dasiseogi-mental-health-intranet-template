@@ -253,6 +253,8 @@ describe('assessment record list page', () => {
     expect(screen.getByText('PHQ-9')).toBeTruthy()
     expect(screen.getByText('GAD-7')).toBeTruthy()
     expect(screen.getAllByRole('link', { name: '상세 보기' }).length).toBe(2)
+    expect(screen.getAllByText('2026-03-31 09:20:00').length).toBeGreaterThan(0)
+    expect(screen.queryByText('2026-03-31T09:20:00')).toBeNull()
   })
 
   it('moves to the session detail route with highlightScaleCode and returns to the same filtered list state', async () => {

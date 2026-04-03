@@ -1,5 +1,6 @@
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
+import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 
 export const ACTIVITY_LOG_ACTION_OPTIONS = [
   'LOGIN',
@@ -83,7 +84,7 @@ function mapActivityLogItem(item: ActivityLogListItemResponse): ActivityLogListI
     targetId: item.targetId == null ? '-' : String(item.targetId),
     summary: normalizeText(item.description),
     ipAddress: normalizeText(item.ipAddress),
-    createdAt: normalizeText(item.createdAt),
+    createdAt: normalizeText(formatSeoulDateTimeText(item.createdAt)),
   }
 }
 

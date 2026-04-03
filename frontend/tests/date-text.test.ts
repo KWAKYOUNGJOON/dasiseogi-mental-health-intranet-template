@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { formatCompactDateInput, toValidDateText } from '../src/shared/utils/dateText'
+import {
+  createCurrentSeoulDateTimeText,
+  formatAssessmentLocalDateTimeText,
+  formatCompactDateInput,
+  formatOffsetDateTimeTextToSeoul,
+  formatSeoulDateTimeText,
+  toValidDateText,
+} from '../src/shared/utils/dateText'
 
 describe('date text utilities', () => {
   it('clamps the month to December when a larger month is entered', () => {
@@ -17,5 +24,25 @@ describe('date text utilities', () => {
 
   it('clamps February 29 to February 28 on non-leap years', () => {
     expect(formatCompactDateInput('20250229')).toBe('2025-02-28')
+  })
+
+  it('builds the current save datetime text in Asia/Seoul', () => {
+    expect(createCurrentSeoulDateTimeText(new Date('2026-03-31T00:20:30Z'))).toBe('2026-03-31T09:20:30')
+  })
+
+  it('keeps assessment api local datetime text unchanged for display', () => {
+    expect(formatAssessmentLocalDateTimeText('2026-03-31T09:20:00')).toBe('2026-03-31 09:20:00')
+  })
+
+  it('converts offset datetime strings to Asia/Seoul in the shared display formatter', () => {
+    expect(formatAssessmentLocalDateTimeText('2026-03-31T00:20:00Z')).toBe('2026-03-31 09:20:00')
+  })
+
+  it('converts offset-based datetime text to Asia/Seoul only in the offset formatter', () => {
+    expect(formatOffsetDateTimeTextToSeoul('2026-03-31T00:20:00Z')).toBe('2026-03-31 09:20:00')
+  })
+
+  it('keeps already formatted Seoul datetime text stable for display', () => {
+    expect(formatSeoulDateTimeText('2026-03-31 09:20:00')).toBe('2026-03-31 09:20:00')
   })
 })

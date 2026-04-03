@@ -1,5 +1,6 @@
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
+import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 
 export const SIGNUP_REQUEST_STATUS_OPTIONS = ['PENDING', 'APPROVED', 'REJECTED'] as const
 export const SIGNUP_REQUEST_PAGE_SIZE_OPTIONS = [20, 50, 100] as const
@@ -92,7 +93,7 @@ function normalizeText(value: string | null | undefined) {
 function mapSignupRequestListItem(item: SignupRequestListItemResponse): SignupRequestListItem {
   return {
     id: item.requestId,
-    submittedAt: normalizeText(item.requestedAt),
+    submittedAt: normalizeText(formatSeoulDateTimeText(item.requestedAt)),
     applicantName: normalizeText(item.name),
     loginId: normalizeText(item.loginId),
     contact: normalizeText(item.phone),

@@ -201,6 +201,8 @@ describe('assessment session detail page', () => {
     expect(screen.getByText('세션 참고 메모')).toBeTruthy()
     expect(screen.getAllByText('불안 수준 확인 필요').length).toBeGreaterThan(0)
     expect(screen.getByText('최근 2주 동안 불안했다.')).toBeTruthy()
+    expect(screen.getByText('2026-03-31 09:20:00')).toBeTruthy()
+    expect(screen.queryByText('2026-03-31T09:20:00')).toBeNull()
   })
 
   it('keeps the requested highlightScaleCode emphasis on the matching scale card', async () => {
@@ -395,7 +397,7 @@ describe('assessment session detail page', () => {
 
     expect(await screen.findByText('오입력 처리되었습니다.')).toBeTruthy()
     expect(screen.getByText('MISENTERED')).toBeTruthy()
-    expect(screen.getByText('2026-03-31T10:05:00')).toBeTruthy()
+    expect(screen.getByText('2026-03-31 10:05:00')).toBeTruthy()
     expect(screen.getAllByText('김담당').length).toBeGreaterThan(0)
     expect(screen.getByText('잘못된 대상자 입력')).toBeTruthy()
     expect(screen.queryByRole('dialog')).toBeNull()

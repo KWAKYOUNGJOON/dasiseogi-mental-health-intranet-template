@@ -18,6 +18,7 @@ import com.dasisuhgi.mentalhealth.common.api.PageResponse;
 import com.dasisuhgi.mentalhealth.common.error.AppException;
 import com.dasisuhgi.mentalhealth.common.security.AccessPolicyService;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
+import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import com.dasisuhgi.mentalhealth.user.entity.User;
 import com.dasisuhgi.mentalhealth.user.repository.UserRepository;
 import java.io.IOException;
@@ -136,7 +137,7 @@ public class BackupService {
         }
 
         try {
-            LocalDateTime startedAt = LocalDateTime.now();
+            LocalDateTime startedAt = SeoulDateTimeSupport.now();
             Path root = Path.of(backupRootPath).toAbsolutePath().normalize();
 
             BackupHistory history = new BackupHistory();
@@ -159,7 +160,7 @@ public class BackupService {
                 history.setFilePath(artifact.filePath().toString());
                 history.setStatus(BackupStatus.SUCCESS);
                 history.setFileSizeBytes(Files.size(artifact.filePath()));
-                history.setCompletedAt(LocalDateTime.now());
+                history.setCompletedAt(SeoulDateTimeSupport.now());
                 history.setFailureReason(null);
                 backupHistoryRepository.save(history);
 
@@ -186,7 +187,7 @@ public class BackupService {
                         history.getFilePath()
                 );
             } catch (Exception exception) {
-                history.setCompletedAt(LocalDateTime.now());
+                history.setCompletedAt(SeoulDateTimeSupport.now());
                 history.setFailureReason(buildFailureReason(exception));
                 backupHistoryRepository.save(history);
                 if (backupType == BackupType.AUTO) {
@@ -285,7 +286,7 @@ public class BackupService {
                       "sessionCount": %d
                     }
                     """.formatted(
-                    LocalDateTime.now(),
+                    SeoulDateTimeSupport.now(),
                     currentUser == null ? null : "\"" + currentUser.getLoginId() + "\"",
                     reason == null || reason.isBlank() ? null : "\"" + reason.replace("\"", "\\\"") + "\"",
                     userRepository.count(),

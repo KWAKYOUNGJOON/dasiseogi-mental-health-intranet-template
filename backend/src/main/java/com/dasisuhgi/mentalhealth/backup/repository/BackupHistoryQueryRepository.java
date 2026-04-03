@@ -4,11 +4,11 @@ import com.dasisuhgi.mentalhealth.backup.dto.BackupHistoryListItemResponse;
 import com.dasisuhgi.mentalhealth.backup.entity.BackupStatus;
 import com.dasisuhgi.mentalhealth.backup.entity.BackupType;
 import com.dasisuhgi.mentalhealth.common.api.PageResponse;
+import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,8 +16,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class BackupHistoryQueryRepository {
-    private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
-
     private final EntityManager entityManager;
 
     public BackupHistoryQueryRepository(EntityManager entityManager) {
@@ -84,8 +82,8 @@ public class BackupHistoryQueryRepository {
                         row.fileName(),
                         row.filePath(),
                         row.fileSizeBytes(),
-                        DATETIME_FORMAT.format(row.startedAt()),
-                        row.completedAt() == null ? null : DATETIME_FORMAT.format(row.completedAt()),
+                        SeoulDateTimeSupport.formatDateTime(row.startedAt()),
+                        SeoulDateTimeSupport.formatDateTime(row.completedAt()),
                         row.executedByNameSnapshot(),
                         row.failureReason()
                 ))

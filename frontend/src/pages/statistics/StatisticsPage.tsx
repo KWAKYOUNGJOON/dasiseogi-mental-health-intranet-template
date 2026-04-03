@@ -12,7 +12,7 @@ import {
 } from '../../features/statistics/api/statisticsApi'
 import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
-import { toValidDateText } from '../../shared/utils/dateText'
+import { formatSeoulDateTimeText, toValidDateText } from '../../shared/utils/dateText'
 
 const DEFAULT_ALERT_PAGE_SIZE = 10
 const ALERT_TYPE_OPTIONS = ['HIGH_RISK', 'CAUTION', 'CRITICAL_ITEM', 'COMPOSITE_RULE']
@@ -251,7 +251,7 @@ export function StatisticsPage() {
                           key={`${alert.sessionId}-${alert.scaleCode}-${index}`}
                           onClick={() => navigate(`/assessments/sessions/${alert.sessionId}?highlightScaleCode=${alert.scaleCode}`)}
                         >
-                          <td>{alert.sessionCompletedAt}</td>
+                          <td>{formatSeoulDateTimeText(alert.sessionCompletedAt)}</td>
                           <td>{alert.clientName}</td>
                           <td>{alert.performedByName}</td>
                           <td>{alert.scaleCode}</td>
