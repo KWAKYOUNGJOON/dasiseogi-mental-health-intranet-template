@@ -11,6 +11,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -29,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@SuppressWarnings("null")
 class IdentifierGenerationIntegrationTest {
     private static final DateTimeFormatter YEAR_MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyyMM");
 
@@ -91,7 +93,10 @@ class IdentifierGenerationIntegrationTest {
                         ))))
                 .andExpect(status().isOk())
                 .andReturn();
-        return (MockHttpSession) result.getRequest().getSession(false);
+        return (MockHttpSession) Objects.requireNonNull(
+                result.getRequest().getSession(false),
+                "Expected a session after successful login"
+        );
     }
 
     private String createClient(MockHttpSession session, String name, String birthDate) throws Exception {
@@ -150,7 +155,10 @@ class IdentifierGenerationIntegrationTest {
     }
 
     private JsonNode body(MvcResult result) throws Exception {
-        return objectMapper.readTree(result.getResponse().getContentAsByteArray());
+        return Objects.requireNonNull(
+                objectMapper.readTree(result.getResponse().getContentAsByteArray()),
+                "Response body must contain JSON"
+        );
     }
 
     private String json(Object value) throws Exception {

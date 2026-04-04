@@ -78,7 +78,7 @@ public class StatisticsController {
         StatisticsExportService.StatisticsExportFile exportFile = statisticsExportService.export(dateFrom, dateTo, type, currentUser);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + exportFile.filename() + "\"")
-                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .contentType(MediaType.parseMediaType("text/csv;charset=" + StandardCharsets.UTF_8.name()))
                 .body(exportFile.content());
     }
 }

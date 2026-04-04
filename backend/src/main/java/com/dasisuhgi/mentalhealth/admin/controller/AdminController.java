@@ -19,8 +19,12 @@ import com.dasisuhgi.mentalhealth.auth.service.AuthService;
 import com.dasisuhgi.mentalhealth.common.api.ApiResponse;
 import com.dasisuhgi.mentalhealth.common.api.PageResponse;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
+import com.dasisuhgi.mentalhealth.restore.dto.RestoreUploadResponse;
+import com.dasisuhgi.mentalhealth.restore.service.RestoreService;
 import jakarta.servlet.http.HttpSession;
 import java.time.LocalDate;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -36,12 +41,20 @@ public class AdminController {
     private final AdminService adminService;
     private final ActivityLogService activityLogService;
     private final BackupService backupService;
+    private final RestoreService restoreService;
     private final AuthService authService;
 
-    public AdminController(AdminService adminService, ActivityLogService activityLogService, BackupService backupService, AuthService authService) {
+    public AdminController(
+            AdminService adminService,
+            ActivityLogService activityLogService,
+            BackupService backupService,
+            RestoreService restoreService,
+            AuthService authService
+    ) {
         this.adminService = adminService;
         this.activityLogService = activityLogService;
         this.backupService = backupService;
+        this.restoreService = restoreService;
         this.authService = authService;
     }
 
@@ -165,5 +178,14 @@ public class AdminController {
                 request == null ? new ManualBackupRunRequest(null) : request,
                 currentUser
         ));
+    }
+
+    @PostMapping(value = "/restores/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<RestoreUploadResponse> uploadRestoreZip(
+            @RequestPart(value = "file", required = false) MultipartFile file,
+            HttpSession session
+    ) {
+        SessionUser currentUser = authService.getRequiredSessionUser(session);
+        return ApiResponse.success(restoreService.uploadAndValidate(file, currentUser));
     }
 }

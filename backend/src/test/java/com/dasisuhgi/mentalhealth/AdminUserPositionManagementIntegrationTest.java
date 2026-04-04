@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -29,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@SuppressWarnings("null")
 class AdminUserPositionManagementIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
@@ -136,7 +138,10 @@ class AdminUserPositionManagementIntegrationTest {
                         ))))
                 .andExpect(status().isOk())
                 .andReturn();
-        return (MockHttpSession) result.getRequest().getSession(false);
+        return (MockHttpSession) Objects.requireNonNull(
+                result.getRequest().getSession(false),
+                "Expected a session after successful login"
+        );
     }
 
     private User findUser(String loginId) {

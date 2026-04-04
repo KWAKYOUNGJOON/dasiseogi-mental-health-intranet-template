@@ -1,5 +1,6 @@
 services:
   backend:
+    image: dasiseogi-backend:local
     environment:
       SPRING_PROFILES_ACTIVE: local
       APP_DB_URL_DOCKER: jdbc:mariadb://db:3306/${LOCAL_DB_NAME:-mental_health_local}?useUnicode=true&characterEncoding=utf8
@@ -11,7 +12,7 @@ services:
         condition: service_healthy
 
   db:
-    image: mariadb:11.4
+    image: dasiseogi-db:local
     restart: unless-stopped
     environment:
       MARIADB_DATABASE: ${LOCAL_DB_NAME:-mental_health_local}

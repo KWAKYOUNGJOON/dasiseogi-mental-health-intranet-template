@@ -16,5 +16,6 @@ public enum ActivityActionType {
     SESSION_MARK_MISENTERED,
     PRINT_SESSION,
     STATISTICS_EXPORT,
-    BACKUP_RUN
+    BACKUP_RUN,
+    RESTORE_UPLOAD
 }

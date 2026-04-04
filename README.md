@@ -239,21 +239,23 @@ npm run build
 
 ## 수동 백업 범위
 
-현재 수동 백업은 환경별로 아래처럼 동작합니다.
+현재 관리자 수동/자동 백업은 환경별 내부 확보 방식은 유지하되, 산출물은 모두 표준 전체 백업 ZIP v1 하나로 통일됩니다.
 
 - MariaDB/MySQL
   - 실행 전 datasource 종류, 백업 경로 writable 여부, dump command 사용 가능 여부를 preflight로 확인합니다.
-  - `mariadb-dump` 또는 `mysqldump` 사용 가능하면 실제 DB dump를 우선 시도합니다.
-  - dump 명령을 찾지 못하면 snapshot ZIP으로 fallback 합니다.
+  - `mariadb-dump` 또는 `mysqldump` 사용 가능하면 ZIP 내부에 `db/database.sql` 을 포함합니다.
+  - dump 명령을 찾지 못하면 DB 파일 없는 snapshot 기반 ZIP으로 fallback 합니다.
 - H2 / 기타 로컬 환경
   - 실행 전 backup root writable 여부를 확인합니다.
-  - snapshot ZIP 방식으로 백업합니다.
+  - DB 파일 없는 snapshot 기반 ZIP을 생성합니다.
 
-snapshot ZIP 포함 항목:
-- `application.yml`
-- `application-prod.yml`
-- `backend/src/main/resources/scales/**/*.json`
-- 사용자/대상자/세션 개수와 실행자 정보를 담은 `metadata/summary.json`
+표준 ZIP 기본 구조:
+- `manifest.json`
+- `db/database.sql` (MariaDB/MySQL + dump 가능 시에만)
+- `config/application.yml`
+- `config/application-prod.yml`
+- `scales/**/*.json`
+- `metadata/summary.json`
 
 현재 미포함 항목:
 - restore 자동화
@@ -263,8 +265,8 @@ snapshot ZIP 포함 항목:
 백업 파일은 기본적으로 `local-backups/` 아래에 생성됩니다.
 
 복구 개요:
-- `DB_DUMP`: 생성된 `.sql` 파일을 MariaDB/MySQL에 직접 import 합니다.
-- `SNAPSHOT`: 설정/척도 JSON/메타데이터 확인용 스냅샷이며 DB 복구 파일은 아닙니다.
+- `DB_DUMP`: ZIP 내부 `db/database.sql` 이 포함된 표준 전체 백업 ZIP입니다.
+- `SNAPSHOT`: DB 파일 없이 설정/척도 JSON/메타데이터를 담은 표준 전체 백업 ZIP입니다.
 
 ## 운영 템플릿
 

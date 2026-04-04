@@ -14,6 +14,7 @@ import com.dasisuhgi.mentalhealth.common.web.RequestMetadataService;
 import com.dasisuhgi.mentalhealth.user.entity.User;
 import java.time.LocalDate;
 import java.util.Locale;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -44,7 +45,8 @@ public class ActivityLogService {
         this.activityLogQueryRepository = activityLogQueryRepository;
         this.accessPolicyService = accessPolicyService;
         this.requestMetadataService = requestMetadataService;
-        this.requiresNewTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.requiresNewTransactionTemplate =
+                new TransactionTemplate(Objects.requireNonNull(transactionManager, "transactionManager"));
         this.requiresNewTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
@@ -70,7 +72,10 @@ public class ActivityLogService {
             String description,
             String ipAddress
     ) {
-        activityLogRepository.save(buildActivityLog(user, actionType, targetType, targetId, targetLabel, description, ipAddress));
+        activityLogRepository.save(Objects.requireNonNull(
+                buildActivityLog(user, actionType, targetType, targetId, targetLabel, description, ipAddress),
+                "activityLog"
+        ));
     }
 
     public void logBestEffort(
@@ -96,7 +101,9 @@ public class ActivityLogService {
         ActivityLog activityLog = buildActivityLog(user, actionType, targetType, targetId, targetLabel, description, ipAddress);
 
         try {
-            requiresNewTransactionTemplate.executeWithoutResult(status -> activityLogRepository.saveAndFlush(activityLog));
+            requiresNewTransactionTemplate.executeWithoutResult(
+                    status -> activityLogRepository.saveAndFlush(Objects.requireNonNull(activityLog, "activityLog"))
+            );
         } catch (RuntimeException exception) {
             log.warn("Activity log persistence failed: actionType={}, targetType={}, targetId={}", actionType, targetType, targetId, exception);
         }

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -25,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@SuppressWarnings("null")
 class ClientDetailLegacyAssessmentSchemaIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
@@ -100,7 +102,10 @@ class ClientDetailLegacyAssessmentSchemaIntegrationTest {
                         ))))
                 .andExpect(status().isOk())
                 .andReturn();
-        return (MockHttpSession) result.getRequest().getSession(false);
+        return (MockHttpSession) Objects.requireNonNull(
+                result.getRequest().getSession(false),
+                "Expected a session after successful login"
+        );
     }
 
     private Client findClient(String name, LocalDate birthDate) {
@@ -110,7 +115,10 @@ class ClientDetailLegacyAssessmentSchemaIntegrationTest {
     }
 
     private JsonNode body(MvcResult result) throws Exception {
-        return objectMapper.readTree(result.getResponse().getContentAsByteArray());
+        return Objects.requireNonNull(
+                objectMapper.readTree(result.getResponse().getContentAsByteArray()),
+                "Response body must contain JSON"
+        );
     }
 
     private String json(Object payload) throws Exception {

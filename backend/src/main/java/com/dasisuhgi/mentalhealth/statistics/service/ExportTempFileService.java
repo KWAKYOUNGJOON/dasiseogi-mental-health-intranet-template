@@ -11,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 @Service
 public class ExportTempFileService {
@@ -105,14 +104,19 @@ public class ExportTempFileService {
     }
 
     private Path resolveConfiguredTempDirectory() {
-        String configuredPath = StringUtils.hasText(exportProperties.getTempPath())
-                ? exportProperties.getTempPath().trim()
-                : ExportProperties.DEFAULT_TEMP_PATH;
+        String configuredPath = ExportProperties.DEFAULT_TEMP_PATH;
+        String tempPath = exportProperties.getTempPath();
+        if (tempPath != null && !tempPath.isBlank()) {
+            configuredPath = tempPath.trim();
+        }
         return Path.of(configuredPath).toAbsolutePath().normalize();
     }
 
     private String buildPrefix(String prefix) {
-        String normalized = StringUtils.hasText(prefix) ? prefix.trim() : "export";
+        String normalized = "export";
+        if (prefix != null && !prefix.isBlank()) {
+            normalized = prefix.trim();
+        }
         if (normalized.length() >= 3) {
             return normalized;
         }

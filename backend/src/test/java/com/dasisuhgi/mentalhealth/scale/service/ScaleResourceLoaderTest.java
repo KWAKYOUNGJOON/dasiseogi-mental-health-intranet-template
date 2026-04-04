@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.core.io.DefaultResourceLoader;
@@ -78,6 +79,9 @@ class ScaleResourceLoaderTest {
     }
 
     private String readClasspathResource(String location) throws IOException {
-        return new String(resourceLoader.getResource(location).getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        return new String(
+                resourceLoader.getResource(Objects.requireNonNull(location, "location")).getInputStream().readAllBytes(),
+                StandardCharsets.UTF_8
+        );
     }
 }

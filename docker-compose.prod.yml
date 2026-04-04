@@ -1,6 +1,6 @@
 services:
   backend:
-    image: youngjoon0520/dasiseogi-backend:latest
+    image: dasiseogi-backend:local
     restart: always
     depends_on:
       db:
@@ -33,7 +33,7 @@ services:
       - dasiseogi-network
 
   frontend:
-    image: youngjoon0520/dasiseogi-frontend:latest
+    image: dasiseogi-frontend:local
     restart: always
     depends_on:
       backend:
@@ -44,7 +44,7 @@ services:
       - dasiseogi-network
 
   db:
-    image: mariadb:11.4
+    image: dasiseogi-db:local
     restart: always
     environment:
       MARIADB_DATABASE: ${PROD_DB_NAME:-mental_health}

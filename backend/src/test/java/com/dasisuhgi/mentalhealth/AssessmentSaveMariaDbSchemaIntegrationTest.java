@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest
 @AutoConfigureMockMvc
+@SuppressWarnings("null")
 class AssessmentSaveMariaDbSchemaIntegrationTest {
     @Container
     static final MariaDBContainer<?> MARIADB = new MariaDBContainer<>("mariadb:11.4");
@@ -176,7 +178,10 @@ class AssessmentSaveMariaDbSchemaIntegrationTest {
                         ))))
                 .andExpect(status().isOk())
                 .andReturn();
-        return (MockHttpSession) result.getRequest().getSession(false);
+        return (MockHttpSession) Objects.requireNonNull(
+                result.getRequest().getSession(false),
+                "Expected a session after successful login"
+        );
     }
 
     private Client findClient(String name, LocalDate birthDate) {
@@ -186,7 +191,10 @@ class AssessmentSaveMariaDbSchemaIntegrationTest {
     }
 
     private JsonNode body(MvcResult result) throws Exception {
-        return objectMapper.readTree(result.getResponse().getContentAsByteArray());
+        return Objects.requireNonNull(
+                objectMapper.readTree(result.getResponse().getContentAsByteArray()),
+                "Response body must contain JSON"
+        );
     }
 
     private String json(Object payload) throws Exception {

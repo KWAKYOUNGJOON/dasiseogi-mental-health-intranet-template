@@ -6,5 +6,6 @@ public enum ActivityTargetType {
     CLIENT,
     SESSION,
     STATISTICS,
-    BACKUP
+    BACKUP,
+    RESTORE
 }

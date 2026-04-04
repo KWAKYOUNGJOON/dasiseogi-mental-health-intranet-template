@@ -24,7 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.catchThrowableOfType;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -113,9 +113,10 @@ class StatisticsExportServiceTest {
                         List.of()
                 ));
 
-        AppException exception = catchThrowableOfType(
+        AppException exception = assertThrows(
+                AppException.class,
                 () -> service.export(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31), "SUMMARY", sessionUser),
-                AppException.class
+                "Expected invalid export temp path to raise AppException"
         );
 
         assertThat(exception).isNotNull();

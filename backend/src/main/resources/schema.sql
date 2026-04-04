@@ -1,7 +1,7 @@
 -- 다시서기 정신건강 평가관리 시스템 초기 스키마 SQL 초안
 -- 범위: identifier_sequences, users, user_approval_requests, clients,
 --       assessment_sessions, session_scales, session_answers, session_alerts,
---       activity_logs, backup_histories
+--       activity_logs, backup_histories, restore_histories
 -- 기준 문서: docs/02-db-design.md, docs/03-api-spec.md, docs/07-validation-rules.md
 -- 대상 DB: MariaDB/MySQL
 
@@ -259,7 +259,8 @@ CREATE TABLE IF NOT EXISTS activity_logs (
                 'SESSION_MARK_MISENTERED',
                 'PRINT_SESSION',
                 'STATISTICS_EXPORT',
-                'BACKUP_RUN'
+                'BACKUP_RUN',
+                'RESTORE_UPLOAD'
             )
         ),
     CONSTRAINT chk_activity_logs_target_type
@@ -270,7 +271,8 @@ CREATE TABLE IF NOT EXISTS activity_logs (
                 'CLIENT',
                 'SESSION',
                 'STATISTICS',
-                'BACKUP'
+                'BACKUP',
+                'RESTORE'
             )
         ),
     CONSTRAINT fk_activity_logs_user
@@ -307,4 +309,29 @@ CREATE TABLE IF NOT EXISTS backup_histories (
     INDEX idx_backup_histories_backup_type (backup_type),
     INDEX idx_backup_histories_status (status),
     INDEX idx_backup_histories_started_at (started_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS restore_histories (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    status VARCHAR(20) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    file_size_bytes BIGINT NULL,
+    uploaded_at DATETIME NOT NULL,
+    validated_at DATETIME NULL,
+    uploaded_by_id BIGINT NULL,
+    uploaded_by_name_snapshot VARCHAR(50) NULL,
+    format_version VARCHAR(50) NULL,
+    datasource_type VARCHAR(30) NULL,
+    backup_id BIGINT NULL,
+    failure_reason VARCHAR(500) NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT chk_restore_histories_status
+        CHECK (status IN ('UPLOADED', 'VALIDATED', 'FAILED')),
+    CONSTRAINT fk_restore_histories_uploaded_by
+        FOREIGN KEY (uploaded_by_id) REFERENCES users (id),
+    INDEX idx_restore_histories_status (status),
+    INDEX idx_restore_histories_uploaded_at (uploaded_at),
+    INDEX idx_restore_histories_validated_at (validated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

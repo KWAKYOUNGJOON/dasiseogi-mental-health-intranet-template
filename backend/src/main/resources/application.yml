@@ -10,6 +10,10 @@ spring:
     username: sa
     password:
     driver-class-name: org.h2.Driver
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
   jpa:
     hibernate:
       ddl-auto: update
@@ -41,6 +45,9 @@ app:
       enabled: true
       cron: 0 0 2 * * *
       zone: Asia/Seoul
+  restore:
+    root-path: ./tmp/restores
+    max-upload-size-bytes: 524288000
   security:
     trust-proxy-headers: false
   seed:

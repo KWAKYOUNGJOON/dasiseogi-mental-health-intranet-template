@@ -12,12 +12,12 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 @Component
 public class ScaleResourceLoader {
@@ -41,9 +41,10 @@ public class ScaleResourceLoader {
         try {
             scaleLocation = ScaleLocation.from(scaleProperties.getResourcePath());
         } catch (InvalidPathException exception) {
-            String configuredPath = StringUtils.hasText(scaleProperties.getResourcePath())
-                    ? scaleProperties.getResourcePath().trim()
-                    : ScaleProperties.DEFAULT_RESOURCE_PATH;
+            String configuredResourcePath = scaleProperties.getResourcePath();
+            String configuredPath = configuredResourcePath == null || configuredResourcePath.isBlank()
+                    ? ScaleProperties.DEFAULT_RESOURCE_PATH
+                    : configuredResourcePath.trim();
             throw fail("Invalid configured scale resource path: " + configuredPath, exception);
         }
         log.info("Loading scale resources from {}", scaleLocation.description());
@@ -119,13 +120,13 @@ public class ScaleResourceLoader {
         if (item == null) {
             throw fail("Scale registry contains a null item: " + scaleLocation.registryDescription());
         }
-        if (!StringUtils.hasText(item.scaleCode())) {
+        if (item.scaleCode() == null || item.scaleCode().isBlank()) {
             throw fail("Scale registry contains an item without scaleCode: " + scaleLocation.registryDescription());
         }
-        if (!StringUtils.hasText(item.scaleName())) {
+        if (item.scaleName() == null || item.scaleName().isBlank()) {
             throw fail("Scale registry item '" + item.scaleCode() + "' is missing scaleName: " + scaleLocation.registryDescription());
         }
-        if (item.implemented() && !StringUtils.hasText(item.definitionFile())) {
+        if (item.implemented() && (item.definitionFile() == null || item.definitionFile().isBlank())) {
             throw fail("Implemented scale '" + item.scaleCode() + "' is missing definitionFile: " + scaleLocation.registryDescription());
         }
     }
@@ -134,7 +135,7 @@ public class ScaleResourceLoader {
         if (definition == null) {
             throw fail("Scale definition for '" + item.scaleCode() + "' is empty: " + scaleLocation.definitionDescription(item.definitionFile()));
         }
-        if (!StringUtils.hasText(definition.scaleCode())) {
+        if (definition.scaleCode() == null || definition.scaleCode().isBlank()) {
             throw fail("Scale definition is missing scaleCode: " + scaleLocation.definitionDescription(item.definitionFile()));
         }
         if (!item.scaleCode().equals(definition.scaleCode())) {
@@ -177,9 +178,10 @@ public class ScaleResourceLoader {
 
     private record ScaleLocation(String configuredPath, String classpathBase, Path filesystemBase) {
         private static ScaleLocation from(String configuredPath) {
-            String normalizedPath = StringUtils.hasText(configuredPath)
-                    ? configuredPath.trim()
-                    : ScaleProperties.DEFAULT_RESOURCE_PATH;
+            String normalizedPath = ScaleProperties.DEFAULT_RESOURCE_PATH;
+            if (configuredPath != null && !configuredPath.isBlank()) {
+                normalizedPath = configuredPath.trim();
+            }
             if (normalizedPath.startsWith(CLASSPATH_PREFIX)) {
                 return new ScaleLocation(normalizedPath, normalizeClasspathBase(normalizedPath), null);
             }
@@ -188,7 +190,7 @@ public class ScaleResourceLoader {
         }
 
         private static String normalizeClasspathBase(String configuredPath) {
-            String path = configuredPath.trim().replace('\\', '/');
+            String path = Objects.requireNonNull(configuredPath, "configuredPath").trim().replace('\\', '/');
             while (path.endsWith("/")) {
                 path = path.substring(0, path.length() - 1);
             }
@@ -232,7 +234,7 @@ public class ScaleResourceLoader {
         }
 
         private InputStream openClasspathResource(ResourceLoader resourceLoader, String location) throws IOException {
-            Resource resource = resourceLoader.getResource(location);
+            Resource resource = resourceLoader.getResource(Objects.requireNonNull(location, "location"));
             if (!resource.exists()) {
                 throw new IOException("resource does not exist");
             }
@@ -247,10 +249,10 @@ public class ScaleResourceLoader {
         }
 
         private String resolveClasspathDefinitionLocation(String definitionFile) {
-            if (!StringUtils.hasText(definitionFile)) {
+            if (definitionFile == null || definitionFile.isBlank()) {
                 throw new IllegalStateException("Scale definitionFile is blank for configured path '" + configuredPath + "'");
             }
-            String normalized = definitionFile.trim().replace('\\', '/');
+            String normalized = Objects.requireNonNull(definitionFile, "definitionFile").trim().replace('\\', '/');
             if (normalized.startsWith(CLASSPATH_PREFIX)) {
                 normalized = normalized.substring(CLASSPATH_PREFIX.length());
             }
@@ -258,17 +260,17 @@ public class ScaleResourceLoader {
             if (normalized.startsWith(DEFAULT_SCALE_ROOT + "/")) {
                 normalized = normalized.substring((DEFAULT_SCALE_ROOT + "/").length());
             }
-            if (!StringUtils.hasText(normalized)) {
+            if (normalized.isBlank()) {
                 throw new IllegalStateException("Scale definitionFile resolved to an empty path for configured path '" + configuredPath + "'");
             }
             return classpathBase + "/" + normalized;
         }
 
         private Path resolveFilesystemDefinitionPath(String definitionFile) {
-            if (!StringUtils.hasText(definitionFile)) {
+            if (definitionFile == null || definitionFile.isBlank()) {
                 throw new IllegalStateException("Scale definitionFile is blank for configured path '" + configuredPath + "'");
             }
-            String normalized = definitionFile.trim().replace('\\', '/');
+            String normalized = Objects.requireNonNull(definitionFile, "definitionFile").trim().replace('\\', '/');
             if (normalized.startsWith(CLASSPATH_PREFIX)) {
                 normalized = normalized.substring(CLASSPATH_PREFIX.length());
             }
@@ -276,7 +278,7 @@ public class ScaleResourceLoader {
             if (normalized.startsWith(DEFAULT_SCALE_ROOT + "/")) {
                 normalized = normalized.substring((DEFAULT_SCALE_ROOT + "/").length());
             }
-            if (!StringUtils.hasText(normalized)) {
+            if (normalized.isBlank()) {
                 throw new IllegalStateException("Scale definitionFile resolved to an empty path for configured path '" + configuredPath + "'");
             }
 

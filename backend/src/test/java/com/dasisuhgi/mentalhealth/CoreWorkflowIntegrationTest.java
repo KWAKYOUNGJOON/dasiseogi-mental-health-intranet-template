@@ -28,6 +28,7 @@ import com.dasisuhgi.mentalhealth.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -36,10 +37,14 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,6 +71,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 @Import(SessionSaveFailureTestConfig.class)
+@SuppressWarnings("null")
 class CoreWorkflowIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
@@ -1068,7 +1074,8 @@ class CoreWorkflowIntegrationTest {
         JsonNode firstPage = body(firstPageResult).path("data");
         assertThat(firstPage.path("totalItems").asLong()).isEqualTo(2L);
         assertThat(firstPage.path("totalPages").asInt()).isEqualTo(2);
-        assertThat(firstPage.path("items").get(0).path("sessionNo").asText()).isEqualTo("AS-PROJ-002");
+        assertThat(Objects.requireNonNull(firstPage.path("items").get(0), "first item").path("sessionNo").asText())
+                .isEqualTo("AS-PROJ-002");
 
         mockMvc.perform(get("/api/v1/assessment-records")
                         .session(session)
@@ -1295,8 +1302,9 @@ class CoreWorkflowIntegrationTest {
                 .andExpect(content().contentTypeCompatibleWith("text/csv"))
                 .andReturn();
 
-        String contentBody = result.getResponse().getContentAsString();
-        assertThat(result.getResponse().getHeader("Content-Disposition")).contains("statistics-summary");
+        String contentBody = Objects.requireNonNull(result.getResponse().getContentAsString(), "CSV response body");
+        assertThat(Objects.requireNonNull(result.getResponse().getHeader("Content-Disposition"), "Content-Disposition"))
+                .contains("statistics-summary");
         assertThat(contentBody).contains("전체 세션 수");
         assertThat(contentBody).contains("전체 척도 시행 건수");
         assertThat(contentBody).contains("사용자A");
@@ -1342,8 +1350,8 @@ class CoreWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.items[0].actionType").value("LOGIN"))
                 .andReturn();
 
-        assertThat(body(pageOne).path("data").path("items").get(0).path("id").asLong())
-                .isGreaterThan(body(pageTwo).path("data").path("items").get(0).path("id").asLong());
+        assertThat(Objects.requireNonNull(body(pageOne).path("data").path("items").get(0), "page one first item").path("id").asLong())
+                .isGreaterThan(Objects.requireNonNull(body(pageTwo).path("data").path("items").get(0), "page two first item").path("id").asLong());
     }
 
     @Test
@@ -1540,8 +1548,14 @@ class CoreWorkflowIntegrationTest {
     @Test
     void manualBackupFallsBackToSnapshotWhenMariaDumpCommandIsUnavailable() throws Exception {
         MockHttpSession session = login("admina", "Test1234!");
-        String originalDatasourceUrl = (String) ReflectionTestUtils.getField(backupService, "datasourceUrl");
-        String originalDumpCommand = (String) ReflectionTestUtils.getField(backupService, "dbDumpCommand");
+        String originalDatasourceUrl = (String) Objects.requireNonNull(
+                ReflectionTestUtils.getField(backupService, "datasourceUrl"),
+                "datasourceUrl"
+        );
+        String originalDumpCommand = (String) Objects.requireNonNull(
+                ReflectionTestUtils.getField(backupService, "dbDumpCommand"),
+                "dbDumpCommand"
+        );
 
         ReflectionTestUtils.setField(backupService, "datasourceUrl", "jdbc:mariadb://127.0.0.1:3306/mental_health_test");
         ReflectionTestUtils.setField(backupService, "dbDumpCommand", "missing-dump-command-xyz");
@@ -1565,9 +1579,18 @@ class CoreWorkflowIntegrationTest {
     @Test
     void manualBackupUsesDbDumpWhenMariaDumpCommandIsAvailable() throws Exception {
         MockHttpSession session = login("admina", "Test1234!");
-        String originalDatasourceUrl = (String) ReflectionTestUtils.getField(backupService, "datasourceUrl");
-        String originalDumpCommand = (String) ReflectionTestUtils.getField(backupService, "dbDumpCommand");
-        String originalRootPath = (String) ReflectionTestUtils.getField(backupService, "backupRootPath");
+        String originalDatasourceUrl = (String) Objects.requireNonNull(
+                ReflectionTestUtils.getField(backupService, "datasourceUrl"),
+                "datasourceUrl"
+        );
+        String originalDumpCommand = (String) Objects.requireNonNull(
+                ReflectionTestUtils.getField(backupService, "dbDumpCommand"),
+                "dbDumpCommand"
+        );
+        String originalRootPath = (String) Objects.requireNonNull(
+                ReflectionTestUtils.getField(backupService, "backupRootPath"),
+                "backupRootPath"
+        );
         Path backupRoot = Files.createTempDirectory("backup-db-dump-success");
         Path fakeDumpCommand = createFakeDumpCommand();
 
@@ -1585,14 +1608,20 @@ class CoreWorkflowIntegrationTest {
                     .andExpect(jsonPath("$.data.datasourceType").value("MARIADB"))
                     .andExpect(jsonPath("$.data.preflightSummary").value(org.hamcrest.Matchers.containsString("preferred=DB_DUMP")))
                     .andExpect(jsonPath("$.data.preflightSummary").value(org.hamcrest.Matchers.containsString("dumpAvailable=true")))
-                    .andExpect(jsonPath("$.data.fileName").value(org.hamcrest.Matchers.endsWith("-db-dump.sql")));
+                    .andExpect(jsonPath("$.data.fileName").value(org.hamcrest.Matchers.endsWith("-db-dump-full-v1.zip")));
 
             BackupHistory history = latestBackupHistory();
+            Map<String, byte[]> zipEntries = readZipEntries(Path.of(history.getFilePath()));
             assertThat(history.getStatus().name()).isEqualTo("SUCCESS");
             assertThat(history.getBackupMethod()).isEqualTo(BackupMethod.DB_DUMP);
             assertThat(history.getFailureReason()).isNull();
             assertThat(Files.exists(Path.of(history.getFilePath()))).isTrue();
-            assertThat(Files.readString(Path.of(history.getFilePath()))).contains("-- fake db dump");
+            assertThat(history.getFileName()).endsWith("-db-dump-full-v1.zip");
+            assertThat(zipEntries).containsKey("db/database.sql");
+            assertThat(new String(
+                    Objects.requireNonNull(zipEntries.get("db/database.sql"), "db/database.sql"),
+                    StandardCharsets.UTF_8
+            )).contains("-- fake db dump");
             assertThat(hasActivityLog(ActivityActionType.BACKUP_RUN, history.getId())).isTrue();
         } finally {
             ReflectionTestUtils.setField(backupService, "datasourceUrl", originalDatasourceUrl);
@@ -1605,7 +1634,10 @@ class CoreWorkflowIntegrationTest {
     void manualBackupFailureStoresDetailedReason() throws Exception {
         MockHttpSession session = login("admina", "Test1234!");
         Path blocker = Files.createTempFile("backup-root-blocker", ".tmp");
-        String originalRootPath = (String) ReflectionTestUtils.getField(backupService, "backupRootPath");
+        String originalRootPath = (String) Objects.requireNonNull(
+                ReflectionTestUtils.getField(backupService, "backupRootPath"),
+                "backupRootPath"
+        );
 
         ReflectionTestUtils.setField(backupService, "backupRootPath", blocker.toString());
         try {
@@ -1689,7 +1721,10 @@ class CoreWorkflowIntegrationTest {
                         ))))
                 .andExpect(status().isOk())
                 .andReturn();
-        return (MockHttpSession) result.getRequest().getSession(false);
+        return (MockHttpSession) Objects.requireNonNull(
+                result.getRequest().getSession(false),
+                "Expected a session after successful login"
+        );
     }
 
     private String createClient(MockHttpSession session, String name, String birthDate) throws Exception {
@@ -1908,7 +1943,10 @@ class CoreWorkflowIntegrationTest {
     }
 
     private JsonNode body(MvcResult result) throws Exception {
-        return objectMapper.readTree(result.getResponse().getContentAsByteArray());
+        return Objects.requireNonNull(
+                objectMapper.readTree(result.getResponse().getContentAsByteArray()),
+                "Response body must contain JSON"
+        );
     }
 
     private String json(Object value) throws Exception {
@@ -1961,6 +1999,23 @@ class CoreWorkflowIntegrationTest {
                 .orElseThrow();
     }
 
+    private Map<String, byte[]> readZipEntries(Path zipPath) throws Exception {
+        Map<String, byte[]> entries = new LinkedHashMap<>();
+        try (ZipFile zipFile = new ZipFile(zipPath.toFile(), StandardCharsets.UTF_8)) {
+            Enumeration<? extends ZipEntry> enumeration = zipFile.entries();
+            while (enumeration.hasMoreElements()) {
+                ZipEntry entry = enumeration.nextElement();
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                try (InputStream inputStream = zipFile.getInputStream(entry)) {
+                    entries.put(entry.getName(), inputStream.readAllBytes());
+                }
+            }
+        }
+        return entries;
+    }
+
     private Path createFakeDumpCommand() throws Exception {
         boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows");
         Path commandFile = Files.createTempFile("fake-db-dump", windows ? ".cmd" : ".sh");
@@ -1975,11 +2030,14 @@ class CoreWorkflowIntegrationTest {
                 set "OUTPUT="
                 set "NEXT_IS_OUTPUT=0"
                 for %%A in (%*) do (
+                  set "ARG=%%~A"
                   if "!NEXT_IS_OUTPUT!"=="1" (
-                    set "OUTPUT=%%~A"
+                    set "OUTPUT=!ARG!"
                     set "NEXT_IS_OUTPUT=0"
                   )
-                  if /I "%%~A"=="--result-file" set "NEXT_IS_OUTPUT=1"
+                  if /I "!ARG!"=="--result-file" set "NEXT_IS_OUTPUT=1"
+                  echo !ARG!| findstr /B /C:"--result-file=" >nul
+                  if not errorlevel 1 set "OUTPUT=!ARG:~14!"
                 )
                 if not defined OUTPUT exit /b 1
                 > "!OUTPUT!" echo -- fake db dump
@@ -1992,8 +2050,16 @@ class CoreWorkflowIntegrationTest {
                   exit 0
                 fi
                 output=""
+                next_is_output=0
                 for arg in "$@"; do
+                  if [ "$next_is_output" = "1" ]; then
+                    output="$arg"
+                    next_is_output=0
+                  fi
                   case "$arg" in
+                    --result-file)
+                      next_is_output=1
+                      ;;
                     --result-file=*)
                       output=${arg#--result-file=}
                       ;;

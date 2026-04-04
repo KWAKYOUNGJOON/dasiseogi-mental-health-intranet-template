@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@SuppressWarnings("null")
 class MariaDbCompatibilityTest {
     @Container
     static final MariaDBContainer<?> MARIADB = new MariaDBContainer<>("mariadb:11.4");
@@ -201,14 +203,20 @@ class MariaDbCompatibilityTest {
                         ))))
                 .andExpect(status().isOk())
                 .andReturn();
-        return (MockHttpSession) result.getRequest().getSession(false);
+        return (MockHttpSession) Objects.requireNonNull(
+                result.getRequest().getSession(false),
+                "Expected a session after successful login"
+        );
     }
 
     private JsonNode data(String path, MockHttpSession session) throws Exception {
         MvcResult result = mockMvc.perform(get(path).session(session))
                 .andExpect(status().isOk())
                 .andReturn();
-        return objectMapper.readTree(result.getResponse().getContentAsByteArray()).path("data");
+        return Objects.requireNonNull(
+                objectMapper.readTree(result.getResponse().getContentAsByteArray()),
+                "Response body must contain JSON"
+        ).path("data");
     }
 
     private JsonNode findByField(JsonNode arrayNode, String fieldName, String expectedValue) {

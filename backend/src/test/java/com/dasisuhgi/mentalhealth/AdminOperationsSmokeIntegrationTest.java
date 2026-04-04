@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -22,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@SuppressWarnings("null")
 class AdminOperationsSmokeIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
@@ -31,7 +33,10 @@ class AdminOperationsSmokeIntegrationTest {
 
     @Test
     void seededAdminSessionCanSmokeTestAdminOperationsEndpoints() throws Exception {
-        MockHttpSession adminSession = login("admina", "Test1234!");
+        MockHttpSession adminSession = Objects.requireNonNull(
+                login("admina", "Test1234!"),
+                "POST /api/v1/auth/login should create a session for the seeded admin account"
+        );
         assertThat(adminSession)
                 .as("POST /api/v1/auth/login should create a session for the seeded admin account")
                 .isNotNull();
@@ -198,11 +203,19 @@ class AdminOperationsSmokeIntegrationTest {
                         ))))
                 .andExpect(status().isOk())
                 .andReturn();
-        return (MockHttpSession) result.getRequest().getSession(false);
+        Object session = Objects.requireNonNull(
+                result.getRequest().getSession(false),
+                "Expected a session after successful login"
+        );
+        assertThat(session).isInstanceOf(MockHttpSession.class);
+        return (MockHttpSession) session;
     }
 
     private JsonNode body(MvcResult result) throws Exception {
-        return objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        return Objects.requireNonNull(
+                objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8)),
+                "Response body must contain JSON"
+        );
     }
 
     private JsonNode findByField(JsonNode items, String fieldName, String expectedValue) {

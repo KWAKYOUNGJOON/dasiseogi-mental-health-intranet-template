@@ -7,6 +7,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Optional;
 import java.util.Locale;
+import java.util.Objects;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -36,6 +37,7 @@ class SchemaValidationMariaDbTest {
         assertThat(tableExists("session_alerts")).isTrue();
         assertThat(tableExists("activity_logs")).isTrue();
         assertThat(tableExists("backup_histories")).isTrue();
+        assertThat(tableExists("restore_histories")).isTrue();
 
         assertThat(indexExists("clients", "idx_clients_name_birth_date")).isTrue();
         assertThat(indexExists("assessment_sessions", "idx_assessment_sessions_client_date")).isTrue();
@@ -43,6 +45,9 @@ class SchemaValidationMariaDbTest {
         assertThat(indexExists("backup_histories", "idx_backup_histories_backup_type")).isTrue();
         assertThat(indexExists("backup_histories", "idx_backup_histories_status")).isTrue();
         assertThat(indexExists("backup_histories", "idx_backup_histories_started_at")).isTrue();
+        assertThat(indexExists("restore_histories", "idx_restore_histories_status")).isTrue();
+        assertThat(indexExists("restore_histories", "idx_restore_histories_uploaded_at")).isTrue();
+        assertThat(indexExists("restore_histories", "idx_restore_histories_validated_at")).isTrue();
     }
 
     @Test
@@ -101,7 +106,7 @@ class SchemaValidationMariaDbTest {
                 MARIADB.getUsername(),
                 MARIADB.getPassword()
         )) {
-            ScriptUtils.executeSqlScript(connection, new ClassPathResource("schema.sql"));
+            ScriptUtils.executeSqlScript(Objects.requireNonNull(connection, "connection"), new ClassPathResource("schema.sql"));
         }
     }
 
