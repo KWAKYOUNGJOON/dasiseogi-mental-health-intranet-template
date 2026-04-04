@@ -3,15 +3,18 @@ package com.dasisuhgi.mentalhealth.restore.service;
 import com.dasisuhgi.mentalhealth.audit.entity.ActivityActionType;
 import com.dasisuhgi.mentalhealth.audit.entity.ActivityTargetType;
 import com.dasisuhgi.mentalhealth.audit.service.ActivityLogService;
+import com.dasisuhgi.mentalhealth.common.api.PageResponse;
 import com.dasisuhgi.mentalhealth.common.error.AppException;
 import com.dasisuhgi.mentalhealth.common.security.AccessPolicyService;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
 import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreDetectedItemResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreDetailResponse;
+import com.dasisuhgi.mentalhealth.restore.dto.RestoreHistoryListItemResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreUploadResponse;
 import com.dasisuhgi.mentalhealth.restore.entity.RestoreHistory;
 import com.dasisuhgi.mentalhealth.restore.entity.RestoreStatus;
+import com.dasisuhgi.mentalhealth.restore.repository.RestoreHistoryQueryRepository;
 import com.dasisuhgi.mentalhealth.restore.repository.RestoreHistoryRepository;
 import com.dasisuhgi.mentalhealth.user.entity.User;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -23,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -51,6 +55,7 @@ public class RestoreService {
     private static final DateTimeFormatter FILE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private final RestoreHistoryRepository restoreHistoryRepository;
+    private final RestoreHistoryQueryRepository restoreHistoryQueryRepository;
     private final AccessPolicyService accessPolicyService;
     private final ActivityLogService activityLogService;
     private final ObjectMapper objectMapper;
@@ -59,6 +64,7 @@ public class RestoreService {
 
     public RestoreService(
             RestoreHistoryRepository restoreHistoryRepository,
+            RestoreHistoryQueryRepository restoreHistoryQueryRepository,
             AccessPolicyService accessPolicyService,
             ActivityLogService activityLogService,
             ObjectMapper objectMapper,
@@ -66,11 +72,33 @@ public class RestoreService {
             @Value("${app.restore.max-upload-size-bytes:524288000}") long maxUploadSizeBytes
     ) {
         this.restoreHistoryRepository = restoreHistoryRepository;
+        this.restoreHistoryQueryRepository = restoreHistoryQueryRepository;
         this.accessPolicyService = accessPolicyService;
         this.activityLogService = activityLogService;
         this.objectMapper = objectMapper;
         this.restoreRootPath = restoreRootPath;
         this.maxUploadSizeBytes = maxUploadSizeBytes > 0 ? maxUploadSizeBytes : MAX_UPLOAD_SIZE_BYTES;
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<RestoreHistoryListItemResponse> getRestoreHistories(
+            String status,
+            LocalDate dateFrom,
+            LocalDate dateTo,
+            int page,
+            int size,
+            SessionUser sessionUser
+    ) {
+        if (page < 1 || size < 1) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "INVALID_PAGE_REQUEST", "페이지 요청 값을 다시 확인해주세요.");
+        }
+        if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE", "조회 기간을 다시 확인해주세요.");
+        }
+
+        User currentUser = accessPolicyService.getCurrentUser(sessionUser);
+        accessPolicyService.assertAdmin(currentUser);
+        return restoreHistoryQueryRepository.findRestoreHistories(parseRestoreStatus(status), dateFrom, dateTo, page, size);
     }
 
     @Transactional(readOnly = true)
@@ -539,6 +567,17 @@ public class RestoreService {
         String message = exception.getMessage();
         String detailed = exception.getClass().getSimpleName() + (message == null || message.isBlank() ? "" : ": " + message);
         return truncate(detailed, 500);
+    }
+
+    private RestoreStatus parseRestoreStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        try {
+            return RestoreStatus.valueOf(status.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "허용되지 않은 복원 상태입니다.");
+        }
     }
 
     private record ValidationResult(

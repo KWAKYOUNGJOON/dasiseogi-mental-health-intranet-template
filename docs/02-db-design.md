@@ -512,6 +512,7 @@
 - 현재 `restore_histories` 는 실제 복원 실행 전 단계인 업로드/검증 결과만 저장한다.
 - `file_path` 는 서버에 저장된 업로드 ZIP 경로를 보존한다.
 - `format_version`, `datasource_type`, `backup_id` 는 manifest 검증 성공 시 채운다.
+- 관리자 복원 검증 이력 목록 조회 API 는 `status`, `uploaded_at` 날짜 범위 조건과 `uploaded_at DESC`, `id DESC` 정렬을 사용한다.
 - 복원 검증 이력 상세 조회 API 는 기존 row 를 다시 읽고 `file_path` 기준으로 `detectedItems` 를 재계산한다.
 - 실제 restore 실행, 자동 백업, 항목 선택 결과 저장은 다음 단계에서 확장한다.
 

@@ -20,12 +20,12 @@ import com.dasisuhgi.mentalhealth.common.api.ApiResponse;
 import com.dasisuhgi.mentalhealth.common.api.PageResponse;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreDetailResponse;
+import com.dasisuhgi.mentalhealth.restore.dto.RestoreHistoryListItemResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreUploadResponse;
 import com.dasisuhgi.mentalhealth.restore.service.RestoreService;
 import jakarta.servlet.http.HttpSession;
 import java.time.LocalDate;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,6 +34,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
@@ -179,6 +180,19 @@ public class AdminController {
                 request == null ? new ManualBackupRunRequest(null) : request,
                 currentUser
         ));
+    }
+
+    @GetMapping("/restores")
+    public ApiResponse<PageResponse<RestoreHistoryListItemResponse>> getRestoreHistories(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) LocalDate dateFrom,
+            @RequestParam(required = false) LocalDate dateTo,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpSession session
+    ) {
+        SessionUser currentUser = authService.getRequiredSessionUser(session);
+        return ApiResponse.success(restoreService.getRestoreHistories(status, dateFrom, dateTo, page, size, currentUser));
     }
 
     @PostMapping(value = "/restores/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

@@ -1474,7 +1474,62 @@
 
 ---
 
-## 14.5 복원 검증 이력 상세 조회
+## 14.5 복원 검증 이력 목록 조회
+
+### 목적
+관리자가 업로드된 복원 ZIP 검증 이력을 최신순으로 조회하고, 상세 조회 또는 다음 복원 단계로 이동할 대상을 선택한다.
+
+### 요청
+- Method: `GET`
+- Path: `/api/v1/admin/restores`
+- Auth: 필요
+- Role: `ADMIN`
+
+### 쿼리 파라미터
+- `status` (optional, `UPLOADED` / `VALIDATED` / `FAILED`)
+- `dateFrom` (optional, `uploadedAt` 기준)
+- `dateTo` (optional, `uploadedAt` 기준)
+- `page`, `size`
+
+### 처리 규칙
+- `restore_histories` 를 `uploadedAt DESC`, `id DESC` 로 조회한다.
+- 날짜 필터는 `uploadedAt` 기준 날짜 단위 inclusive 조건으로 처리한다.
+- `PageResponse` 패턴을 재사용한다.
+- 목록 item 은 `restoreId`, `status`, `fileName`, `fileSizeBytes`, `uploadedAt`, `validatedAt`, `uploadedByName`, `formatVersion`, `datasourceType`, `backupId`, `failureReason` 을 포함한다.
+- 목록 응답에는 `detectedItems` 를 넣지 않는다.
+- 잘못된 `status`, `page`, `size`, `dateFrom > dateTo` 는 400 에러로 처리한다.
+
+### 성공 응답 예시
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "restoreId": 12,
+        "status": "VALIDATED",
+        "fileName": "backup-20260404-101500-snapshot-full-v1.zip",
+        "fileSizeBytes": 248901,
+        "uploadedAt": "2026-04-04 10:15:58",
+        "validatedAt": "2026-04-04 10:16:02",
+        "uploadedByName": "관리자A",
+        "formatVersion": "FULL_BACKUP_ZIP_V1",
+        "datasourceType": "H2",
+        "backupId": 41,
+        "failureReason": null
+      }
+    ],
+    "page": 1,
+    "size": 20,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}
+```
+
+---
+
+## 14.6 복원 검증 이력 상세 조회
 
 ### 목적
 관리자가 이미 저장된 복원 검증 이력 1건을 다시 열어 메타데이터와 현재 저장 ZIP 기준 복원 가능 항목을 재조회한다.
@@ -1596,6 +1651,7 @@
 - `GET /api/v1/admin/activity-logs`
 - `GET /api/v1/admin/backups`
 - `POST /api/v1/admin/backups/run`
+- `GET /api/v1/admin/restores`
 - `POST /api/v1/admin/restores/upload`
 - `GET /api/v1/admin/restores/{restoreId}`
 
