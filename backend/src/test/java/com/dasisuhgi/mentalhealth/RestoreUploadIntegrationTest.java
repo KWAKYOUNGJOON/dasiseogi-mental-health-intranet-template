@@ -1,5 +1,9 @@
 package com.dasisuhgi.mentalhealth;
 
+import com.dasisuhgi.mentalhealth.audit.entity.ActivityActionType;
+import com.dasisuhgi.mentalhealth.audit.entity.ActivityLog;
+import com.dasisuhgi.mentalhealth.audit.entity.ActivityTargetType;
+import com.dasisuhgi.mentalhealth.audit.repository.ActivityLogRepository;
 import com.dasisuhgi.mentalhealth.restore.entity.RestoreHistory;
 import com.dasisuhgi.mentalhealth.restore.entity.RestoreStatus;
 import com.dasisuhgi.mentalhealth.restore.repository.RestoreHistoryRepository;
@@ -53,6 +57,9 @@ class RestoreUploadIntegrationTest {
 
     @Autowired
     private RestoreHistoryRepository restoreHistoryRepository;
+
+    @Autowired
+    private ActivityLogRepository activityLogRepository;
 
     @Autowired
     private RestoreService restoreService;
@@ -228,6 +235,12 @@ class RestoreUploadIntegrationTest {
             assertThat(history.getDatasourceType()).isEqualTo("H2");
             assertThat(history.getBackupId()).isEqualTo(backupData.path("backupId").asLong());
             assertThat(Path.of(history.getFilePath())).exists();
+
+            ActivityLog log = latestActivityLog(ActivityActionType.RESTORE_UPLOAD);
+            assertThat(log.getTargetType()).isEqualTo(ActivityTargetType.RESTORE);
+            assertThat(log.getTargetId()).isEqualTo(history.getId());
+            assertThat(log.getTargetLabel()).isEqualTo(history.getFileName());
+            assertThat(log.getDescription()).contains("복원 ZIP 업로드 및 검증 성공");
         });
     }
 
@@ -369,6 +382,13 @@ class RestoreUploadIntegrationTest {
     private RestoreHistory latestRestoreHistory() {
         return restoreHistoryRepository.findAll().stream()
                 .max(Comparator.comparing(RestoreHistory::getId))
+                .orElseThrow();
+    }
+
+    private ActivityLog latestActivityLog(ActivityActionType actionType) {
+        return activityLogRepository.findAll().stream()
+                .filter(log -> log.getActionType() == actionType)
+                .max(Comparator.comparing(ActivityLog::getId))
                 .orElseThrow();
     }
 

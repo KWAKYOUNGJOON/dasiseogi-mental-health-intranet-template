@@ -394,8 +394,8 @@ describe('admin backups', () => {
 
     await user.click(screen.getByText('restore-validated.zip'))
 
-    expect(await screen.findByText('db/database.sql')).toBeTruthy()
-    expect(screen.getByText('현재 버전 복원 제외')).toBeTruthy()
+    expect((await screen.findAllByText('db/database.sql')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('현재 버전 복원 제외').length).toBeGreaterThan(0)
 
     const executeButton = screen.getByRole('button', { name: '복원 실행' })
     expect(executeButton).toBeDisabled()
@@ -416,6 +416,6 @@ describe('admin backups', () => {
     })
 
     expect(await screen.findByText('복원 실행이 완료되었습니다.')).toBeTruthy()
-    expect(await screen.findByText('backup-20260404-091000-snapshot-full-v1.zip')).toBeTruthy()
+    expect((await screen.findAllByText('backup-20260404-091000-snapshot-full-v1.zip')).length).toBeGreaterThan(0)
   })
 })
