@@ -8,6 +8,7 @@ import com.dasisuhgi.mentalhealth.common.security.AccessPolicyService;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
 import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreDetectedItemResponse;
+import com.dasisuhgi.mentalhealth.restore.dto.RestoreDetailResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreUploadResponse;
 import com.dasisuhgi.mentalhealth.restore.entity.RestoreHistory;
 import com.dasisuhgi.mentalhealth.restore.entity.RestoreStatus;
@@ -22,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -71,6 +73,36 @@ public class RestoreService {
         this.maxUploadSizeBytes = maxUploadSizeBytes > 0 ? maxUploadSizeBytes : MAX_UPLOAD_SIZE_BYTES;
     }
 
+    @Transactional(readOnly = true)
+    public RestoreDetailResponse getRestoreDetail(Long restoreId, SessionUser sessionUser) {
+        User currentUser = accessPolicyService.getCurrentUser(sessionUser);
+        if (!accessPolicyService.isAdmin(currentUser)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "RESTORE_DETAIL_FORBIDDEN", "복원 검증 이력을 조회할 권한이 없습니다.");
+        }
+
+        RestoreHistory history = restoreHistoryRepository.findById(restoreId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "RESTORE_HISTORY_NOT_FOUND", "복원 검증 이력을 찾을 수 없습니다."));
+
+        List<RestoreDetectedItemResponse> detectedItems = switch (history.getStatus()) {
+            case VALIDATED -> recalculateDetectedItems(history);
+            case FAILED, UPLOADED -> List.of();
+        };
+
+        return new RestoreDetailResponse(
+                history.getId(),
+                history.getStatus().name(),
+                history.getFileName(),
+                history.getUploadedAt(),
+                history.getValidatedAt(),
+                history.getUploadedByNameSnapshot(),
+                history.getFormatVersion(),
+                history.getDatasourceType(),
+                history.getBackupId(),
+                history.getFailureReason(),
+                detectedItems
+        );
+    }
+
     @Transactional(noRollbackFor = Exception.class)
     public RestoreUploadResponse uploadAndValidate(MultipartFile file, SessionUser sessionUser) {
         User currentUser = accessPolicyService.getCurrentUser(sessionUser);
@@ -95,7 +127,7 @@ public class RestoreService {
         restoreHistoryRepository.save(history);
 
         try {
-            ValidationResult validationResult = validateStoredZip(storedFilePath, originalFileName);
+            ValidationResult validationResult = inspectStoredZip(storedFilePath, originalFileName);
             history.setStatus(RestoreStatus.VALIDATED);
             history.setValidatedAt(SeoulDateTimeSupport.now());
             history.setFormatVersion(validationResult.formatVersion());
@@ -183,7 +215,21 @@ public class RestoreService {
         }
     }
 
-    private ValidationResult validateStoredZip(Path storedFilePath, String originalFileName) {
+    private List<RestoreDetectedItemResponse> recalculateDetectedItems(RestoreHistory history) {
+        if (!StringUtils.hasText(history.getFilePath())) {
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "RESTORE_ARCHIVE_UNAVAILABLE", "저장된 복원 ZIP 파일을 사용할 수 없습니다.");
+        }
+
+        try {
+            return inspectStoredZip(Path.of(history.getFilePath()), history.getFileName()).detectedItems();
+        } catch (AppException exception) {
+            throw mapRestoreDetailInspectionException(exception);
+        } catch (RuntimeException exception) {
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "RESTORE_ARCHIVE_UNAVAILABLE", "저장된 복원 ZIP 파일을 사용할 수 없습니다.");
+        }
+    }
+
+    private ValidationResult inspectStoredZip(Path storedFilePath, String originalFileName) {
         if (!originalFileName.toLowerCase(Locale.ROOT).endsWith(".zip")) {
             throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_FILE_INVALID", ".zip 파일만 업로드할 수 있습니다.");
         }
@@ -199,6 +245,7 @@ public class RestoreService {
             ManifestData manifestData = parseManifest(manifestNode);
             validateRequiredStructure(manifestData.entries());
             validateManifestEntries(zipFile, actualEntries, manifestData.entries());
+            validateDatabaseDumpConsistency(manifestData.summary(), manifestData.entries());
 
             return new ValidationResult(
                     manifestData.formatVersion(),
@@ -213,6 +260,13 @@ public class RestoreService {
         } catch (IOException exception) {
             throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_FILE_INVALID", "ZIP 파일을 열 수 없습니다.");
         }
+    }
+
+    private AppException mapRestoreDetailInspectionException(AppException exception) {
+        if ("RESTORE_FILE_INVALID".equals(exception.getErrorCode())) {
+            return new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "RESTORE_ARCHIVE_UNAVAILABLE", "저장된 복원 ZIP 파일을 사용할 수 없습니다.");
+        }
+        return new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "RESTORE_DETAIL_FAILED", "복원 검증 이력 상세 조회에 실패했습니다.");
     }
 
     private Map<String, ZipEntry> indexZipEntries(ZipFile zipFile) {
@@ -243,18 +297,26 @@ public class RestoreService {
 
     private ManifestData parseManifest(JsonNode manifestNode) {
         String formatVersion = requireText(manifestNode, "formatVersion");
-        requireText(manifestNode, "createdAt");
+        requireOffsetDateTime(manifestNode, "createdAt");
         String datasourceType = requireText(manifestNode, "datasourceType");
         requireText(manifestNode, "appVersion");
         long backupId = requireLong(manifestNode, "backupId");
-        requireObject(manifestNode, "executedBy");
+        if (backupId <= 0) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_MANIFEST_INVALID", "manifest 필드가 올바르지 않습니다: backupId");
+        }
+        JsonNode executedByNode = requireObject(manifestNode, "executedBy");
+        requireText(executedByNode, "loginId");
+        requireText(executedByNode, "name");
         requireText(manifestNode, "profile");
         requireText(manifestNode, "environment");
-        requireObject(manifestNode, "summary");
+        ManifestSummaryData summary = parseManifestSummary(requireObject(manifestNode, "summary"), datasourceType);
         JsonNode entriesNode = requireArray(manifestNode, "entries");
 
         if (!FORMAT_VERSION.equals(formatVersion)) {
             throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_MANIFEST_INVALID", "지원하지 않는 백업 포맷 버전입니다.");
+        }
+        if (entriesNode.size() == 0) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_MANIFEST_INVALID", "manifest entries 가 비어 있습니다.");
         }
 
         List<ManifestEntryData> entries = new ArrayList<>();
@@ -276,7 +338,23 @@ public class RestoreService {
             }
             entries.add(new ManifestEntryData(itemType, relativePath, size, sha256.toLowerCase(Locale.ROOT)));
         }
-        return new ManifestData(formatVersion, datasourceType, backupId, entries);
+        return new ManifestData(formatVersion, datasourceType, backupId, summary, entries);
+    }
+
+    private ManifestSummaryData parseManifestSummary(JsonNode summaryNode, String datasourceType) {
+        requireText(summaryNode, "backupType");
+        requireText(summaryNode, "backupMethod");
+        String summaryDatasourceType = requireText(summaryNode, "datasourceType");
+        boolean includesDatabaseDump = requireBoolean(summaryNode, "includesDatabaseDump");
+        requireLong(summaryNode, "userCount");
+        requireLong(summaryNode, "clientCount");
+        requireLong(summaryNode, "sessionCount");
+
+        if (!datasourceType.equals(summaryDatasourceType)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_MANIFEST_INVALID",
+                    "manifest summary.datasourceType 가 상위 datasourceType 과 일치하지 않습니다.");
+        }
+        return new ManifestSummaryData(includesDatabaseDump);
     }
 
     private void validateRequiredStructure(List<ManifestEntryData> entries) {
@@ -314,6 +392,15 @@ public class RestoreService {
                 throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_MANIFEST_INVALID",
                         "manifest entry sha256 이 실제 ZIP 과 일치하지 않습니다: " + manifestEntry.relativePath());
             }
+        }
+    }
+
+    private void validateDatabaseDumpConsistency(ManifestSummaryData summary, List<ManifestEntryData> entries) {
+        boolean hasDatabaseDumpEntry = entries.stream()
+                .anyMatch(entry -> "db/database.sql".equals(entry.relativePath()));
+        if (summary.includesDatabaseDump() != hasDatabaseDumpEntry) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_MANIFEST_INVALID",
+                    "manifest summary.includesDatabaseDump 와 db/database.sql 포함 여부가 일치하지 않습니다.");
         }
     }
 
@@ -390,6 +477,23 @@ public class RestoreService {
         return valueNode.asLong();
     }
 
+    private boolean requireBoolean(JsonNode node, String fieldName) {
+        JsonNode valueNode = node.get(fieldName);
+        if (valueNode == null || !valueNode.isBoolean()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_MANIFEST_INVALID", "manifest 필드가 올바르지 않습니다: " + fieldName);
+        }
+        return valueNode.asBoolean();
+    }
+
+    private OffsetDateTime requireOffsetDateTime(JsonNode node, String fieldName) {
+        String value = requireText(node, fieldName);
+        try {
+            return OffsetDateTime.parse(value);
+        } catch (Exception exception) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_MANIFEST_INVALID", "manifest 필드가 올바르지 않습니다: " + fieldName);
+        }
+    }
+
     private JsonNode requireObject(JsonNode node, String fieldName) {
         JsonNode valueNode = node.get(fieldName);
         if (valueNode == null || !valueNode.isObject()) {
@@ -449,8 +553,12 @@ public class RestoreService {
             String formatVersion,
             String datasourceType,
             Long backupId,
+            ManifestSummaryData summary,
             List<ManifestEntryData> entries
     ) {
+    }
+
+    private record ManifestSummaryData(boolean includesDatabaseDump) {
     }
 
     private record ManifestEntryData(

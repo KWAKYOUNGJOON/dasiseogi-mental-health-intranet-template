@@ -1,13 +1,19 @@
 package com.dasisuhgi.mentalhealth;
 
+import com.dasisuhgi.mentalhealth.audit.entity.ActivityActionType;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -88,6 +94,29 @@ class SchemaValidationMariaDbTest {
         ColumnDefinition userApprovalRequestUserId = columnDefinition("user_approval_requests", "user_id");
         assertThat(userApprovalRequestUserId.dataType()).isEqualTo("bigint");
         assertThat(userApprovalRequestUserId.nullable()).isTrue();
+
+        ColumnDefinition restoreHistoryStatus = columnDefinition("restore_histories", "status");
+        assertThat(restoreHistoryStatus.dataType()).isEqualTo("varchar");
+        assertThat(restoreHistoryStatus.nullable()).isFalse();
+        assertThat(restoreHistoryStatus.characterMaximumLength()).isEqualTo(20L);
+
+        ColumnDefinition restoreHistoryFileName = columnDefinition("restore_histories", "file_name");
+        assertThat(restoreHistoryFileName.dataType()).isEqualTo("varchar");
+        assertThat(restoreHistoryFileName.nullable()).isFalse();
+        assertThat(restoreHistoryFileName.characterMaximumLength()).isEqualTo(255L);
+
+        ColumnDefinition restoreHistoryFilePath = columnDefinition("restore_histories", "file_path");
+        assertThat(restoreHistoryFilePath.dataType()).isEqualTo("varchar");
+        assertThat(restoreHistoryFilePath.nullable()).isFalse();
+        assertThat(restoreHistoryFilePath.characterMaximumLength()).isEqualTo(500L);
+
+        ColumnDefinition restoreHistoryUploadedAt = columnDefinition("restore_histories", "uploaded_at");
+        assertThat(restoreHistoryUploadedAt.dataType()).isEqualTo("datetime");
+        assertThat(restoreHistoryUploadedAt.nullable()).isFalse();
+
+        ColumnDefinition restoreHistoryValidatedAt = columnDefinition("restore_histories", "validated_at");
+        assertThat(restoreHistoryValidatedAt.dataType()).isEqualTo("datetime");
+        assertThat(restoreHistoryValidatedAt.nullable()).isTrue();
     }
 
     @Test
@@ -98,6 +127,24 @@ class SchemaValidationMariaDbTest {
         assertThat(checkClause).isPresent();
         assertThat(normalize(checkClause.orElseThrow())).contains("json_valid");
         assertThat(normalize(checkClause.orElseThrow())).contains("raw_result_snapshot");
+    }
+
+    @Test
+    void schemaSqlKeepsActivityLogActionTypeCheckConstraintInSyncWithEnum() throws Exception {
+        applySchemaSql();
+
+        Optional<String> checkClause = checkConstraintClause("activity_logs", "chk_activity_logs_action_type");
+        assertThat(checkClause).isPresent();
+
+        String normalizedClause = normalize(checkClause.orElseThrow());
+        Set<String> actualAllowedValues = extractQuotedUppercaseTokens(checkClause.orElseThrow());
+        Set<String> expectedValues = Arrays.stream(ActivityActionType.values())
+                .map(Enum::name)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        assertThat(normalizedClause).contains("action_type");
+        assertThat(actualAllowedValues).contains("USER_PROFILE_UPDATE", "USER_POSITION_NAME_CHANGE", "RESTORE_UPLOAD");
+        assertThat(actualAllowedValues).containsExactlyInAnyOrderElementsOf(expectedValues);
     }
 
     private void applySchemaSql() throws Exception {
@@ -214,6 +261,15 @@ class SchemaValidationMariaDbTest {
 
     private String normalize(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private Set<String> extractQuotedUppercaseTokens(String clause) {
+        Set<String> tokens = new LinkedHashSet<>();
+        Matcher matcher = Pattern.compile("'([A-Z_]+)'").matcher(clause == null ? "" : clause);
+        while (matcher.find()) {
+            tokens.add(matcher.group(1));
+        }
+        return tokens;
     }
 
     private record ColumnDefinition(

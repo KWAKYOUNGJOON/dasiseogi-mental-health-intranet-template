@@ -19,6 +19,7 @@ import com.dasisuhgi.mentalhealth.auth.service.AuthService;
 import com.dasisuhgi.mentalhealth.common.api.ApiResponse;
 import com.dasisuhgi.mentalhealth.common.api.PageResponse;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
+import com.dasisuhgi.mentalhealth.restore.dto.RestoreDetailResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreUploadResponse;
 import com.dasisuhgi.mentalhealth.restore.service.RestoreService;
 import jakarta.servlet.http.HttpSession;
@@ -187,5 +188,14 @@ public class AdminController {
     ) {
         SessionUser currentUser = authService.getRequiredSessionUser(session);
         return ApiResponse.success(restoreService.uploadAndValidate(file, currentUser));
+    }
+
+    @GetMapping("/restores/{restoreId}")
+    public ApiResponse<RestoreDetailResponse> getRestoreDetail(
+            @PathVariable Long restoreId,
+            HttpSession session
+    ) {
+        SessionUser currentUser = authService.getRequiredSessionUser(session);
+        return ApiResponse.success(restoreService.getRestoreDetail(restoreId, currentUser));
     }
 }

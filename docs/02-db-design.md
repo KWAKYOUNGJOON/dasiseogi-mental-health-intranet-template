@@ -64,6 +64,7 @@
 ### 3.4 운영 영역
 - `activity_logs` : 주요 기능 사용 로그
 - `backup_histories` : 백업 실행 이력
+- `restore_histories` : 복원 ZIP 업로드 및 검증 이력
 
 ### 3.5 기술 보조 영역
 - `identifier_sequences` : 대상자 번호(`client_no`), 세션 번호(`session_no`) 생성에 사용하는 기술 보조 테이블
@@ -86,7 +87,7 @@
 - 한 개의 검사 세션(`assessment_sessions`)은 여러 개의 척도 결과(`session_scales`)를 가질 수 있다.
 - 한 개의 척도 결과(`session_scales`)는 여러 개의 문항 응답(`session_answers`)을 가진다.
 - 한 개의 세션(`assessment_sessions`)은 여러 개의 경고 기록(`session_alerts`)을 가질 수 있다.
-- 한 명의 사용자(`users`)는 여러 개의 로그(`activity_logs`)와 백업 이력(`backup_histories`)을 생성할 수 있다.
+- 한 명의 사용자(`users`)는 여러 개의 로그(`activity_logs`), 백업 이력(`backup_histories`), 복원 업로드 이력(`restore_histories`)을 생성할 수 있다.
 
 ### 4.2 관계 구조 개념
 - `users 1 : N clients`
@@ -401,11 +402,13 @@
 - `user_name_snapshot` VARCHAR(50) NULL
 - `action_type` VARCHAR(50) NOT NULL
   - `LOGIN`
+  - `USER_PROFILE_UPDATE`
   - `SIGNUP_REQUEST`
   - `SIGNUP_APPROVE`
   - `SIGNUP_REJECT`
   - `USER_ROLE_CHANGE`
   - `USER_STATUS_CHANGE`
+  - `USER_POSITION_NAME_CHANGE`
   - `CLIENT_CREATE`
   - `CLIENT_UPDATE`
   - `CLIENT_MARK_MISREGISTERED`
@@ -414,6 +417,7 @@
   - `PRINT_SESSION`
   - `STATISTICS_EXPORT`
   - `BACKUP_RUN`
+  - `RESTORE_UPLOAD`
 - `target_type` VARCHAR(50) NULL
   - `USER`
   - `SIGNUP_REQUEST`
@@ -421,6 +425,7 @@
   - `SESSION`
   - `STATISTICS`
   - `BACKUP`
+  - `RESTORE`
 - `target_id` BIGINT NULL
 - `target_label` VARCHAR(255) NULL
 - `description` VARCHAR(500) NULL
@@ -472,12 +477,52 @@
 - 수동 백업 실행 응답의 `datasourceType`, `preflightSummary` 는 `ManualBackupRunResponse` 전용 값이며, 현재 이 테이블 컬럼으로 저장하지 않는다.
 
 ### 인덱스
-- 현재 `schema.sql` 기준으로 PK 외 별도 보조 인덱스는 두지 않는다.
+- INDEX `idx_backup_histories_backup_type` (`backup_type`)
+- INDEX `idx_backup_histories_status` (`status`)
+- INDEX `idx_backup_histories_started_at` (`started_at`)
 - 현재 백업 목록 조회는 `backup_type`, `status`, `started_at` 조건과 `started_at DESC`, `id DESC` 정렬을 사용한다.
 
 ---
 
-## 5.10 identifier_sequences
+## 5.10 restore_histories
+
+### 목적
+관리자 복원용 표준 전체 백업 ZIP 업로드 결과와 manifest 검증 상태를 저장한다.
+
+### 주요 컬럼
+- `id` BIGINT PK
+- `status` VARCHAR(20) NOT NULL
+  - `UPLOADED`
+  - `VALIDATED`
+  - `FAILED`
+- `file_name` VARCHAR(255) NOT NULL
+- `file_path` VARCHAR(500) NOT NULL
+- `file_size_bytes` BIGINT NULL
+- `uploaded_at` DATETIME NOT NULL
+- `validated_at` DATETIME NULL
+- `uploaded_by_id` BIGINT NULL FK -> `users.id`
+- `uploaded_by_name_snapshot` VARCHAR(50) NULL
+- `format_version` VARCHAR(50) NULL
+- `datasource_type` VARCHAR(30) NULL
+- `backup_id` BIGINT NULL
+- `failure_reason` VARCHAR(500) NULL
+- `created_at` DATETIME NOT NULL
+
+### 설계 메모
+- 현재 `restore_histories` 는 실제 복원 실행 전 단계인 업로드/검증 결과만 저장한다.
+- `file_path` 는 서버에 저장된 업로드 ZIP 경로를 보존한다.
+- `format_version`, `datasource_type`, `backup_id` 는 manifest 검증 성공 시 채운다.
+- 복원 검증 이력 상세 조회 API 는 기존 row 를 다시 읽고 `file_path` 기준으로 `detectedItems` 를 재계산한다.
+- 실제 restore 실행, 자동 백업, 항목 선택 결과 저장은 다음 단계에서 확장한다.
+
+### 인덱스
+- INDEX `idx_restore_histories_status` (`status`)
+- INDEX `idx_restore_histories_uploaded_at` (`uploaded_at`)
+- INDEX `idx_restore_histories_validated_at` (`validated_at`)
+
+---
+
+## 5.11 identifier_sequences
 
 ### 목적
 업무 도메인 테이블이 사용하는 외부 노출 번호 생성 흐름을 지원하는 기술 보조 테이블이다.
@@ -633,7 +678,12 @@
 - `DB_DUMP`
 - `SNAPSHOT`
 
-### 10.8 경고 유형
+### 10.8 복원 검증 상태
+- `UPLOADED`
+- `VALIDATED`
+- `FAILED`
+
+### 10.9 경고 유형
 - `HIGH_RISK`
 - `CAUTION`
 - `CRITICAL_ITEM`
@@ -655,6 +705,7 @@
 8. `session_alerts`
 9. `activity_logs`
 10. `backup_histories`
+11. `restore_histories`
 
 이 순서를 따르면 FK 의존성 충돌을 줄일 수 있다.
 
@@ -718,6 +769,7 @@
 - 사용자 관리: `users`
 - 로그 확인: `activity_logs`
 - 백업 관리: `backup_histories`
+- 복원 ZIP 업로드 검증: `restore_histories`
 
 ---
 

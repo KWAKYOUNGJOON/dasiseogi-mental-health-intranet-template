@@ -247,11 +247,13 @@ CREATE TABLE IF NOT EXISTS activity_logs (
         CHECK (
             action_type IN (
                 'LOGIN',
+                'USER_PROFILE_UPDATE',
                 'SIGNUP_REQUEST',
                 'SIGNUP_APPROVE',
                 'SIGNUP_REJECT',
                 'USER_ROLE_CHANGE',
                 'USER_STATUS_CHANGE',
+                'USER_POSITION_NAME_CHANGE',
                 'CLIENT_CREATE',
                 'CLIENT_UPDATE',
                 'CLIENT_MARK_MISREGISTERED',

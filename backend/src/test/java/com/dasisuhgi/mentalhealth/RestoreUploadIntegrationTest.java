@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -71,6 +72,31 @@ class RestoreUploadIntegrationTest {
                         .session(session))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("RESTORE_UPLOAD_FORBIDDEN"));
+    }
+
+    @Test
+    void onlyAdminCanViewRestoreDetail() throws Exception {
+        MockHttpSession adminSession = login("admina", "Test1234!");
+        MockHttpSession userSession = login("usera", "Test1234!");
+
+        withTempRestoreRoot(() -> {
+            long restoreId = uploadValidatedRestore(adminSession).path("data").path("restoreId").asLong();
+
+            mockMvc.perform(get("/api/v1/admin/restores/{restoreId}", restoreId)
+                            .session(userSession))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value("RESTORE_DETAIL_FORBIDDEN"));
+        });
+    }
+
+    @Test
+    void returnsNotFoundWhenRestoreHistoryDoesNotExist() throws Exception {
+        MockHttpSession session = login("admina", "Test1234!");
+
+        mockMvc.perform(get("/api/v1/admin/restores/{restoreId}", 999999L)
+                        .session(session))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESTORE_HISTORY_NOT_FOUND"));
     }
 
     @Test
@@ -118,7 +144,7 @@ class RestoreUploadIntegrationTest {
         manifest.put("datasourceType", "H2");
         manifest.put("appVersion", "unknown");
         manifest.put("backupId", 1L);
-        manifest.put("executedBy", Map.of("loginId", "admina"));
+        manifest.put("executedBy", Map.of("loginId", "admina", "name", "관리자A"));
         manifest.put("profile", "test");
         manifest.put("environment", "test");
         // summary omitted
@@ -135,6 +161,35 @@ class RestoreUploadIntegrationTest {
 
             RestoreHistory history = latestRestoreHistory();
             assertThat(history.getStatus()).isEqualTo(RestoreStatus.FAILED);
+        });
+    }
+
+    @Test
+    void returnsValidatedRestoreDetailAndDetectedItemsConsistentWithUploadResponse() throws Exception {
+        MockHttpSession session = login("admina", "Test1234!");
+
+        withTempRestoreRoot(() -> {
+            JsonNode uploadBody = uploadValidatedRestore(session);
+            long restoreId = uploadBody.path("data").path("restoreId").asLong();
+
+            MvcResult detailResult = mockMvc.perform(get("/api/v1/admin/restores/{restoreId}", restoreId)
+                            .session(session))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.restoreId").value(restoreId))
+                    .andExpect(jsonPath("$.data.status").value("VALIDATED"))
+                    .andExpect(jsonPath("$.data.fileName").value(uploadBody.path("data").path("fileName").asText()))
+                    .andExpect(jsonPath("$.data.uploadedAt").isString())
+                    .andExpect(jsonPath("$.data.validatedAt").isString())
+                    .andExpect(jsonPath("$.data.uploadedByName").value("관리자A"))
+                    .andExpect(jsonPath("$.data.formatVersion").value("FULL_BACKUP_ZIP_V1"))
+                    .andExpect(jsonPath("$.data.datasourceType").value("H2"))
+                    .andExpect(jsonPath("$.data.backupId").value(uploadBody.path("data").path("backupId").asLong()))
+                    .andExpect(jsonPath("$.data.failureReason").doesNotExist())
+                    .andReturn();
+
+            JsonNode detailBody = body(detailResult);
+            assertThat(detailBody.path("data").path("detectedItems"))
+                    .isEqualTo(uploadBody.path("data").path("detectedItems"));
         });
     }
 
@@ -177,6 +232,50 @@ class RestoreUploadIntegrationTest {
     }
 
     @Test
+    void returnsFailedRestoreDetailWithFailureReasonAndEmptyDetectedItems() throws Exception {
+        MockHttpSession session = login("admina", "Test1234!");
+        byte[] zipBytes = createZip(Map.of(
+                "config/application.yml", "app: test".getBytes(StandardCharsets.UTF_8)
+        ));
+
+        withTempRestoreRoot(() -> {
+            mockMvc.perform(multipart("/api/v1/admin/restores/upload")
+                            .file(new MockMultipartFile("file", "missing-manifest.zip", "application/zip", zipBytes))
+                            .session(session))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value("RESTORE_MANIFEST_INVALID"));
+
+            RestoreHistory history = latestRestoreHistory();
+
+            mockMvc.perform(get("/api/v1/admin/restores/{restoreId}", history.getId())
+                            .session(session))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.restoreId").value(history.getId()))
+                    .andExpect(jsonPath("$.data.status").value("FAILED"))
+                    .andExpect(jsonPath("$.data.failureReason").value(org.hamcrest.Matchers.containsString("manifest.json")))
+                    .andExpect(jsonPath("$.data.detectedItems").isArray())
+                    .andExpect(jsonPath("$.data.detectedItems").isEmpty());
+        });
+    }
+
+    @Test
+    void failsWhenValidatedRestoreArchiveIsMissingDuringDetailLookup() throws Exception {
+        MockHttpSession session = login("admina", "Test1234!");
+
+        withTempRestoreRoot(() -> {
+            JsonNode uploadBody = uploadValidatedRestore(session);
+            long restoreId = uploadBody.path("data").path("restoreId").asLong();
+            RestoreHistory history = restoreHistoryRepository.findById(restoreId).orElseThrow();
+            Files.delete(Path.of(history.getFilePath()));
+
+            mockMvc.perform(get("/api/v1/admin/restores/{restoreId}", restoreId)
+                            .session(session))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.errorCode").value("RESTORE_ARCHIVE_UNAVAILABLE"));
+        });
+    }
+
+    @Test
     void failsWhenManifestEntriesDoNotMatchActualZipEntries() throws Exception {
         MockHttpSession session = login("admina", "Test1234!");
         Map<String, byte[]> payloadEntries = minimalPayloadEntries();
@@ -197,6 +296,26 @@ class RestoreUploadIntegrationTest {
             RestoreHistory history = latestRestoreHistory();
             assertThat(history.getStatus()).isEqualTo(RestoreStatus.FAILED);
             assertThat(history.getFailureReason()).contains("config/application.yml");
+        });
+    }
+
+    @Test
+    void failsWhenDatabaseDumpFlagDoesNotMatchManifestEntries() throws Exception {
+        MockHttpSession session = login("admina", "Test1234!");
+        Map<String, byte[]> payloadEntries = minimalPayloadEntries();
+        Map<String, Object> manifest = standardManifest(manifestEntries(payloadEntries), true);
+        byte[] zipBytes = createStandardZip(manifest, payloadEntries);
+
+        withTempRestoreRoot(() -> {
+            mockMvc.perform(multipart("/api/v1/admin/restores/upload")
+                            .file(new MockMultipartFile("file", "db-flag-mismatch.zip", "application/zip", zipBytes))
+                            .session(session))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value("RESTORE_MANIFEST_INVALID"));
+
+            RestoreHistory history = latestRestoreHistory();
+            assertThat(history.getStatus()).isEqualTo(RestoreStatus.FAILED);
+            assertThat(history.getFailureReason()).contains("includesDatabaseDump");
         });
     }
 
@@ -227,6 +346,26 @@ class RestoreUploadIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsByteArray());
     }
 
+    private JsonNode uploadValidatedRestore(MockHttpSession session) throws Exception {
+        MvcResult backupRunResult = mockMvc.perform(post("/api/v1/admin/backups/run")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("reason", "restore detail integration test"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode backupData = body(backupRunResult).path("data");
+        byte[] backupZipBytes = Files.readAllBytes(Path.of(backupData.path("filePath").asText()));
+
+        MvcResult uploadResult = mockMvc.perform(multipart("/api/v1/admin/restores/upload")
+                        .file(new MockMultipartFile("file", backupData.path("fileName").asText(), "application/zip", backupZipBytes))
+                        .session(session))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return body(uploadResult);
+    }
+
     private RestoreHistory latestRestoreHistory() {
         return restoreHistoryRepository.findAll().stream()
                 .max(Comparator.comparing(RestoreHistory::getId))
@@ -243,6 +382,10 @@ class RestoreUploadIntegrationTest {
     }
 
     private Map<String, Object> standardManifest(List<Map<String, Object>> entries) {
+        return standardManifest(entries, false);
+    }
+
+    private Map<String, Object> standardManifest(List<Map<String, Object>> entries, boolean includesDatabaseDump) {
         Map<String, Object> manifest = new LinkedHashMap<>();
         manifest.put("formatVersion", "FULL_BACKUP_ZIP_V1");
         manifest.put("createdAt", "2026-04-04T12:00:00+09:00");
@@ -252,7 +395,16 @@ class RestoreUploadIntegrationTest {
         manifest.put("executedBy", Map.of("loginId", "admina", "name", "관리자A"));
         manifest.put("profile", "test");
         manifest.put("environment", "test");
-        manifest.put("summary", Map.of("backupMethod", "SNAPSHOT"));
+        manifest.put("summary", Map.of(
+                "backupType", "MANUAL",
+                "backupMethod", includesDatabaseDump ? "DB_DUMP" : "SNAPSHOT",
+                "datasourceType", "H2",
+                "includesDatabaseDump", includesDatabaseDump,
+                "userCount", 3,
+                "clientCount", 2,
+                "sessionCount", 1,
+                "reason", "restore validation test"
+        ));
         manifest.put("entries", entries);
         return manifest;
     }

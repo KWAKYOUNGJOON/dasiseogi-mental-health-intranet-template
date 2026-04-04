@@ -122,6 +122,7 @@
 - 모든 대상자 오등록 / 세션 오입력 상태 변경 가능
 - 로그 조회 가능
 - 백업 조회 및 수동 백업 가능
+- 표준 전체 백업 ZIP 복원 업로드 및 서버 검증 가능
 - 통계 엑셀 내보내기 가능
 
 ---
@@ -177,7 +178,7 @@
 6. 검사 세션 저장/조회 API
 7. 검사기록 목록 API
 8. 통계 API
-9. 관리자 운영 API(로그/백업)
+9. 관리자 운영 API(로그/백업/복원 검증)
 
 ---
 
@@ -1391,9 +1392,154 @@
     "datasourceType": "MARIADB",
     "preflightSummary": "datasource=MARIADB, preferred=DB_DUMP, dumpCommand=mariadb-dump, dumpAvailable=true, fallback=-",
     "status": "SUCCESS",
-    "fileName": "backup-20260329-090500-db-dump.sql",
-    "filePath": "D:/backup/backup-20260329-090500-db-dump.sql"
+    "fileName": "backup-20260329-090500-db-dump-full-v1.zip",
+    "filePath": "D:/backup/backup-20260329-090500-db-dump-full-v1.zip"
   }
+}
+```
+
+---
+
+## 14.4 복원용 전체 백업 ZIP 업로드 및 검증
+
+### 목적
+관리자가 표준 전체 백업 ZIP v1 파일을 업로드하고, 서버가 ZIP/manifest/엔트리 무결성을 검증한 뒤 복원 후보 항목을 반환한다.
+
+### 요청
+- Method: `POST`
+- Path: `/api/v1/admin/restores/upload`
+- Auth: 필요
+- Role: `ADMIN`
+- Content-Type: `multipart/form-data`
+- Part name: `file`
+
+### 처리 규칙
+- `.zip` 확장자와 실제 ZIP 열기 가능 여부를 함께 검증한다.
+- 최대 업로드 크기는 500MB 이다.
+- 암호화 ZIP 은 지원하지 않는다.
+- 루트 `manifest.json` 이 반드시 있어야 한다.
+- `manifest.json` 은 현재 표준 전체 백업 ZIP v1 생성 구조(`formatVersion`, `createdAt`, `datasourceType`, `appVersion`, `backupId`, `executedBy`, `profile`, `environment`, `summary`, `entries`)를 기준으로 검증한다.
+- `entries[*].relativePath`, `size`, `sha256` 와 실제 ZIP 엔트리 내용을 대조한다.
+- `config/application.yml`, `config/application-prod.yml`, `scales/**`, `metadata/summary.json` 이 빠지면 실패한다.
+- `db/database.sql` 은 선택 항목이다.
+- 검증 결과는 `restore_histories` 에 저장한다.
+- 성공/실패 모두 activity log 적재 대상이다.
+
+### 성공 응답 예시
+```json
+{
+  "success": true,
+  "data": {
+    "restoreId": 12,
+    "status": "VALIDATED",
+    "fileName": "backup-20260404-101500-snapshot-full-v1.zip",
+    "validatedAt": "2026-04-04T10:16:02",
+    "formatVersion": "FULL_BACKUP_ZIP_V1",
+    "datasourceType": "H2",
+    "backupId": 41,
+    "detectedItems": [
+      {
+        "itemType": "CONFIG",
+        "relativePaths": [
+          "config/application-prod.yml",
+          "config/application.yml"
+        ]
+      },
+      {
+        "itemType": "SCALES",
+        "relativePaths": [
+          "scales/common/scale-registry.json",
+          "scales/phq9.json"
+        ]
+      },
+      {
+        "itemType": "METADATA",
+        "relativePaths": [
+          "metadata/summary.json"
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 실패 응답 예시
+```json
+{
+  "success": false,
+  "message": "manifest.json 파일이 없습니다.",
+  "errorCode": "RESTORE_MANIFEST_INVALID"
+}
+```
+
+---
+
+## 14.5 복원 검증 이력 상세 조회
+
+### 목적
+관리자가 이미 저장된 복원 검증 이력 1건을 다시 열어 메타데이터와 현재 저장 ZIP 기준 복원 가능 항목을 재조회한다.
+
+### 요청
+- Method: `GET`
+- Path: `/api/v1/admin/restores/{restoreId}`
+- Auth: 필요
+- Role: `ADMIN`
+
+### 처리 규칙
+- `restore_histories` 기존 row 1건만 조회하며, 새 row 를 만들지 않는다.
+- `VALIDATED` 상태면 서버 저장 ZIP 을 다시 읽고 기존 upload 검증과 동일한 기준으로 `detectedItems` 를 재계산한다.
+- `FAILED` 상태면 저장된 `failureReason` 을 반환하고 `detectedItems` 는 빈 배열이다.
+- `UPLOADED` 상태면 아직 검증 완료 전이므로 `detectedItems` 는 빈 배열이다.
+- `VALIDATED` 상태인데 저장 ZIP 파일이 사라졌거나 열 수 없으면 실패한다.
+- 상세 조회 때문에 상태값은 바꾸지 않는다.
+
+### 성공 응답 예시
+```json
+{
+  "success": true,
+  "data": {
+    "restoreId": 12,
+    "status": "VALIDATED",
+    "fileName": "backup-20260404-101500-snapshot-full-v1.zip",
+    "uploadedAt": "2026-04-04T10:15:58",
+    "validatedAt": "2026-04-04T10:16:02",
+    "uploadedByName": "관리자A",
+    "formatVersion": "FULL_BACKUP_ZIP_V1",
+    "datasourceType": "H2",
+    "backupId": 41,
+    "failureReason": null,
+    "detectedItems": [
+      {
+        "itemType": "CONFIG",
+        "relativePaths": [
+          "config/application-prod.yml",
+          "config/application.yml"
+        ]
+      },
+      {
+        "itemType": "SCALES",
+        "relativePaths": [
+          "scales/common/scale-registry.json",
+          "scales/phq9.json"
+        ]
+      },
+      {
+        "itemType": "METADATA",
+        "relativePaths": [
+          "metadata/summary.json"
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 실패 응답 예시
+```json
+{
+  "success": false,
+  "message": "저장된 복원 ZIP 파일을 사용할 수 없습니다.",
+  "errorCode": "RESTORE_ARCHIVE_UNAVAILABLE"
 }
 ```
 
@@ -1450,6 +1596,8 @@
 - `GET /api/v1/admin/activity-logs`
 - `GET /api/v1/admin/backups`
 - `POST /api/v1/admin/backups/run`
+- `POST /api/v1/admin/restores/upload`
+- `GET /api/v1/admin/restores/{restoreId}`
 
 ## 15.10 운영 점검
 - `GET /api/v1/health`
@@ -1481,13 +1629,21 @@
 - `SCALE_DUPLICATED`
 - `INVALID_SCALE_CODE`
 - `PRINT_NOT_ALLOWED`
+- `RESTORE_UPLOAD_FORBIDDEN`
+- `RESTORE_FILE_INVALID`
+- `RESTORE_MANIFEST_INVALID`
+- `RESTORE_UPLOAD_FAILED`
+- `RESTORE_DETAIL_FORBIDDEN`
+- `RESTORE_HISTORY_NOT_FOUND`
+- `RESTORE_ARCHIVE_UNAVAILABLE`
+- `RESTORE_DETAIL_FAILED`
 
 ## 16.3 권한 예외 기준
 - 대상자 수정: 작성자 또는 관리자만 가능
 - 대상자 오등록 처리: 작성자 또는 관리자만 가능
 - 세션 오입력 처리: 작성자 또는 관리자만 가능
 - 오등록/오입력 포함 조회: 관리자 또는 작성자만 가능
-- 사용자 관리/승인/로그/백업: 관리자만 가능
+- 사용자 관리/승인/로그/백업/복원 업로드 검증/복원 검증 이력 상세 조회: 관리자만 가능
 - 통계 CSV 내보내기: 관리자만 가능
 
 ---
@@ -1524,6 +1680,7 @@
 - 출력 데이터 조회
 - 통계 엑셀 내보내기
 - 수동 백업 실행
+- 복원 ZIP 업로드 및 검증
 
 ---
 
