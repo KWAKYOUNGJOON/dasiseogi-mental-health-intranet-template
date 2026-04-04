@@ -2,11 +2,21 @@ import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
 import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 
-export const RESTORE_STATUS_OPTIONS = ['UPLOADED', 'VALIDATED', 'FAILED'] as const
+export const RESTORE_STATUS_OPTIONS = [
+  'UPLOADED',
+  'VALIDATED',
+  'PRE_BACKUP_RUNNING',
+  'PRE_BACKUP_FAILED',
+  'RESTORING',
+  'SUCCESS',
+  'FAILED',
+] as const
 export const RESTORE_DETECTED_ITEM_TYPES = ['DATABASE', 'CONFIG', 'SCALES', 'METADATA'] as const
+export const RESTORE_EXECUTABLE_ITEM_TYPES = ['DATABASE'] as const
 
 export type RestoreStatus = (typeof RESTORE_STATUS_OPTIONS)[number]
 export type RestoreDetectedItemType = (typeof RESTORE_DETECTED_ITEM_TYPES)[number]
+export type RestoreExecutableItemType = (typeof RESTORE_EXECUTABLE_ITEM_TYPES)[number]
 
 interface RestoreHistoryListItemResponse {
   restoreId: number
@@ -41,10 +51,14 @@ interface RestoreDetailResponse {
   fileName: string | null
   uploadedAt: string
   validatedAt: string | null
+  executedAt: string | null
   uploadedByName: string | null
   formatVersion: string | null
   datasourceType: string | null
   backupId: number | null
+  selectedItemTypes: string[] | null
+  preBackupId: number | null
+  preBackupFileName: string | null
   failureReason: string | null
   detectedItems: RestoreDetectedItemResponse[]
 }
@@ -58,6 +72,17 @@ interface RestoreUploadResponse {
   datasourceType: string | null
   backupId: number | null
   detectedItems: RestoreDetectedItemResponse[]
+  failureReason: string | null
+}
+
+interface RestoreExecuteResponse {
+  restoreId: number
+  status: RestoreStatus
+  executedAt: string | null
+  selectedItemTypes: string[] | null
+  preBackupId: number | null
+  preBackupFileName: string | null
+  message: string | null
   failureReason: string | null
 }
 
@@ -99,10 +124,14 @@ export interface RestoreDetail {
   fileName: string
   uploadedAt: string
   validatedAt: string
+  executedAt: string
   uploadedByName: string
   formatVersion: string
   datasourceType: string
   backupId: number | null
+  selectedItemTypes: string[]
+  preBackupId: number | null
+  preBackupFileName: string
   failureReason: string
   detectedItems: RestoreDetectedItem[]
 }
@@ -119,9 +148,29 @@ export interface RestoreUploadResult {
   failureReason: string
 }
 
+export interface RestoreExecuteParams {
+  selectedItemTypes: string[]
+  confirmationText: string
+}
+
+export interface RestoreExecuteResult {
+  restoreId: number
+  status: RestoreStatus
+  executedAt: string
+  selectedItemTypes: string[]
+  preBackupId: number | null
+  preBackupFileName: string
+  message: string
+  failureReason: string
+}
+
 function normalizeText(value: string | null | undefined) {
   const trimmed = value?.trim()
   return trimmed ? trimmed : '-'
+}
+
+function normalizeArray(values: string[] | null | undefined) {
+  return (values ?? []).map((value) => value.trim()).filter(Boolean)
 }
 
 function formatFileSize(fileSizeBytes: number | null) {
@@ -177,10 +226,14 @@ function mapRestoreDetail(response: RestoreDetailResponse): RestoreDetail {
     fileName: normalizeText(response.fileName),
     uploadedAt: normalizeText(formatSeoulDateTimeText(response.uploadedAt)),
     validatedAt: normalizeText(formatSeoulDateTimeText(response.validatedAt)),
+    executedAt: normalizeText(formatSeoulDateTimeText(response.executedAt)),
     uploadedByName: normalizeText(response.uploadedByName),
     formatVersion: normalizeText(response.formatVersion),
     datasourceType: normalizeText(response.datasourceType),
     backupId: response.backupId ?? null,
+    selectedItemTypes: normalizeArray(response.selectedItemTypes),
+    preBackupId: response.preBackupId ?? null,
+    preBackupFileName: normalizeText(response.preBackupFileName),
     failureReason: normalizeText(response.failureReason),
     detectedItems: response.detectedItems.map(mapDetectedItem),
   }
@@ -196,6 +249,19 @@ function mapRestoreUploadResult(response: RestoreUploadResponse): RestoreUploadR
     datasourceType: normalizeText(response.datasourceType),
     backupId: response.backupId ?? null,
     detectedItems: response.detectedItems.map(mapDetectedItem),
+    failureReason: normalizeText(response.failureReason),
+  }
+}
+
+function mapRestoreExecuteResult(response: RestoreExecuteResponse): RestoreExecuteResult {
+  return {
+    restoreId: response.restoreId,
+    status: response.status,
+    executedAt: normalizeText(formatSeoulDateTimeText(response.executedAt)),
+    selectedItemTypes: normalizeArray(response.selectedItemTypes),
+    preBackupId: response.preBackupId ?? null,
+    preBackupFileName: normalizeText(response.preBackupFileName),
+    message: normalizeText(response.message),
     failureReason: normalizeText(response.failureReason),
   }
 }
@@ -216,4 +282,9 @@ export async function uploadRestoreZip(file: File) {
 
   const response = await http.post<ApiResponse<RestoreUploadResponse>>('/admin/restores/upload', formData)
   return mapRestoreUploadResult(response.data.data)
+}
+
+export async function executeRestore(restoreId: number, payload: RestoreExecuteParams) {
+  const response = await http.post<ApiResponse<RestoreExecuteResponse>>(`/admin/restores/${restoreId}/execute`, payload)
+  return mapRestoreExecuteResult(response.data.data)
 }

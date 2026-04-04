@@ -17,5 +17,6 @@ public enum ActivityActionType {
     PRINT_SESSION,
     STATISTICS_EXPORT,
     BACKUP_RUN,
-    RESTORE_UPLOAD
+    RESTORE_UPLOAD,
+    RESTORE_EXECUTE
 }

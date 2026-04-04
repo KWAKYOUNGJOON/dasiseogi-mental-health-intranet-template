@@ -48,6 +48,8 @@ app:
   restore:
     root-path: ./tmp/restores
     max-upload-size-bytes: 524288000
+    db-import-command:
+    db-import-timeout-seconds: 60
   security:
     trust-proxy-headers: false
   seed:

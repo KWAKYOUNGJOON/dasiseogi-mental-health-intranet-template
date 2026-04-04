@@ -17,6 +17,15 @@ vi.mock('../src/features/admin/api/backupManagementApi', () => ({
   runManualBackup: vi.fn(),
 }))
 
+vi.mock('../src/features/admin/api/restoreManagementApi', () => ({
+  RESTORE_DETECTED_ITEM_TYPES: ['DATABASE', 'CONFIG', 'SCALES', 'METADATA'],
+  RESTORE_EXECUTABLE_ITEM_TYPES: ['DATABASE'],
+  fetchRestoreHistoryPage: vi.fn(),
+  fetchRestoreDetail: vi.fn(),
+  uploadRestoreZip: vi.fn(),
+  executeRestore: vi.fn(),
+}))
+
 vi.mock('../src/pages/clients/ClientListPage', () => ({
   ClientListPage: () => <div>대상자 목록 화면</div>,
 }))
@@ -28,10 +37,18 @@ import {
   fetchLatestBackupHistory,
   runManualBackup,
 } from '../src/features/admin/api/backupManagementApi'
+import {
+  executeRestore,
+  fetchRestoreDetail,
+  fetchRestoreHistoryPage,
+} from '../src/features/admin/api/restoreManagementApi'
 
 const mockedFetchBackupHistoryPage = vi.mocked(fetchBackupHistoryPage)
 const mockedFetchLatestBackupHistory = vi.mocked(fetchLatestBackupHistory)
 const mockedRunManualBackup = vi.mocked(runManualBackup)
+const mockedFetchRestoreHistoryPage = vi.mocked(fetchRestoreHistoryPage)
+const mockedFetchRestoreDetail = vi.mocked(fetchRestoreDetail)
+const mockedExecuteRestore = vi.mocked(executeRestore)
 
 function createAdminUser(role: 'ADMIN' | 'USER' = 'ADMIN') {
   return {
@@ -79,6 +96,67 @@ function createBackupHistoryPage(
   }
 }
 
+function createRestoreHistoryItem(
+  overrides?: Partial<Awaited<ReturnType<typeof fetchRestoreHistoryPage>>['items'][number]>,
+) {
+  return {
+    id: 71,
+    status: 'VALIDATED' as const,
+    fileName: 'restore-validated.zip',
+    fileSizeLabel: '2.0 MB',
+    uploadedAt: '2026-04-04 09:00',
+    validatedAt: '2026-04-04 09:05',
+    uploadedByName: '관리자',
+    formatVersion: 'FULL_BACKUP_ZIP_V1',
+    datasourceType: 'MYSQL',
+    backupId: 9001,
+    failureReason: '-',
+    ...overrides,
+  }
+}
+
+function createRestoreHistoryPage(
+  items: Array<ReturnType<typeof createRestoreHistoryItem>>,
+  overrides?: Partial<Awaited<ReturnType<typeof fetchRestoreHistoryPage>>>,
+) {
+  return {
+    items,
+    page: 1,
+    size: 20,
+    totalItems: items.length,
+    totalPages: items.length > 0 ? 1 : 0,
+    ...overrides,
+  }
+}
+
+function createRestoreDetail(
+  overrides?: Partial<Awaited<ReturnType<typeof fetchRestoreDetail>>>,
+) {
+  return {
+    id: 71,
+    status: 'VALIDATED' as const,
+    fileName: 'restore-validated.zip',
+    uploadedAt: '2026-04-04 09:00',
+    validatedAt: '2026-04-04 09:05',
+    executedAt: '-',
+    uploadedByName: '관리자',
+    formatVersion: 'FULL_BACKUP_ZIP_V1',
+    datasourceType: 'MYSQL',
+    backupId: 9001,
+    selectedItemTypes: [],
+    preBackupId: null,
+    preBackupFileName: '-',
+    failureReason: '-',
+    detectedItems: [
+      { itemType: 'DATABASE', relativePaths: ['db/database.sql'] },
+      { itemType: 'CONFIG', relativePaths: ['config/application.yml'] },
+      { itemType: 'SCALES', relativePaths: ['scales/test-scale.json'] },
+      { itemType: 'METADATA', relativePaths: ['metadata/summary.json'] },
+    ],
+    ...overrides,
+  }
+}
+
 function renderAdminBackupsPage() {
   return render(
     <MemoryRouter>
@@ -98,6 +176,10 @@ beforeEach(() => {
   mockedFetchBackupHistoryPage.mockReset()
   mockedFetchLatestBackupHistory.mockReset()
   mockedRunManualBackup.mockReset()
+  mockedFetchRestoreHistoryPage.mockReset()
+  mockedFetchRestoreDetail.mockReset()
+  mockedExecuteRestore.mockReset()
+  mockedFetchRestoreHistoryPage.mockResolvedValue(createRestoreHistoryPage([]))
 })
 
 afterEach(() => {
@@ -274,5 +356,66 @@ describe('admin backups', () => {
 
     expect(await screen.findByText('대상자 목록 화면')).toBeTruthy()
     expect(mockedFetchBackupHistoryPage).not.toHaveBeenCalled()
+  })
+
+  it('executes restore through the existing preparation block and reloads list/detail', async () => {
+    const user = userEvent.setup()
+
+    mockedFetchBackupHistoryPage.mockResolvedValue(createBackupHistoryPage([createBackupHistoryItem()]))
+    mockedFetchLatestBackupHistory.mockResolvedValue(createBackupHistoryItem())
+    mockedFetchRestoreHistoryPage
+      .mockResolvedValueOnce(createRestoreHistoryPage([createRestoreHistoryItem()]))
+      .mockResolvedValueOnce(createRestoreHistoryPage([createRestoreHistoryItem({ status: 'SUCCESS' as const })]))
+    mockedFetchRestoreDetail
+      .mockResolvedValueOnce(createRestoreDetail())
+      .mockResolvedValueOnce(
+        createRestoreDetail({
+          status: 'SUCCESS' as const,
+          executedAt: '2026-04-04 09:10',
+          selectedItemTypes: ['DATABASE'],
+          preBackupId: 8001,
+          preBackupFileName: 'backup-20260404-091000-snapshot-full-v1.zip',
+        }),
+      )
+    mockedExecuteRestore.mockResolvedValue({
+      restoreId: 71,
+      status: 'SUCCESS',
+      executedAt: '2026-04-04 09:10',
+      selectedItemTypes: ['DATABASE'],
+      preBackupId: 8001,
+      preBackupFileName: 'backup-20260404-091000-snapshot-full-v1.zip',
+      message: '복원 실행이 완료되었습니다.',
+      failureReason: '-',
+    })
+
+    renderAdminBackupsPage()
+
+    await screen.findByText('restore-validated.zip')
+
+    await user.click(screen.getByText('restore-validated.zip'))
+
+    expect(await screen.findByText('db/database.sql')).toBeTruthy()
+    expect(screen.getByText('현재 버전 복원 제외')).toBeTruthy()
+
+    const executeButton = screen.getByRole('button', { name: '복원 실행' })
+    expect(executeButton).toBeDisabled()
+
+    await user.type(screen.getByLabelText('복원 실행 확인 문구'), '전체 복원을 실행합니다')
+    expect(screen.getByRole('button', { name: '복원 실행' })).toBeEnabled()
+    await user.click(executeButton)
+
+    await waitFor(() => {
+      expect(mockedExecuteRestore).toHaveBeenCalledWith(71, {
+        selectedItemTypes: ['DATABASE'],
+        confirmationText: '전체 복원을 실행합니다',
+      })
+    })
+    await waitFor(() => {
+      expect(mockedFetchRestoreHistoryPage).toHaveBeenCalledTimes(2)
+      expect(mockedFetchRestoreDetail).toHaveBeenCalledTimes(2)
+    })
+
+    expect(await screen.findByText('복원 실행이 완료되었습니다.')).toBeTruthy()
+    expect(await screen.findByText('backup-20260404-091000-snapshot-full-v1.zip')).toBeTruthy()
   })
 })

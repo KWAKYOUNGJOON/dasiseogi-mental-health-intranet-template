@@ -766,7 +766,7 @@ class CoreWorkflowIntegrationTest {
         mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}", sessionId).session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.scales[0].totalScore").value(18))
-                .andExpect(jsonPath("$.data.scales[0].resultLevel").value("주의 필요"))
+                .andExpect(jsonPath("$.data.scales[0].resultLevel").value("정상"))
                 .andExpect(jsonPath("$.data.scales[0].alerts.length()").value(1))
                 .andExpect(jsonPath("$.data.scales[0].alerts[0].alertCode").value("IESR_TOTAL_18"));
     }
@@ -790,7 +790,57 @@ class CoreWorkflowIntegrationTest {
         mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}", sessionId).session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.scales[0].totalScore").value(25))
-                .andExpect(jsonPath("$.data.scales[0].resultLevel").value("고위험 의심"))
+                .andExpect(jsonPath("$.data.scales[0].resultLevel").value("약간 충격"))
+                .andExpect(jsonPath("$.data.scales[0].alerts.length()").value(2))
+                .andExpect(jsonPath("$.data.scales[0].alerts[0].alertCode").value("IESR_TOTAL_18"))
+                .andExpect(jsonPath("$.data.scales[0].alerts[1].alertCode").value("IESR_TOTAL_25"));
+    }
+
+    @Test
+    void saveIesrSessionUsesSevereImpactRangeAt40() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+        Client client = findClient("김대상", LocalDate.of(1982, 7, 13));
+
+        MvcResult saveResult = mockMvc.perform(post("/api/v1/assessment-sessions")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(sessionSaveRequest(client.getId(), "IES-R 심한 충격", List.of(
+                                scaleRequest("IESR", "4", "4", "4", "4", "4", "4", "4", "4", "4", "4", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0")
+                        )))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        long sessionId = body(saveResult).path("data").path("sessionId").asLong();
+
+        mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}", sessionId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scales[0].totalScore").value(40))
+                .andExpect(jsonPath("$.data.scales[0].resultLevel").value("심한 충격"))
+                .andExpect(jsonPath("$.data.scales[0].alerts.length()").value(2))
+                .andExpect(jsonPath("$.data.scales[0].alerts[0].alertCode").value("IESR_TOTAL_18"))
+                .andExpect(jsonPath("$.data.scales[0].alerts[1].alertCode").value("IESR_TOTAL_25"));
+    }
+
+    @Test
+    void saveIesrSessionUsesVerySevereImpactRangeAt60() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+        Client client = findClient("김대상", LocalDate.of(1982, 7, 13));
+
+        MvcResult saveResult = mockMvc.perform(post("/api/v1/assessment-sessions")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(sessionSaveRequest(client.getId(), "IES-R 매우 심한 충격", List.of(
+                                scaleRequest("IESR", "4", "4", "4", "4", "4", "4", "4", "4", "4", "4", "4", "4", "4", "4", "4", "0", "0", "0", "0", "0", "0", "0")
+                        )))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        long sessionId = body(saveResult).path("data").path("sessionId").asLong();
+
+        mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}", sessionId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scales[0].totalScore").value(60))
+                .andExpect(jsonPath("$.data.scales[0].resultLevel").value("매우 심한 충격"))
                 .andExpect(jsonPath("$.data.scales[0].alerts.length()").value(2))
                 .andExpect(jsonPath("$.data.scales[0].alerts[0].alertCode").value("IESR_TOTAL_18"))
                 .andExpect(jsonPath("$.data.scales[0].alerts[1].alertCode").value("IESR_TOTAL_25"));
@@ -820,6 +870,76 @@ class CoreWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.scales[0].alerts[0].alertCode").value("KMDQ_POSITIVE"))
                 .andExpect(jsonPath("$.data.scales[0].answers[13].answerValue").value("N"))
                 .andExpect(jsonPath("$.data.scales[0].answers[14].answerValue").value("NONE"));
+    }
+
+    @Test
+    void saveKmdqSessionRequiresSamePeriodAnswerWhenTwoOrMoreSymptomsAreYes() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+        Client client = findClient("김대상", LocalDate.of(1982, 7, 13));
+
+        mockMvc.perform(post("/api/v1/assessment-sessions")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(sessionSaveRequest(client.getId(), "K-MDQ 조건부 문항", List.of(
+                                scaleRequestWithAnswers("KMDQ", List.of(
+                                        answer(1, "Y"),
+                                        answer(2, "Y"),
+                                        answer(3, "N"),
+                                        answer(4, "N"),
+                                        answer(5, "N"),
+                                        answer(6, "N"),
+                                        answer(7, "N"),
+                                        answer(8, "N"),
+                                        answer(9, "N"),
+                                        answer(10, "N"),
+                                        answer(11, "N"),
+                                        answer(12, "N"),
+                                        answer(13, "N")
+                                ))
+                        )))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("ANSWER_INCOMPLETE"));
+    }
+
+    @Test
+    void saveKmdqSessionAllowsOmittingImpairmentWithoutAffectingScore() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+        Client client = findClient("김대상", LocalDate.of(1982, 7, 13));
+
+        MvcResult saveResult = mockMvc.perform(post("/api/v1/assessment-sessions")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(sessionSaveRequest(client.getId(), "K-MDQ 기능손상 선택 응답", List.of(
+                                scaleRequestWithAnswers("KMDQ", List.of(
+                                        answer(1, "Y"),
+                                        answer(2, "Y"),
+                                        answer(3, "Y"),
+                                        answer(4, "Y"),
+                                        answer(5, "Y"),
+                                        answer(6, "Y"),
+                                        answer(7, "Y"),
+                                        answer(8, "N"),
+                                        answer(9, "N"),
+                                        answer(10, "N"),
+                                        answer(11, "N"),
+                                        answer(12, "N"),
+                                        answer(13, "N"),
+                                        answer(14, "Y")
+                                ))
+                        )))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        long sessionId = body(saveResult).path("data").path("sessionId").asLong();
+
+        mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}", sessionId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scales[0].scaleCode").value("KMDQ"))
+                .andExpect(jsonPath("$.data.scales[0].totalScore").value(7))
+                .andExpect(jsonPath("$.data.scales[0].resultLevel").value("양성 의심"))
+                .andExpect(jsonPath("$.data.scales[0].answers.length()").value(14))
+                .andExpect(jsonPath("$.data.scales[0].answers[13].questionNo").value(14))
+                .andExpect(jsonPath("$.data.scales[0].alerts[0].alertCode").value("KMDQ_POSITIVE"));
     }
 
     @Test
@@ -1929,6 +2049,10 @@ class CoreWorkflowIntegrationTest {
             answers.add(answer(index + 1, answerValues[index]));
         }
 
+        return scaleRequestWithAnswers(scaleCode, answers);
+    }
+
+    private Map<String, Object> scaleRequestWithAnswers(String scaleCode, List<Map<String, Object>> answers) {
         Map<String, Object> scale = new LinkedHashMap<>();
         scale.put("scaleCode", scaleCode);
         scale.put("answers", answers);

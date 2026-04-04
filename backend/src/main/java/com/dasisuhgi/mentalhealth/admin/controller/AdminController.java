@@ -20,6 +20,8 @@ import com.dasisuhgi.mentalhealth.common.api.ApiResponse;
 import com.dasisuhgi.mentalhealth.common.api.PageResponse;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreDetailResponse;
+import com.dasisuhgi.mentalhealth.restore.dto.RestoreExecuteRequest;
+import com.dasisuhgi.mentalhealth.restore.dto.RestoreExecuteResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreHistoryListItemResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreUploadResponse;
 import com.dasisuhgi.mentalhealth.restore.service.RestoreService;
@@ -211,5 +213,19 @@ public class AdminController {
     ) {
         SessionUser currentUser = authService.getRequiredSessionUser(session);
         return ApiResponse.success(restoreService.getRestoreDetail(restoreId, currentUser));
+    }
+
+    @PostMapping("/restores/{restoreId}/execute")
+    public ApiResponse<RestoreExecuteResponse> executeRestore(
+            @PathVariable Long restoreId,
+            @RequestBody(required = false) RestoreExecuteRequest request,
+            HttpSession session
+    ) {
+        SessionUser currentUser = authService.getRequiredSessionUser(session);
+        return ApiResponse.success(restoreService.executeRestore(
+                restoreId,
+                request == null ? new RestoreExecuteRequest(null, null) : request,
+                currentUser
+        ));
     }
 }

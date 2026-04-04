@@ -51,6 +51,78 @@ function createScaleDetail(overrides?: Partial<ScaleDetail>): ScaleDetail {
   }
 }
 
+function createKmdqScaleDetail(): ScaleDetail {
+  return {
+    scaleCode: 'KMDQ',
+    scaleName: 'K-MDQ',
+    displayOrder: 4,
+    questionCount: 15,
+    screeningThreshold: 7,
+    questions: [
+      ...Array.from({ length: 13 }, (_, index) => ({
+        questionNo: index + 1,
+        questionKey: `kmdq_symptom_${index + 1}`,
+        questionText: `증상 문항 ${index + 1}`,
+        reverseScored: false,
+        options: [
+          { value: 'N', label: '아니오', score: 0 },
+          { value: 'Y', label: '예', score: 1 },
+        ],
+      })),
+      {
+        questionNo: 14,
+        questionKey: 'kmdq_same_period',
+        questionText: '같은 시기에 벌어진 적이 있었습니까?',
+        reverseScored: false,
+        options: [
+          { value: 'N', label: '아니오', score: 0 },
+          { value: 'Y', label: '예', score: 0 },
+        ],
+      },
+      {
+        questionNo: 15,
+        questionKey: 'kmdq_impairment',
+        questionText: '이러한 일들로 인해서 문제가 발생했습니까?',
+        reverseScored: false,
+        options: [
+          { value: 'NONE', label: '문제 없었다', score: 0 },
+          { value: 'MINOR', label: '경미한 문제', score: 0 },
+          { value: 'MODERATE', label: '중등도의 문제', score: 0 },
+          { value: 'SERIOUS', label: '심각한 문제', score: 0 },
+        ],
+      },
+    ],
+  }
+}
+
+function createIesrScaleDetail(): ScaleDetail {
+  const options = [
+    { value: '0', label: '전혀 아니다', score: 0 },
+    { value: '1', label: '약간 그렇다', score: 1 },
+    { value: '2', label: '그런 편이다', score: 2 },
+    { value: '3', label: '꽤 그렇다', score: 3 },
+    { value: '4', label: '매우 그렇다', score: 4 },
+  ]
+
+  return {
+    scaleCode: 'IESR',
+    scaleName: 'IES-R',
+    displayOrder: 8,
+    questionCount: 22,
+    screeningThreshold: 18,
+    questions: Array.from({ length: 22 }, (_, index) => ({
+      questionNo: index + 1,
+      questionKey: `iesr_q${index + 1}`,
+      questionText:
+        index === 0
+          ? '그 사건을 떠올리게 하는 어떤 것이 나에게 그때의 감정을 다시 불러 일으켰다'
+          : `IES-R 문항 ${index + 1}`,
+      reverseScored: false,
+      options,
+    })),
+  }
+}
+
 function LocationDisplay() {
   const location = useLocation()
 
@@ -127,6 +199,14 @@ beforeEach(() => {
       })
     }
 
+    if (scaleCode === 'KMDQ') {
+      return createKmdqScaleDetail()
+    }
+
+    if (scaleCode === 'IESR') {
+      return createIesrScaleDetail()
+    }
+
     throw new Error(`Unexpected scale code: ${scaleCode}`)
   })
 
@@ -154,6 +234,17 @@ describe('assessment input page', () => {
     expect(screen.getByText('2. GAD7').getAttribute('aria-current')).toBe(null)
     expect(screen.getByText('응답 완료')).toBeTruthy()
     expect(screen.getByRole('region', { name: '문항 이동' })).toBeTruthy()
+  })
+
+  it('shows the IES-R specific past-week guidance on the input form', async () => {
+    useAssessmentDraftStore.getState().reset()
+    useAssessmentDraftStore.getState().initialize(42, ['IESR'])
+
+    renderAssessmentInputPage()
+
+    expect(await screen.findByRole('heading', { name: 'IES-R 입력' })).toBeTruthy()
+    expect(screen.getByText('기간 안내')).toBeTruthy()
+    expect(screen.getByText('IES-R는 "지난 일주일 동안" 어떠셨는지를 기준으로 응답합니다.')).toBeTruthy()
   })
 
   it('allows answering questions and keeps next disabled until the current scale is complete', async () => {
@@ -243,5 +334,48 @@ describe('assessment input page', () => {
 
     expect(await screen.findByText('선택된 척도 정보가 없습니다. 척도 선택부터 다시 시작해주세요.')).toBeTruthy()
     expect(screen.getByRole('link', { name: '척도 선택으로 돌아가기' }).getAttribute('href')).toBe('/assessments/start/42')
+  })
+
+  it('toggles K-MDQ conditional questions without deleting existing answers', async () => {
+    const user = userEvent.setup()
+    const store = useAssessmentDraftStore.getState()
+
+    store.reset()
+    store.initialize(42, ['KMDQ'])
+    for (let questionNo = 2; questionNo <= 13; questionNo += 1) {
+      store.setAnswer('KMDQ', questionNo, 'N')
+    }
+
+    renderAssessmentInputPage()
+
+    await waitFor(() => {
+      expect(mockedFetchScaleDetail).toHaveBeenCalledWith('KMDQ')
+    })
+
+    expect(await screen.findByRole('heading', { name: 'K-MDQ 입력' })).toBeTruthy()
+    expect(screen.queryByText('같은 시기에 벌어진 적이 있었습니까?')).toBeNull()
+    expect(screen.queryByText('이러한 일들로 인해서 문제가 발생했습니까?')).toBeNull()
+
+    await user.click(getAnswerOption('증상 문항 1', '예').label)
+
+    expect(screen.queryByText('같은 시기에 벌어진 적이 있었습니까?')).toBeNull()
+    expect(screen.getByText('이러한 일들로 인해서 문제가 발생했습니까?')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '다음' }).hasAttribute('disabled')).toBe(false)
+
+    await user.click(getAnswerOption('증상 문항 2', '예').label)
+
+    expect(screen.getByText('같은 시기에 벌어진 적이 있었습니까?')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '다음' }).hasAttribute('disabled')).toBe(true)
+
+    await user.click(getAnswerOption('같은 시기에 벌어진 적이 있었습니까?', '예').label)
+
+    expect(useAssessmentDraftStore.getState().answersByScale.KMDQ?.[14]).toBe('Y')
+    expect(screen.getByRole('button', { name: '다음' }).hasAttribute('disabled')).toBe(false)
+
+    await user.click(getAnswerOption('증상 문항 2', '아니오').label)
+
+    expect(useAssessmentDraftStore.getState().answersByScale.KMDQ?.[14]).toBe('Y')
+    expect(screen.queryByText('같은 시기에 벌어진 적이 있었습니까?')).toBeNull()
+    expect(screen.getByRole('button', { name: '다음' }).hasAttribute('disabled')).toBe(false)
   })
 })

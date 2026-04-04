@@ -262,7 +262,8 @@ CREATE TABLE IF NOT EXISTS activity_logs (
                 'PRINT_SESSION',
                 'STATISTICS_EXPORT',
                 'BACKUP_RUN',
-                'RESTORE_UPLOAD'
+                'RESTORE_UPLOAD',
+                'RESTORE_EXECUTE'
             )
         ),
     CONSTRAINT chk_activity_logs_target_type
@@ -326,11 +327,15 @@ CREATE TABLE IF NOT EXISTS restore_histories (
     format_version VARCHAR(50) NULL,
     datasource_type VARCHAR(30) NULL,
     backup_id BIGINT NULL,
+    executed_at DATETIME NULL,
+    selected_item_types VARCHAR(100) NULL,
+    pre_backup_id BIGINT NULL,
+    pre_backup_file_name VARCHAR(255) NULL,
     failure_reason VARCHAR(500) NULL,
     created_at DATETIME NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT chk_restore_histories_status
-        CHECK (status IN ('UPLOADED', 'VALIDATED', 'FAILED')),
+        CHECK (status IN ('UPLOADED', 'VALIDATED', 'PRE_BACKUP_RUNNING', 'PRE_BACKUP_FAILED', 'RESTORING', 'SUCCESS', 'FAILED')),
     CONSTRAINT fk_restore_histories_uploaded_by
         FOREIGN KEY (uploaded_by_id) REFERENCES users (id),
     INDEX idx_restore_histories_status (status),

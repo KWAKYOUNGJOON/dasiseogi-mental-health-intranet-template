@@ -19,6 +19,8 @@ export const ACTIVITY_LOG_ACTION_OPTIONS = [
   'PRINT_SESSION',
   'STATISTICS_EXPORT',
   'BACKUP_RUN',
+  'RESTORE_UPLOAD',
+  'RESTORE_EXECUTE',
 ] as const
 
 export const ACTIVITY_LOG_PAGE_SIZE_OPTIONS = [20, 50, 100] as const
@@ -26,7 +28,7 @@ export const ACTIVITY_LOG_PAGE_SIZE_OPTIONS = [20, 50, 100] as const
 export type ActivityLogActionType = (typeof ACTIVITY_LOG_ACTION_OPTIONS)[number]
 export type ActivityLogPageSize = (typeof ACTIVITY_LOG_PAGE_SIZE_OPTIONS)[number]
 
-type ActivityLogTargetType = 'USER' | 'SIGNUP_REQUEST' | 'CLIENT' | 'SESSION' | 'STATISTICS' | 'BACKUP'
+type ActivityLogTargetType = 'USER' | 'SIGNUP_REQUEST' | 'CLIENT' | 'SESSION' | 'STATISTICS' | 'BACKUP' | 'RESTORE'
 
 interface ActivityLogListItemResponse {
   id: number

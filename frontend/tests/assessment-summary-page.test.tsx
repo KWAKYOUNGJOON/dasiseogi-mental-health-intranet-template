@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -53,6 +53,75 @@ function createScaleDetail(overrides?: Partial<ScaleDetail>): ScaleDetail {
       },
     ],
     ...overrides,
+  }
+}
+
+function createKmdqScaleDetail(): ScaleDetail {
+  return {
+    scaleCode: 'KMDQ',
+    scaleName: 'K-MDQ',
+    displayOrder: 4,
+    questionCount: 15,
+    screeningThreshold: 7,
+    questions: [
+      ...Array.from({ length: 13 }, (_, index) => ({
+        questionNo: index + 1,
+        questionKey: `kmdq_symptom_${index + 1}`,
+        questionText: `증상 문항 ${index + 1}`,
+        reverseScored: false,
+        options: [
+          { value: 'N', label: '아니오', score: 0 },
+          { value: 'Y', label: '예', score: 1 },
+        ],
+      })),
+      {
+        questionNo: 14,
+        questionKey: 'kmdq_same_period',
+        questionText: '같은 시기에 벌어진 적이 있었습니까?',
+        reverseScored: false,
+        options: [
+          { value: 'N', label: '아니오', score: 0 },
+          { value: 'Y', label: '예', score: 0 },
+        ],
+      },
+      {
+        questionNo: 15,
+        questionKey: 'kmdq_impairment',
+        questionText: '이러한 일들로 인해서 문제가 발생했습니까?',
+        reverseScored: false,
+        options: [
+          { value: 'NONE', label: '문제 없었다', score: 0 },
+          { value: 'MINOR', label: '경미한 문제', score: 0 },
+          { value: 'MODERATE', label: '중등도의 문제', score: 0 },
+          { value: 'SERIOUS', label: '심각한 문제', score: 0 },
+        ],
+      },
+    ],
+  }
+}
+
+function createIesrScaleDetail(): ScaleDetail {
+  const options = [
+    { value: '0', label: '전혀 아니다', score: 0 },
+    { value: '1', label: '약간 그렇다', score: 1 },
+    { value: '2', label: '그런 편이다', score: 2 },
+    { value: '3', label: '꽤 그렇다', score: 3 },
+    { value: '4', label: '매우 그렇다', score: 4 },
+  ]
+
+  return {
+    scaleCode: 'IESR',
+    scaleName: 'IES-R',
+    displayOrder: 8,
+    questionCount: 22,
+    screeningThreshold: 18,
+    questions: Array.from({ length: 22 }, (_, index) => ({
+      questionNo: index + 1,
+      questionKey: `iesr_q${index + 1}`,
+      questionText: `IES-R 문항 ${index + 1}`,
+      reverseScored: false,
+      options,
+    })),
   }
 }
 
@@ -118,7 +187,17 @@ function initializeDraft(options?: {
 beforeEach(() => {
   mockedCreateAssessmentSession.mockReset()
   mockedFetchScaleDetail.mockReset()
-  mockedFetchScaleDetail.mockResolvedValue(createScaleDetail())
+  mockedFetchScaleDetail.mockImplementation(async (scaleCode) => {
+    if (scaleCode === 'KMDQ') {
+      return createKmdqScaleDetail()
+    }
+
+    if (scaleCode === 'IESR') {
+      return createIesrScaleDetail()
+    }
+
+    return createScaleDetail()
+  })
   useAssessmentDraftStore.getState().reset()
 })
 
@@ -140,6 +219,26 @@ describe('assessment summary page', () => {
     expect(screen.getByText('1')).toBeTruthy()
     expect(screen.getByRole('textbox', { name: /세션 메모/ })).toBeTruthy()
     expect(screen.getByText('0/1000')).toBeTruthy()
+  })
+
+  it('shows the aligned IES-R preview result and warning text on the summary table', async () => {
+    initializeDraft({
+      scaleCodes: ['IESR'],
+      answersByScale: {
+        IESR: Object.fromEntries(
+          Array.from({ length: 22 }, (_, index) => [index + 1, index < 9 ? '2' : '0']),
+        ) as Record<number, string>,
+      },
+    })
+
+    renderAssessmentSummaryPage()
+
+    const iesrRow = (await screen.findByText('IES-R')).closest('tr')
+
+    expect(iesrRow).toBeTruthy()
+    expect(within(iesrRow as HTMLTableRowElement).getByText('18')).toBeTruthy()
+    expect(within(iesrRow as HTMLTableRowElement).getByText('정상')).toBeTruthy()
+    expect(within(iesrRow as HTMLTableRowElement).getByText('주의 필요')).toBeTruthy()
   })
 
   it('shows an error and retry action when scale definitions fail to load', async () => {
@@ -291,5 +390,110 @@ describe('assessment summary page', () => {
     expect(useAssessmentDraftStore.getState().clientId).toBe(42)
     expect(useAssessmentDraftStore.getState().selectedScaleCodes).toEqual(['PHQ9'])
     expect(useAssessmentDraftStore.getState().memo).toBe('재시도 메모')
+  })
+
+  it('blocks save when K-MDQ same-period question is required but missing', async () => {
+    const user = userEvent.setup()
+
+    initializeDraft({
+      scaleCodes: ['KMDQ'],
+      answersByScale: {
+        KMDQ: {
+          1: 'Y',
+          2: 'Y',
+          3: 'N',
+          4: 'N',
+          5: 'N',
+          6: 'N',
+          7: 'N',
+          8: 'N',
+          9: 'N',
+          10: 'N',
+          11: 'N',
+          12: 'N',
+          13: 'N',
+        },
+      },
+    })
+
+    renderAssessmentSummaryPage()
+
+    expect(await screen.findByText('K-MDQ')).toBeTruthy()
+    expect(screen.getByText('13 / 14')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '세션 저장' }))
+
+    expect(mockedCreateAssessmentSession).not.toHaveBeenCalled()
+    expect((await screen.findByRole('alert')).textContent).toContain('K-MDQ 응답이 완료되지 않았습니다.')
+  })
+
+  it('allows K-MDQ save without impairment answer and keeps preview aligned to symptom count only', async () => {
+    const user = userEvent.setup()
+
+    mockedCreateAssessmentSession.mockResolvedValue({
+      sessionId: 778,
+      sessionNo: 'AS-20260331-0003',
+      clientId: 42,
+      status: 'COMPLETED',
+      scaleCount: 1,
+      hasAlert: false,
+    })
+
+    initializeDraft({
+      scaleCodes: ['KMDQ'],
+      answersByScale: {
+        KMDQ: {
+          1: 'Y',
+          2: 'N',
+          3: 'N',
+          4: 'N',
+          5: 'N',
+          6: 'N',
+          7: 'N',
+          8: 'N',
+          9: 'N',
+          10: 'N',
+          11: 'N',
+          12: 'N',
+          13: 'N',
+        },
+      },
+    })
+
+    renderAssessmentSummaryPage()
+
+    expect(await screen.findByText('K-MDQ')).toBeTruthy()
+    expect(screen.getByText('13 / 13')).toBeTruthy()
+    expect(screen.getByText('1')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '세션 저장' }))
+
+    expect(mockedCreateAssessmentSession).toHaveBeenCalledTimes(1)
+    expect(mockedCreateAssessmentSession.mock.calls[0]?.[0]).toEqual({
+      clientId: 42,
+      sessionStartedAt: '2026-03-31T09:00:00',
+      sessionCompletedAt: expect.any(String),
+      memo: '',
+      selectedScales: [
+        {
+          scaleCode: 'KMDQ',
+          answers: [
+            { questionNo: 1, answerValue: 'Y' },
+            { questionNo: 2, answerValue: 'N' },
+            { questionNo: 3, answerValue: 'N' },
+            { questionNo: 4, answerValue: 'N' },
+            { questionNo: 5, answerValue: 'N' },
+            { questionNo: 6, answerValue: 'N' },
+            { questionNo: 7, answerValue: 'N' },
+            { questionNo: 8, answerValue: 'N' },
+            { questionNo: 9, answerValue: 'N' },
+            { questionNo: 10, answerValue: 'N' },
+            { questionNo: 11, answerValue: 'N' },
+            { questionNo: 12, answerValue: 'N' },
+            { questionNo: 13, answerValue: 'N' },
+          ],
+        },
+      ],
+    })
   })
 })

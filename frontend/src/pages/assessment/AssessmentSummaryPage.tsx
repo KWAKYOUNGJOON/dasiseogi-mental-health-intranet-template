@@ -3,11 +3,19 @@ import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { createAssessmentSession, fetchScaleDetail, type ScaleDetail } from '../../features/assessment/api/assessmentApi'
 import { useAssessmentDraftStore } from '../../features/assessment/store/assessmentDraftStore'
+import {
+  calculateScalePreviewTotalScore,
+  countAnsweredQuestions,
+  getIesrPreviewAlertMessages,
+  getIesrPreviewResultLevel,
+  getRequiredQuestions,
+} from '../../features/assessment/utils/kmdq'
 import { PageHeader } from '../../shared/components/PageHeader'
 import { createCurrentSeoulDateTimeText } from '../../shared/utils/dateText'
 import type { ApiResponse } from '../../shared/types/api'
 
 const SESSION_MEMO_MAX_LENGTH = 1000
+const IESR_SCALE_CODE = 'IESR'
 
 function getErrorMessage(error: unknown, fallbackMessage: string) {
   if (!isAxiosError<ApiResponse<unknown>>(error)) {
@@ -15,27 +23,6 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
   }
 
   return error.response?.data?.message ?? fallbackMessage
-}
-
-function calculatePreviewTotalScore(definition: ScaleDetail | undefined, answers: Record<number, string>) {
-  if (!definition) {
-    return 0
-  }
-
-  return definition.questions.reduce((accumulator, question) => {
-    const selectedValue = answers[question.questionNo]
-    const option = question.options.find((candidate) => candidate.value === selectedValue)
-
-    if (!option) {
-      return accumulator
-    }
-
-    const maxScore = Math.max(...question.options.map((candidate) => candidate.score))
-    const minScore = Math.min(...question.options.map((candidate) => candidate.score))
-    const appliedScore = question.reverseScored ? minScore + maxScore - option.score : option.score
-
-    return accumulator + appliedScore
-  }, 0)
 }
 
 export function AssessmentSummaryPage() {
@@ -105,18 +92,21 @@ export function AssessmentSummaryPage() {
       selectedScaleCodes.map((code) => {
         const definition = definitions[code]
         const answers = answersByScale[code] ?? {}
-        const answeredCount = definition?.questions.filter((question) => {
-          const answerValue = answers[question.questionNo]
-          return typeof answerValue === 'string' && answerValue.length > 0
-        }).length ?? 0
-        const questionCount = definition?.questionCount ?? 0
+        const requiredQuestions = definition ? getRequiredQuestions(definition, answers) : []
+        const answeredCount = countAnsweredQuestions(requiredQuestions, answers)
+        const questionCount = requiredQuestions.length
+        const totalScorePreview = calculateScalePreviewTotalScore(definition, answers)
+        const canPreviewIesrResult = code === IESR_SCALE_CODE && Boolean(definition)
+        const iesrAlertMessages = canPreviewIesrResult ? getIesrPreviewAlertMessages(totalScorePreview) : []
 
         return {
           scaleCode: code,
           scaleName: definition?.scaleName ?? code,
           answeredCount,
           questionCount,
-          totalScorePreview: calculatePreviewTotalScore(definition, answers),
+          totalScorePreview,
+          resultLevelPreview: canPreviewIesrResult ? getIesrPreviewResultLevel(totalScorePreview) : null,
+          alertPreview: canPreviewIesrResult ? (iesrAlertMessages.length > 0 ? iesrAlertMessages.join(' / ') : '-') : null,
         }
       }),
     [answersByScale, definitions, selectedScaleCodes],
@@ -170,7 +160,7 @@ export function AssessmentSummaryPage() {
       }
 
       const answers = answersByScale[code] ?? {}
-      const hasMissingAnswer = definition.questions.some((question) => {
+      const hasMissingAnswer = getRequiredQuestions(definition, answers).some((question) => {
         const answerValue = answers[question.questionNo]
         return typeof answerValue !== 'string' || answerValue.length === 0
       })
@@ -285,8 +275,8 @@ export function AssessmentSummaryPage() {
                   {summary.answeredCount} / {summary.questionCount || '-'}
                 </td>
                 <td>{summary.totalScorePreview}</td>
-                <td>저장 후 서버 최종 계산</td>
-                <td>저장 후 서버 최종 계산</td>
+                <td>{summary.resultLevelPreview ?? '저장 후 서버 최종 계산'}</td>
+                <td>{summary.alertPreview ?? '저장 후 서버 최종 계산'}</td>
               </tr>
             ))}
           </tbody>

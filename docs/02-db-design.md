@@ -418,6 +418,7 @@
   - `STATISTICS_EXPORT`
   - `BACKUP_RUN`
   - `RESTORE_UPLOAD`
+  - `RESTORE_EXECUTE`
 - `target_type` VARCHAR(50) NULL
   - `USER`
   - `SIGNUP_REQUEST`
@@ -487,13 +488,17 @@
 ## 5.10 restore_histories
 
 ### 목적
-관리자 복원용 표준 전체 백업 ZIP 업로드 결과와 manifest 검증 상태를 저장한다.
+관리자 복원용 표준 전체 백업 ZIP 업로드/검증 결과와 실제 복원 실행 상태를 저장한다.
 
 ### 주요 컬럼
 - `id` BIGINT PK
 - `status` VARCHAR(20) NOT NULL
   - `UPLOADED`
   - `VALIDATED`
+  - `PRE_BACKUP_RUNNING`
+  - `PRE_BACKUP_FAILED`
+  - `RESTORING`
+  - `SUCCESS`
   - `FAILED`
 - `file_name` VARCHAR(255) NOT NULL
 - `file_path` VARCHAR(500) NOT NULL
@@ -505,16 +510,22 @@
 - `format_version` VARCHAR(50) NULL
 - `datasource_type` VARCHAR(30) NULL
 - `backup_id` BIGINT NULL
+- `executed_at` DATETIME NULL
+- `selected_item_types` VARCHAR(100) NULL
+- `pre_backup_id` BIGINT NULL
+- `pre_backup_file_name` VARCHAR(255) NULL
 - `failure_reason` VARCHAR(500) NULL
 - `created_at` DATETIME NOT NULL
 
 ### 설계 메모
-- 현재 `restore_histories` 는 실제 복원 실행 전 단계인 업로드/검증 결과만 저장한다.
 - `file_path` 는 서버에 저장된 업로드 ZIP 경로를 보존한다.
 - `format_version`, `datasource_type`, `backup_id` 는 manifest 검증 성공 시 채운다.
+- `executed_at`, `selected_item_types`, `pre_backup_id`, `pre_backup_file_name` 은 실제 복원 실행 시 채운다.
+- v1 실제 적용 대상은 `DATABASE` 그룹만 허용한다.
+- `PRE_BACKUP_RUNNING` -> `PRE_BACKUP_FAILED` / `RESTORING` -> `SUCCESS` / `FAILED` 순서로 상태가 전이된다.
 - 관리자 복원 검증 이력 목록 조회 API 는 `status`, `uploaded_at` 날짜 범위 조건과 `uploaded_at DESC`, `id DESC` 정렬을 사용한다.
 - 복원 검증 이력 상세 조회 API 는 기존 row 를 다시 읽고 `file_path` 기준으로 `detectedItems` 를 재계산한다.
-- 실제 restore 실행, 자동 백업, 항목 선택 결과 저장은 다음 단계에서 확장한다.
+- 실제 복원 실행 API 는 저장 ZIP 재검증, 확인 문구 검증, pre-restore backup, DB import 결과를 같은 row 에 반영한다.
 
 ### 인덱스
 - INDEX `idx_restore_histories_status` (`status`)
@@ -679,9 +690,13 @@
 - `DB_DUMP`
 - `SNAPSHOT`
 
-### 10.8 복원 검증 상태
+### 10.8 복원 상태
 - `UPLOADED`
 - `VALIDATED`
+- `PRE_BACKUP_RUNNING`
+- `PRE_BACKUP_FAILED`
+- `RESTORING`
+- `SUCCESS`
 - `FAILED`
 
 ### 10.9 경고 유형

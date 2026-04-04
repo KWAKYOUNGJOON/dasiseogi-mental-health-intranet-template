@@ -68,6 +68,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AssessmentService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final String KMDQ_SCALE_CODE = "KMDQ";
+    private static final int KMDQ_SYMPTOM_QUESTION_END_NO = 13;
+    private static final int KMDQ_SAME_PERIOD_QUESTION_NO = 14;
 
     private final AssessmentSessionRepository assessmentSessionRepository;
     private final SessionScaleRepository sessionScaleRepository;
@@ -409,10 +412,6 @@ public class AssessmentService {
         String scaleCode = request.scaleCode().trim().toUpperCase(Locale.ROOT);
         ScaleDefinition definition = scaleService.getActiveDefinition(scaleCode);
 
-        if (request.answers().size() != definition.questionCount()) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "ANSWER_INCOMPLETE", "모든 문항에 응답해야 저장할 수 있습니다.");
-        }
-
         Map<Integer, AnswerRequest> answerMap = new HashMap<>();
         for (AnswerRequest answerRequest : request.answers()) {
             if (answerMap.put(answerRequest.questionNo(), answerRequest) != null) {
@@ -420,22 +419,89 @@ public class AssessmentService {
             }
         }
 
+        Map<Integer, ScaleQuestion> questionsByNo = definition.items().stream()
+                .collect(Collectors.toMap(ScaleQuestion::questionNo, question -> question, (existing, replacement) -> existing, LinkedHashMap::new));
+        validateAnswerQuestionNumbers(answerMap, questionsByNo);
+
+        if (KMDQ_SCALE_CODE.equals(scaleCode)) {
+            return evaluateKmdqScale(definition, answerMap);
+        }
+
+        if (answerMap.size() != definition.questionCount()) {
+            throw answerIncomplete();
+        }
+
         List<EvaluatedAnswer> evaluatedAnswers = new ArrayList<>();
         int totalScore = 0;
         for (ScaleQuestion question : definition.items()) {
             AnswerRequest answerRequest = answerMap.get(question.questionNo());
             if (answerRequest == null) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "ANSWER_INCOMPLETE", "모든 문항에 응답해야 저장할 수 있습니다.");
+                throw answerIncomplete();
             }
-            ScaleOption option = question.options().stream()
-                    .filter(candidate -> candidate.value().equals(answerRequest.answerValue()))
-                    .findFirst()
-                    .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "ANSWER_VALUE_INVALID", "허용되지 않은 응답값입니다."));
-            int appliedScore = question.reverseScored() ? reverseScore(option.score(), question.options()) : option.score();
-            evaluatedAnswers.add(new EvaluatedAnswer(question, option, appliedScore));
-            totalScore += appliedScore;
+            EvaluatedAnswer evaluatedAnswer = evaluateAnswer(question, answerRequest);
+            evaluatedAnswers.add(evaluatedAnswer);
+            totalScore += evaluatedAnswer.appliedScore();
         }
 
+        return buildScaleEvaluation(definition, totalScore, evaluatedAnswers);
+    }
+
+    private ScaleEvaluation evaluateKmdqScale(ScaleDefinition definition, Map<Integer, AnswerRequest> answerMap) {
+        List<EvaluatedAnswer> evaluatedAnswers = new ArrayList<>();
+        int symptomYesCount = 0;
+
+        for (ScaleQuestion question : definition.items()) {
+            if (question.questionNo() > KMDQ_SYMPTOM_QUESTION_END_NO) {
+                continue;
+            }
+            AnswerRequest answerRequest = answerMap.get(question.questionNo());
+            if (answerRequest == null) {
+                throw answerIncomplete();
+            }
+
+            EvaluatedAnswer evaluatedAnswer = evaluateAnswer(question, answerRequest);
+            evaluatedAnswers.add(evaluatedAnswer);
+            symptomYesCount += evaluatedAnswer.appliedScore();
+        }
+
+        for (ScaleQuestion question : definition.items()) {
+            if (question.questionNo() <= KMDQ_SYMPTOM_QUESTION_END_NO) {
+                continue;
+            }
+
+            AnswerRequest answerRequest = answerMap.get(question.questionNo());
+            boolean required = question.questionNo() == KMDQ_SAME_PERIOD_QUESTION_NO && symptomYesCount >= 2;
+            if (answerRequest == null) {
+                if (required) {
+                    throw answerIncomplete();
+                }
+                continue;
+            }
+
+            evaluatedAnswers.add(evaluateAnswer(question, answerRequest));
+        }
+
+        return buildScaleEvaluation(definition, symptomYesCount, evaluatedAnswers);
+    }
+
+    private void validateAnswerQuestionNumbers(Map<Integer, AnswerRequest> answerMap, Map<Integer, ScaleQuestion> questionsByNo) {
+        for (Integer questionNo : answerMap.keySet()) {
+            if (!questionsByNo.containsKey(questionNo)) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "ANSWER_QUESTION_INVALID", "존재하지 않는 문항 번호입니다.");
+            }
+        }
+    }
+
+    private EvaluatedAnswer evaluateAnswer(ScaleQuestion question, AnswerRequest answerRequest) {
+        ScaleOption option = question.options().stream()
+                .filter(candidate -> candidate.value().equals(answerRequest.answerValue()))
+                .findFirst()
+                .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "ANSWER_VALUE_INVALID", "허용되지 않은 응답값입니다."));
+        int appliedScore = question.reverseScored() ? reverseScore(option.score(), question.options()) : option.score();
+        return new EvaluatedAnswer(question, option, appliedScore);
+    }
+
+    private ScaleEvaluation buildScaleEvaluation(ScaleDefinition definition, int totalScore, List<EvaluatedAnswer> evaluatedAnswers) {
         final int calculatedTotalScore = totalScore;
         String resultLevel = definition.interpretationRules().stream()
                 .filter(rule -> matches(rule, calculatedTotalScore))
@@ -470,6 +536,10 @@ public class AssessmentService {
         }
 
         return new ScaleEvaluation(definition, totalScore, resultLevel, !alerts.isEmpty(), evaluatedAnswers, alerts);
+    }
+
+    private AppException answerIncomplete() {
+        return new AppException(HttpStatus.BAD_REQUEST, "ANSWER_INCOMPLETE", "모든 문항에 응답해야 저장할 수 있습니다.");
     }
 
     private List<String> resolveTargetQuestionKeys(ScaleAlertRule rule) {

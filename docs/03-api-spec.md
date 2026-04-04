@@ -1486,7 +1486,7 @@
 - Role: `ADMIN`
 
 ### 쿼리 파라미터
-- `status` (optional, `UPLOADED` / `VALIDATED` / `FAILED`)
+- `status` (optional, `UPLOADED` / `VALIDATED` / `PRE_BACKUP_RUNNING` / `PRE_BACKUP_FAILED` / `RESTORING` / `SUCCESS` / `FAILED`)
 - `dateFrom` (optional, `uploadedAt` 기준)
 - `dateTo` (optional, `uploadedAt` 기준)
 - `page`, `size`
@@ -1542,10 +1542,10 @@
 
 ### 처리 규칙
 - `restore_histories` 기존 row 1건만 조회하며, 새 row 를 만들지 않는다.
-- `VALIDATED` 상태면 서버 저장 ZIP 을 다시 읽고 기존 upload 검증과 동일한 기준으로 `detectedItems` 를 재계산한다.
-- `FAILED` 상태면 저장된 `failureReason` 을 반환하고 `detectedItems` 는 빈 배열이다.
+- `formatVersion` 이 있는 이력은 서버 저장 ZIP 을 다시 읽고 기존 upload 검증과 동일한 기준으로 `detectedItems` 를 재계산한다.
+- 업로드 검증 실패로 `formatVersion` 이 없는 `FAILED` 상태면 저장된 `failureReason` 을 반환하고 `detectedItems` 는 빈 배열이다.
 - `UPLOADED` 상태면 아직 검증 완료 전이므로 `detectedItems` 는 빈 배열이다.
-- `VALIDATED` 상태인데 저장 ZIP 파일이 사라졌거나 열 수 없으면 실패한다.
+- `VALIDATED` / `PRE_BACKUP_FAILED` / `RESTORING` / `SUCCESS` / 실행 후 `FAILED` 상태인데 저장 ZIP 파일이 사라졌거나 열 수 없으면 실패한다.
 - 상세 조회 때문에 상태값은 바꾸지 않는다.
 
 ### 성공 응답 예시
@@ -1558,10 +1558,14 @@
     "fileName": "backup-20260404-101500-snapshot-full-v1.zip",
     "uploadedAt": "2026-04-04T10:15:58",
     "validatedAt": "2026-04-04T10:16:02",
+    "executedAt": null,
     "uploadedByName": "관리자A",
     "formatVersion": "FULL_BACKUP_ZIP_V1",
     "datasourceType": "H2",
     "backupId": 41,
+    "selectedItemTypes": [],
+    "preBackupId": null,
+    "preBackupFileName": null,
     "failureReason": null,
     "detectedItems": [
       {
@@ -1595,6 +1599,64 @@
   "success": false,
   "message": "저장된 복원 ZIP 파일을 사용할 수 없습니다.",
   "errorCode": "RESTORE_ARCHIVE_UNAVAILABLE"
+}
+```
+
+---
+
+## 14.7 실제 복원 실행
+
+### 목적
+관리자가 `VALIDATED` 된 복원 검증 이력에 대해 서버 자동 백업 이후 `DATABASE` 복원을 실제 실행한다.
+
+### 요청
+- Method: `POST`
+- Path: `/api/v1/admin/restores/{restoreId}/execute`
+- Auth: 필요
+- Role: `ADMIN`
+
+### 요청 body 예시
+```json
+{
+  "selectedItemTypes": ["DATABASE"],
+  "confirmationText": "전체 복원을 실행합니다"
+}
+```
+
+### 처리 규칙
+- `VALIDATED` 상태의 이력만 실행할 수 있다.
+- `selectedItemTypes` 는 비어 있으면 안 되며, v1 실제 실행 허용 범위는 `DATABASE` 만이다.
+- 확인 문구는 `전체 복원을 실행합니다` 와 정확히 일치해야 한다.
+- 서버는 저장 ZIP 접근 가능 여부와 manifest/detectedItems 를 다시 계산한 뒤 실행 대상 존재 여부를 확인한다.
+- 실제 복원 전 서버가 기존 백업 서비스 흐름을 재사용해 pre-restore backup 을 수행한다.
+- pre-backup 성공 시에만 `db/database.sql` 기반 DATABASE 복원을 실행한다.
+- 현재 v1 실제 복원은 `MARIADB` / `MYSQL` datasource 에서만 지원한다.
+- 실행 결과는 `restore_histories` 의 `status`, `executedAt`, `selectedItemTypes`, `preBackupId`, `preBackupFileName`, `failureReason` 에 반영한다.
+- activity log 적재 대상이다.
+
+### 성공 응답 예시
+```json
+{
+  "success": true,
+  "data": {
+    "restoreId": 12,
+    "status": "SUCCESS",
+    "executedAt": "2026-04-04T10:21:10",
+    "selectedItemTypes": ["DATABASE"],
+    "preBackupId": 44,
+    "preBackupFileName": "backup-20260404-102109-snapshot-full-v1.zip",
+    "message": "복원 실행이 완료되었습니다.",
+    "failureReason": null
+  }
+}
+```
+
+### 실패 응답 예시
+```json
+{
+  "success": false,
+  "message": "VALIDATED 상태의 복원 검증 이력만 실행할 수 있습니다.",
+  "errorCode": "RESTORE_EXECUTE_INVALID_STATUS"
 }
 ```
 
@@ -1654,6 +1716,7 @@
 - `GET /api/v1/admin/restores`
 - `POST /api/v1/admin/restores/upload`
 - `GET /api/v1/admin/restores/{restoreId}`
+- `POST /api/v1/admin/restores/{restoreId}/execute`
 
 ## 15.10 운영 점검
 - `GET /api/v1/health`
@@ -1693,13 +1756,19 @@
 - `RESTORE_HISTORY_NOT_FOUND`
 - `RESTORE_ARCHIVE_UNAVAILABLE`
 - `RESTORE_DETAIL_FAILED`
+- `RESTORE_EXECUTE_FORBIDDEN`
+- `RESTORE_EXECUTE_INVALID_STATUS`
+- `RESTORE_CONFIRMATION_TEXT_MISMATCH`
+- `RESTORE_ITEM_SELECTION_INVALID`
+- `RESTORE_UNSUPPORTED_ITEM_TYPE`
+- `RESTORE_UNSUPPORTED_DATASOURCE`
 
 ## 16.3 권한 예외 기준
 - 대상자 수정: 작성자 또는 관리자만 가능
 - 대상자 오등록 처리: 작성자 또는 관리자만 가능
 - 세션 오입력 처리: 작성자 또는 관리자만 가능
 - 오등록/오입력 포함 조회: 관리자 또는 작성자만 가능
-- 사용자 관리/승인/로그/백업/복원 업로드 검증/복원 검증 이력 상세 조회: 관리자만 가능
+- 사용자 관리/승인/로그/백업/복원 업로드 검증/복원 검증 이력 상세 조회/실제 복원 실행: 관리자만 가능
 - 통계 CSV 내보내기: 관리자만 가능
 
 ---

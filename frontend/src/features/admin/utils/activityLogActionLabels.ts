@@ -15,6 +15,8 @@ export const ACTIVITY_LOG_ACTION_LABELS: Readonly<Record<string, string>> = {
   PRINT_SESSION: '출력 보기',
   STATISTICS_EXPORT: '통계 내보내기',
   BACKUP_RUN: '백업 실행',
+  RESTORE_UPLOAD: '복원 ZIP 업로드',
+  RESTORE_EXECUTE: '복원 실행',
 }
 
 export function formatActivityLogActionLabel(actionType: string) {

@@ -5,6 +5,7 @@ import { fetchScaleDetail, type ScaleDetail } from '../../features/assessment/ap
 import { AssessmentProgressHeader } from '../../features/assessment/components/AssessmentProgressHeader'
 import { ScaleQuestionForm } from '../../features/assessment/components/ScaleQuestionForm'
 import { useAssessmentDraftStore } from '../../features/assessment/store/assessmentDraftStore'
+import { countAnsweredQuestions, getRequiredQuestions } from '../../features/assessment/utils/kmdq'
 import { PageHeader } from '../../shared/components/PageHeader'
 import type { ApiResponse } from '../../shared/types/api'
 
@@ -65,16 +66,12 @@ export function AssessmentInputPage() {
     }
   }, [currentScaleCode, hasValidDraft])
 
-  const answeredCount = useMemo(() => {
-    if (!scale) {
-      return 0
-    }
-
-    return scale.questions.filter((question) => Boolean(currentAnswers[question.questionNo])).length
-  }, [currentAnswers, scale])
+  const requiredQuestions = useMemo(() => (scale ? getRequiredQuestions(scale, currentAnswers) : []), [currentAnswers, scale])
+  const answeredCount = useMemo(() => countAnsweredQuestions(requiredQuestions, currentAnswers), [currentAnswers, requiredQuestions])
+  const requiredQuestionCount = requiredQuestions.length
   const isFirstScale = currentScaleIndex === 0
   const isLastScale = currentScaleIndex === selectedScaleCodes.length - 1
-  const canMoveNext = Boolean(scale) && answeredCount === (scale?.questionCount ?? 0)
+  const canMoveNext = Boolean(scale) && answeredCount === requiredQuestionCount
 
   if (!hasValidClientId) {
     return (
@@ -134,7 +131,7 @@ export function AssessmentInputPage() {
             <div aria-live="polite" className="assessment-page-header-meta">
               <span className="assessment-page-header-meta__label">응답 완료</span>
               <strong>
-                {answeredCount} / {scale.questionCount}
+                {answeredCount} / {requiredQuestionCount}
               </strong>
             </div>
           ) : null
@@ -162,7 +159,7 @@ export function AssessmentInputPage() {
             {error
               ? '입력 가능한 척도를 다시 확인해주세요.'
               : scale
-                ? `응답 완료 ${answeredCount} / ${scale.questionCount}`
+                ? `응답 완료 ${answeredCount} / ${requiredQuestionCount}`
                 : '척도 정보를 불러오는 중...'}
           </strong>
         </div>

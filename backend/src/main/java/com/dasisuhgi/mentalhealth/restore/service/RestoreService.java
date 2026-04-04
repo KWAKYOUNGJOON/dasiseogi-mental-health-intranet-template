@@ -3,6 +3,8 @@ package com.dasisuhgi.mentalhealth.restore.service;
 import com.dasisuhgi.mentalhealth.audit.entity.ActivityActionType;
 import com.dasisuhgi.mentalhealth.audit.entity.ActivityTargetType;
 import com.dasisuhgi.mentalhealth.audit.service.ActivityLogService;
+import com.dasisuhgi.mentalhealth.backup.dto.ManualBackupRunResponse;
+import com.dasisuhgi.mentalhealth.backup.service.BackupService;
 import com.dasisuhgi.mentalhealth.common.api.PageResponse;
 import com.dasisuhgi.mentalhealth.common.error.AppException;
 import com.dasisuhgi.mentalhealth.common.security.AccessPolicyService;
@@ -10,6 +12,8 @@ import com.dasisuhgi.mentalhealth.common.session.SessionUser;
 import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreDetectedItemResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreDetailResponse;
+import com.dasisuhgi.mentalhealth.restore.dto.RestoreExecuteRequest;
+import com.dasisuhgi.mentalhealth.restore.dto.RestoreExecuteResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreHistoryListItemResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreUploadResponse;
 import com.dasisuhgi.mentalhealth.restore.entity.RestoreHistory;
@@ -21,6 +25,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,10 +39,12 @@ import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
@@ -51,33 +58,56 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class RestoreService {
     private static final String FORMAT_VERSION = "FULL_BACKUP_ZIP_V1";
+    private static final String DATABASE_ITEM_TYPE = "DATABASE";
+    private static final String DATABASE_SQL_PATH = "db/database.sql";
+    private static final String EXECUTE_CONFIRMATION_TEXT = "전체 복원을 실행합니다";
+    private static final Set<String> EXECUTABLE_ITEM_TYPES = Set.of(DATABASE_ITEM_TYPE);
     private static final long MAX_UPLOAD_SIZE_BYTES = 500L * 1024L * 1024L;
+    private static final long DEFAULT_IMPORT_TIMEOUT_SECONDS = 60L;
     private static final DateTimeFormatter FILE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private final RestoreHistoryRepository restoreHistoryRepository;
     private final RestoreHistoryQueryRepository restoreHistoryQueryRepository;
     private final AccessPolicyService accessPolicyService;
     private final ActivityLogService activityLogService;
+    private final BackupService backupService;
     private final ObjectMapper objectMapper;
     private final String restoreRootPath;
     private final long maxUploadSizeBytes;
+    private final String datasourceUrl;
+    private final String datasourceUsername;
+    private final String datasourcePassword;
+    private final String dbImportCommand;
+    private final long dbImportTimeoutSeconds;
 
     public RestoreService(
             RestoreHistoryRepository restoreHistoryRepository,
             RestoreHistoryQueryRepository restoreHistoryQueryRepository,
             AccessPolicyService accessPolicyService,
             ActivityLogService activityLogService,
+            BackupService backupService,
             ObjectMapper objectMapper,
             @Value("${app.restore.root-path:./tmp/restores}") String restoreRootPath,
-            @Value("${app.restore.max-upload-size-bytes:524288000}") long maxUploadSizeBytes
+            @Value("${app.restore.max-upload-size-bytes:524288000}") long maxUploadSizeBytes,
+            @Value("${spring.datasource.url}") String datasourceUrl,
+            @Value("${spring.datasource.username:}") String datasourceUsername,
+            @Value("${spring.datasource.password:}") String datasourcePassword,
+            @Value("${app.restore.db-import-command:}") String dbImportCommand,
+            @Value("${app.restore.db-import-timeout-seconds:60}") long dbImportTimeoutSeconds
     ) {
         this.restoreHistoryRepository = restoreHistoryRepository;
         this.restoreHistoryQueryRepository = restoreHistoryQueryRepository;
         this.accessPolicyService = accessPolicyService;
         this.activityLogService = activityLogService;
+        this.backupService = backupService;
         this.objectMapper = objectMapper;
         this.restoreRootPath = restoreRootPath;
         this.maxUploadSizeBytes = maxUploadSizeBytes > 0 ? maxUploadSizeBytes : MAX_UPLOAD_SIZE_BYTES;
+        this.datasourceUrl = datasourceUrl;
+        this.datasourceUsername = datasourceUsername;
+        this.datasourcePassword = datasourcePassword;
+        this.dbImportCommand = dbImportCommand;
+        this.dbImportTimeoutSeconds = dbImportTimeoutSeconds > 0 ? dbImportTimeoutSeconds : DEFAULT_IMPORT_TIMEOUT_SECONDS;
     }
 
     @Transactional(readOnly = true)
@@ -111,10 +141,7 @@ public class RestoreService {
         RestoreHistory history = restoreHistoryRepository.findById(restoreId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "RESTORE_HISTORY_NOT_FOUND", "복원 검증 이력을 찾을 수 없습니다."));
 
-        List<RestoreDetectedItemResponse> detectedItems = switch (history.getStatus()) {
-            case VALIDATED -> recalculateDetectedItems(history);
-            case FAILED, UPLOADED -> List.of();
-        };
+        List<RestoreDetectedItemResponse> detectedItems = canInspectArchive(history) ? recalculateDetectedItems(history) : List.of();
 
         return new RestoreDetailResponse(
                 history.getId(),
@@ -122,10 +149,14 @@ public class RestoreService {
                 history.getFileName(),
                 history.getUploadedAt(),
                 history.getValidatedAt(),
+                history.getExecutedAt(),
                 history.getUploadedByNameSnapshot(),
                 history.getFormatVersion(),
                 history.getDatasourceType(),
                 history.getBackupId(),
+                parseSelectedItemTypes(history.getSelectedItemTypes()),
+                history.getPreBackupId(),
+                history.getPreBackupFileName(),
                 history.getFailureReason(),
                 detectedItems
         );
@@ -206,6 +237,115 @@ public class RestoreService {
         }
     }
 
+    @Transactional(noRollbackFor = Exception.class)
+    public RestoreExecuteResponse executeRestore(Long restoreId, RestoreExecuteRequest request, SessionUser sessionUser) {
+        User currentUser = accessPolicyService.getCurrentUser(sessionUser);
+        if (!accessPolicyService.isAdmin(currentUser)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "RESTORE_EXECUTE_FORBIDDEN", "복원 실행 권한이 없습니다.");
+        }
+
+        RestoreHistory history = restoreHistoryRepository.findLockedById(restoreId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "RESTORE_HISTORY_NOT_FOUND", "복원 검증 이력을 찾을 수 없습니다."));
+
+        if (history.getStatus() != RestoreStatus.VALIDATED) {
+            throw new AppException(HttpStatus.CONFLICT, "RESTORE_EXECUTE_INVALID_STATUS", "VALIDATED 상태의 복원 검증 이력만 실행할 수 있습니다.");
+        }
+
+        ValidationResult validationResult = resolveStoredValidationResult(history);
+        List<String> selectedItemTypes = normalizeSelectedItemTypes(request == null ? null : request.selectedItemTypes());
+        assertExecutableSelection(selectedItemTypes, validationResult.detectedItems());
+        assertConfirmationText(request == null ? null : request.confirmationText());
+
+        String archiveDatasourceType = normalizeDatasourceType(validationResult.datasourceType());
+        String runtimeDatasourceType = determineDatasourceType(datasourceUrl);
+        if (!isSupportedImportDatasource(archiveDatasourceType) || !isSupportedImportDatasource(runtimeDatasourceType)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_UNSUPPORTED_DATASOURCE",
+                    "현재 버전에서는 MariaDB/MySQL datasource 의 DATABASE 복원만 지원합니다.");
+        }
+
+        history.setExecutedAt(SeoulDateTimeSupport.now());
+        history.setSelectedItemTypes(String.join(",", selectedItemTypes));
+        history.setPreBackupId(null);
+        history.setPreBackupFileName(null);
+        history.setFailureReason(null);
+        history.setStatus(RestoreStatus.PRE_BACKUP_RUNNING);
+        restoreHistoryRepository.saveAndFlush(history);
+
+        activityLogService.logBestEffort(
+                currentUser,
+                ActivityActionType.RESTORE_EXECUTE,
+                ActivityTargetType.RESTORE,
+                history.getId(),
+                history.getFileName(),
+                "복원 실행 시작: restoreId=" + history.getId() + ", selectedItemTypes=" + String.join(",", selectedItemTypes)
+        );
+
+        ManualBackupRunResponse preBackupResult;
+        try {
+            preBackupResult = backupService.runPreRestoreBackup(
+                    "restoreId=" + history.getId() + " pre-restore backup",
+                    currentUser
+            );
+        } catch (Exception exception) {
+            String failureReason = buildFailureReason(exception);
+            history.setStatus(RestoreStatus.PRE_BACKUP_FAILED);
+            history.setFailureReason(failureReason);
+            restoreHistoryRepository.saveAndFlush(history);
+
+            activityLogService.logBestEffort(
+                    currentUser,
+                    ActivityActionType.RESTORE_EXECUTE,
+                    ActivityTargetType.RESTORE,
+                    history.getId(),
+                    history.getFileName(),
+                    "복원 실행 실패(pre-backup): restoreId=" + history.getId() + ", reason=" + failureReason
+            );
+
+            return buildExecuteResponse(history, "복원 직전 자동 백업에 실패했습니다.");
+        }
+
+        history.setPreBackupId(preBackupResult.backupId());
+        history.setPreBackupFileName(preBackupResult.fileName());
+        history.setStatus(RestoreStatus.RESTORING);
+        restoreHistoryRepository.saveAndFlush(history);
+
+        try {
+            executeDatabaseRestore(Path.of(history.getFilePath()), archiveDatasourceType);
+            history.setStatus(RestoreStatus.SUCCESS);
+            history.setFailureReason(null);
+            restoreHistoryRepository.saveAndFlush(history);
+
+            activityLogService.logBestEffort(
+                    currentUser,
+                    ActivityActionType.RESTORE_EXECUTE,
+                    ActivityTargetType.RESTORE,
+                    history.getId(),
+                    history.getFileName(),
+                    "복원 실행 성공: restoreId=" + history.getId()
+                            + ", preBackupId=" + history.getPreBackupId()
+                            + ", selectedItemTypes=" + String.join(",", selectedItemTypes)
+            );
+
+            return buildExecuteResponse(history, "복원 실행이 완료되었습니다.");
+        } catch (Exception exception) {
+            String failureReason = buildFailureReason(exception);
+            history.setStatus(RestoreStatus.FAILED);
+            history.setFailureReason(failureReason);
+            restoreHistoryRepository.saveAndFlush(history);
+
+            activityLogService.logBestEffort(
+                    currentUser,
+                    ActivityActionType.RESTORE_EXECUTE,
+                    ActivityTargetType.RESTORE,
+                    history.getId(),
+                    history.getFileName(),
+                    "복원 실행 실패: restoreId=" + history.getId() + ", reason=" + failureReason
+            );
+
+            return buildExecuteResponse(history, "DATABASE 복원 실행에 실패했습니다.");
+        }
+    }
+
     private void validateMultipartFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_FILE_INVALID", "업로드할 ZIP 파일이 필요합니다.");
@@ -243,6 +383,10 @@ public class RestoreService {
         }
     }
 
+    private boolean canInspectArchive(RestoreHistory history) {
+        return StringUtils.hasText(history.getFilePath()) && StringUtils.hasText(history.getFormatVersion());
+    }
+
     private List<RestoreDetectedItemResponse> recalculateDetectedItems(RestoreHistory history) {
         if (!StringUtils.hasText(history.getFilePath())) {
             throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "RESTORE_ARCHIVE_UNAVAILABLE", "저장된 복원 ZIP 파일을 사용할 수 없습니다.");
@@ -255,6 +399,243 @@ public class RestoreService {
         } catch (RuntimeException exception) {
             throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "RESTORE_ARCHIVE_UNAVAILABLE", "저장된 복원 ZIP 파일을 사용할 수 없습니다.");
         }
+    }
+
+    private ValidationResult resolveStoredValidationResult(RestoreHistory history) {
+        if (!StringUtils.hasText(history.getFilePath())) {
+            throw new AppException(HttpStatus.CONFLICT, "RESTORE_ARCHIVE_UNAVAILABLE", "저장된 복원 ZIP 파일을 사용할 수 없습니다.");
+        }
+
+        try {
+            Path archivePath = Path.of(history.getFilePath());
+            if (!Files.isRegularFile(archivePath) || !Files.isReadable(archivePath)) {
+                throw new IOException("stored archive is not accessible");
+            }
+            return inspectStoredZip(archivePath, history.getFileName());
+        } catch (AppException exception) {
+            throw new AppException(HttpStatus.CONFLICT, "RESTORE_ARCHIVE_UNAVAILABLE", "저장된 복원 ZIP 파일을 사용할 수 없습니다.");
+        } catch (Exception exception) {
+            throw new AppException(HttpStatus.CONFLICT, "RESTORE_ARCHIVE_UNAVAILABLE", "저장된 복원 ZIP 파일을 사용할 수 없습니다.");
+        }
+    }
+
+    private void assertExecutableSelection(List<String> selectedItemTypes, List<RestoreDetectedItemResponse> detectedItems) {
+        if (selectedItemTypes.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_ITEM_SELECTION_INVALID", "복원 대상 항목을 하나 이상 선택해주세요.");
+        }
+
+        if (!EXECUTABLE_ITEM_TYPES.containsAll(selectedItemTypes)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_UNSUPPORTED_ITEM_TYPE",
+                    "현재 버전에서는 DATABASE 그룹만 실제 복원할 수 있습니다.");
+        }
+
+        Set<String> detectedItemTypes = detectedItems.stream()
+                .map(RestoreDetectedItemResponse::itemType)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (!detectedItemTypes.containsAll(selectedItemTypes)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_ITEM_SELECTION_INVALID",
+                    "선택한 복원 대상이 저장된 ZIP 에 존재하지 않습니다.");
+        }
+    }
+
+    private void assertConfirmationText(String confirmationText) {
+        if (!EXECUTE_CONFIRMATION_TEXT.equals(confirmationText)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_CONFIRMATION_TEXT_MISMATCH",
+                    "확인 문구는 정확히 " + EXECUTE_CONFIRMATION_TEXT + " 이어야 합니다.");
+        }
+    }
+
+    private List<String> normalizeSelectedItemTypes(List<String> selectedItemTypes) {
+        if (selectedItemTypes == null) {
+            return List.of();
+        }
+        return selectedItemTypes.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .map(value -> value.toUpperCase(Locale.ROOT))
+                .distinct()
+                .toList();
+    }
+
+    private List<String> parseSelectedItemTypes(String selectedItemTypes) {
+        if (!StringUtils.hasText(selectedItemTypes)) {
+            return List.of();
+        }
+        return List.of(selectedItemTypes.split(",")).stream()
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
+    }
+
+    private RestoreExecuteResponse buildExecuteResponse(RestoreHistory history, String message) {
+        return new RestoreExecuteResponse(
+                history.getId(),
+                history.getStatus().name(),
+                history.getExecutedAt(),
+                parseSelectedItemTypes(history.getSelectedItemTypes()),
+                history.getPreBackupId(),
+                history.getPreBackupFileName(),
+                message,
+                history.getFailureReason()
+        );
+    }
+
+    private void executeDatabaseRestore(Path archivePath, String archiveDatasourceType) throws Exception {
+        if (!isSupportedImportDatasource(archiveDatasourceType)) {
+            throw new IOException("Unsupported archive datasource type: " + archiveDatasourceType);
+        }
+
+        String executable = resolveImportExecutable();
+        if (executable == null) {
+            throw new IOException("DB import command is not available.");
+        }
+
+        JdbcConnectionInfo connectionInfo = parseJdbcConnectionInfo(datasourceUrl);
+        Path databaseSqlFile = extractDatabaseSqlFile(archivePath);
+
+        try {
+            List<String> command = buildCommandInvocation(
+                    executable,
+                    List.of(
+                            "--host=" + connectionInfo.host(),
+                            "--port=" + connectionInfo.port(),
+                            "--user=" + datasourceUsername,
+                            connectionInfo.database()
+                    )
+            );
+
+            ProcessBuilder processBuilder = new ProcessBuilder(command);
+            processBuilder.redirectInput(databaseSqlFile.toFile());
+            if (datasourcePassword != null && !datasourcePassword.isBlank()) {
+                processBuilder.environment().put("MYSQL_PWD", datasourcePassword);
+            }
+
+            Process process = processBuilder.start();
+            String stderr;
+            try (InputStream errorStream = process.getErrorStream()) {
+                if (!process.waitFor(dbImportTimeoutSeconds, TimeUnit.SECONDS)) {
+                    process.destroyForcibly();
+                    throw new IOException("DB import timed out after " + dbImportTimeoutSeconds + " seconds.");
+                }
+                stderr = new String(errorStream.readAllBytes(), StandardCharsets.UTF_8).trim();
+            }
+
+            if (process.exitValue() != 0) {
+                throw new IOException("DB import failed with exit code " + process.exitValue() + (stderr.isBlank() ? "" : " - " + stderr));
+            }
+        } finally {
+            Files.deleteIfExists(databaseSqlFile);
+        }
+    }
+
+    private Path extractDatabaseSqlFile(Path archivePath) throws Exception {
+        Path tempFile = Files.createTempFile("restore-database-", ".sql");
+        try (ZipFile zipFile = new ZipFile(archivePath.toFile(), StandardCharsets.UTF_8)) {
+            ZipEntry databaseEntry = zipFile.getEntry(DATABASE_SQL_PATH);
+            if (databaseEntry == null) {
+                throw new IOException(DATABASE_SQL_PATH + " entry is missing.");
+            }
+            try (InputStream inputStream = zipFile.getInputStream(databaseEntry)) {
+                Files.copy(inputStream, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            return tempFile;
+        } catch (Exception exception) {
+            Files.deleteIfExists(tempFile);
+            throw exception;
+        }
+    }
+
+    private boolean isSupportedImportDatasource(String datasourceType) {
+        return "MARIADB".equals(datasourceType) || "MYSQL".equals(datasourceType);
+    }
+
+    private String normalizeDatasourceType(String datasourceType) {
+        return datasourceType == null ? "" : datasourceType.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String determineDatasourceType(String jdbcUrl) {
+        if (jdbcUrl == null) {
+            return "UNKNOWN";
+        }
+        if (jdbcUrl.startsWith("jdbc:mariadb://")) {
+            return "MARIADB";
+        }
+        if (jdbcUrl.startsWith("jdbc:mysql://")) {
+            return "MYSQL";
+        }
+        if (jdbcUrl.startsWith("jdbc:h2:")) {
+            return "H2";
+        }
+        return "OTHER";
+    }
+
+    private JdbcConnectionInfo parseJdbcConnectionInfo(String jdbcUrl) throws IOException {
+        if (!StringUtils.hasText(jdbcUrl)) {
+            throw new IOException("Datasource URL is missing.");
+        }
+        try {
+            URI uri = URI.create(jdbcUrl.substring("jdbc:".length()));
+            String database = uri.getPath();
+            if (database == null || database.isBlank() || "/".equals(database)) {
+                throw new IOException("Database name is missing in datasource URL.");
+            }
+            return new JdbcConnectionInfo(
+                    uri.getHost(),
+                    uri.getPort() > 0 ? uri.getPort() : 3306,
+                    database.startsWith("/") ? database.substring(1) : database
+            );
+        } catch (IOException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new IOException("DB 연결 정보 해석에 실패했습니다.", exception);
+        }
+    }
+
+    private String resolveImportExecutable() {
+        if (dbImportCommand != null && !dbImportCommand.isBlank()) {
+            String configured = dbImportCommand.trim();
+            return isExecutableAvailable(configured) ? configured : null;
+        }
+        for (String candidate : List.of("mariadb", "mysql")) {
+            if (isExecutableAvailable(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private boolean isExecutableAvailable(String candidate) {
+        try {
+            Process process = new ProcessBuilder(buildCommandInvocation(candidate, List.of("--version"))).start();
+            return process.waitFor(5, TimeUnit.SECONDS) && process.exitValue() == 0;
+        } catch (Exception exception) {
+            return false;
+        }
+    }
+
+    private List<String> buildCommandInvocation(String executable, List<String> args) {
+        if (isWindowsScript(executable)) {
+            List<String> command = new ArrayList<>();
+            command.add("cmd.exe");
+            command.add("/c");
+            command.add(executable);
+            command.addAll(args);
+            return command;
+        }
+        List<String> command = new ArrayList<>();
+        command.add(executable);
+        command.addAll(args);
+        return command;
+    }
+
+    private boolean isWindowsScript(String executable) {
+        String normalized = executable.toLowerCase(Locale.ROOT);
+        return isWindows() && (normalized.endsWith(".cmd") || normalized.endsWith(".bat"));
+    }
+
+    private boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows");
     }
 
     private ValidationResult inspectStoredZip(Path storedFilePath, String originalFileName) {
@@ -425,7 +806,7 @@ public class RestoreService {
 
     private void validateDatabaseDumpConsistency(ManifestSummaryData summary, List<ManifestEntryData> entries) {
         boolean hasDatabaseDumpEntry = entries.stream()
-                .anyMatch(entry -> "db/database.sql".equals(entry.relativePath()));
+                .anyMatch(entry -> DATABASE_SQL_PATH.equals(entry.relativePath()));
         if (summary.includesDatabaseDump() != hasDatabaseDumpEntry) {
             throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_MANIFEST_INVALID",
                     "manifest summary.includesDatabaseDump 와 db/database.sql 포함 여부가 일치하지 않습니다.");
@@ -458,9 +839,9 @@ public class RestoreService {
     private List<RestoreDetectedItemResponse> detectItems(List<ManifestEntryData> entries) {
         List<RestoreDetectedItemResponse> detectedItems = new ArrayList<>();
 
-        List<String> databasePaths = filterPaths(entries, path -> "db/database.sql".equals(path));
+        List<String> databasePaths = filterPaths(entries, path -> DATABASE_SQL_PATH.equals(path));
         if (!databasePaths.isEmpty()) {
-            detectedItems.add(new RestoreDetectedItemResponse("DATABASE", databasePaths));
+            detectedItems.add(new RestoreDetectedItemResponse(DATABASE_ITEM_TYPE, databasePaths));
         }
 
         List<String> configPaths = filterPaths(entries, path -> path.startsWith("config/"));
@@ -609,5 +990,8 @@ public class RestoreService {
     }
 
     private record EntryContentData(long size, String sha256) {
+    }
+
+    private record JdbcConnectionInfo(String host, int port, String database) {
     }
 }

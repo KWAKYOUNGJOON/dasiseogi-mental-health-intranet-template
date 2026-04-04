@@ -9,10 +9,14 @@ public record RestoreDetailResponse(
         String fileName,
         LocalDateTime uploadedAt,
         LocalDateTime validatedAt,
+        LocalDateTime executedAt,
         String uploadedByName,
         String formatVersion,
         String datasourceType,
         Long backupId,
+        List<String> selectedItemTypes,
+        Long preBackupId,
+        String preBackupFileName,
         String failureReason,
         List<RestoreDetectedItemResponse> detectedItems
 ) {

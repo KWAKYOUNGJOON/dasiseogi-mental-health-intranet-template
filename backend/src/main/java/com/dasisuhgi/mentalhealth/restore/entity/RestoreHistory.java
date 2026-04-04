@@ -54,6 +54,16 @@ public class RestoreHistory {
 
     private Long backupId;
 
+    private LocalDateTime executedAt;
+
+    @Column(length = 100)
+    private String selectedItemTypes;
+
+    private Long preBackupId;
+
+    @Column(length = 255)
+    private String preBackupFileName;
+
     @Column(length = 500)
     private String failureReason;
 

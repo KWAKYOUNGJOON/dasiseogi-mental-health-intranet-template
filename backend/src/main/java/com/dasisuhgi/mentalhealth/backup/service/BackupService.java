@@ -140,6 +140,11 @@ public class BackupService {
         return executeBackup(BackupType.MANUAL, request == null ? null : request.reason(), currentUser);
     }
 
+    @Transactional(noRollbackFor = Exception.class)
+    public ManualBackupRunResponse runPreRestoreBackup(String reason, User currentUser) {
+        return executeBackup(BackupType.MANUAL, reason, currentUser);
+    }
+
     @Scheduled(cron = "${app.backup.auto.cron:0 0 2 * * *}", zone = "${app.backup.auto.zone:Asia/Seoul}")
     @Transactional(noRollbackFor = Exception.class)
     public void runAutomaticBackup() {

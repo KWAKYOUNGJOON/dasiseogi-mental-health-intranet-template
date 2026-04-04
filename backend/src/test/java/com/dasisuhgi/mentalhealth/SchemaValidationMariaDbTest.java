@@ -117,6 +117,24 @@ class SchemaValidationMariaDbTest {
         ColumnDefinition restoreHistoryValidatedAt = columnDefinition("restore_histories", "validated_at");
         assertThat(restoreHistoryValidatedAt.dataType()).isEqualTo("datetime");
         assertThat(restoreHistoryValidatedAt.nullable()).isTrue();
+
+        ColumnDefinition restoreHistoryExecutedAt = columnDefinition("restore_histories", "executed_at");
+        assertThat(restoreHistoryExecutedAt.dataType()).isEqualTo("datetime");
+        assertThat(restoreHistoryExecutedAt.nullable()).isTrue();
+
+        ColumnDefinition restoreHistorySelectedItemTypes = columnDefinition("restore_histories", "selected_item_types");
+        assertThat(restoreHistorySelectedItemTypes.dataType()).isEqualTo("varchar");
+        assertThat(restoreHistorySelectedItemTypes.nullable()).isTrue();
+        assertThat(restoreHistorySelectedItemTypes.characterMaximumLength()).isEqualTo(100L);
+
+        ColumnDefinition restoreHistoryPreBackupId = columnDefinition("restore_histories", "pre_backup_id");
+        assertThat(restoreHistoryPreBackupId.dataType()).isEqualTo("bigint");
+        assertThat(restoreHistoryPreBackupId.nullable()).isTrue();
+
+        ColumnDefinition restoreHistoryPreBackupFileName = columnDefinition("restore_histories", "pre_backup_file_name");
+        assertThat(restoreHistoryPreBackupFileName.dataType()).isEqualTo("varchar");
+        assertThat(restoreHistoryPreBackupFileName.nullable()).isTrue();
+        assertThat(restoreHistoryPreBackupFileName.characterMaximumLength()).isEqualTo(255L);
     }
 
     @Test
@@ -143,7 +161,7 @@ class SchemaValidationMariaDbTest {
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
 
         assertThat(normalizedClause).contains("action_type");
-        assertThat(actualAllowedValues).contains("USER_PROFILE_UPDATE", "USER_POSITION_NAME_CHANGE", "RESTORE_UPLOAD");
+        assertThat(actualAllowedValues).contains("USER_PROFILE_UPDATE", "USER_POSITION_NAME_CHANGE", "RESTORE_UPLOAD", "RESTORE_EXECUTE");
         assertThat(actualAllowedValues).containsExactlyInAnyOrderElementsOf(expectedValues);
     }
 

@@ -19,11 +19,15 @@ import {
 } from '../api/backupManagementApi'
 import {
   RESTORE_DETECTED_ITEM_TYPES,
+  RESTORE_EXECUTABLE_ITEM_TYPES,
+  executeRestore,
   fetchRestoreDetail,
   fetchRestoreHistoryPage,
   uploadRestoreZip,
   type RestoreDetectedItem,
   type RestoreDetail,
+  type RestoreDetectedItemType,
+  type RestoreExecutableItemType,
   type RestoreHistoryPage,
   type RestoreStatus,
 } from '../api/restoreManagementApi'
@@ -59,11 +63,19 @@ const GENERIC_RUN_ERROR_MESSAGE = '수동 백업 실행에 실패했습니다. �
 const GENERIC_RESTORE_UPLOAD_ERROR_MESSAGE = '복원 ZIP 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.'
 const GENERIC_RESTORE_LIST_ERROR_MESSAGE = '복원 검증 이력을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
 const GENERIC_RESTORE_DETAIL_ERROR_MESSAGE = '복원 검증 상세를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+const GENERIC_RESTORE_EXECUTE_ERROR_MESSAGE = '복원 실행에 실패했습니다. 잠시 후 다시 시도해주세요.'
 const BACKUP_PATH_GUIDE = '백업 저장 경로는 운영 설정(APP_BACKUP_ROOT_PATH)을 따릅니다.'
 const RESTORE_DETAIL_EMPTY_MESSAGE = '복원 검증 이력을 선택하면 상세를 확인할 수 있습니다.'
 const RESTORE_UPLOADED_GUIDE = '아직 검증 완료 전 상태입니다. 검증이 끝나면 validatedAt 과 detectedItems 를 확인할 수 있습니다.'
-const RESTORE_FAILED_DETECTED_ITEMS_GUIDE = 'detectedItems 는 비어 있습니다.'
+const RESTORE_FAILED_DETECTED_ITEMS_GUIDE = '실패 상태여도 검증 완료된 ZIP 은 detectedItems 를 다시 확인할 수 있습니다.'
 const RESTORE_VALIDATED_DETECTED_ITEMS_GUIDE = '검증된 항목은 그룹별 relativePaths 기준으로 확인할 수 있습니다.'
+const RESTORE_PREPARATION_CONFIRMATION_TEXT = '전체 복원을 실행합니다'
+const RESTORE_PREPARATION_SELECTION_GUIDE = 'VALIDATED 상태의 복원 검증 상세에서만 DATABASE 복원 실행을 진행할 수 있습니다.'
+const RESTORE_PREPARATION_EMPTY_GROUPS_GUIDE = 'detectedItems 에 DATABASE 항목이 없어 실제 복원을 실행할 수 없습니다.'
+const RESTORE_PREPARATION_CONFIRMATION_GUIDE = `확인 문구는 ${RESTORE_PREPARATION_CONFIRMATION_TEXT} 와 정확히 일치해야 합니다.`
+const RESTORE_PREPARATION_CONFIRMATION_ERROR = '확인 문구가 정확히 일치하지 않습니다.'
+const RESTORE_EXECUTION_SCOPE_GUIDE = '현재 버전에서는 DATABASE 그룹만 실제 복원 가능합니다.'
+const RESTORE_EXECUTION_EXCLUDED_BADGE = '현재 버전 복원 제외'
 const BACKUP_TYPE_FILTER_LABELS: Readonly<Partial<Record<BackupType, string>>> = {
   AUTO: '자동 백업',
   MANUAL: '수동 백업',
@@ -197,6 +209,34 @@ function getRestoreDetailError(response: ApiResponse<unknown> | undefined): Deta
   }
 }
 
+function getRestoreExecuteErrorMessage(response: ApiResponse<unknown> | undefined) {
+  if (!response) {
+    return GENERIC_RESTORE_EXECUTE_ERROR_MESSAGE
+  }
+
+  switch (response.errorCode) {
+    case 'FORBIDDEN':
+    case 'RESTORE_EXECUTE_FORBIDDEN':
+      return getFallbackMessage(response.message, '복원 실행 권한이 없습니다.')
+    case 'RESTORE_HISTORY_NOT_FOUND':
+      return getFallbackMessage(response.message, '복원 검증 이력을 찾을 수 없습니다.')
+    case 'RESTORE_EXECUTE_INVALID_STATUS':
+      return getFallbackMessage(response.message, 'VALIDATED 상태의 복원 검증 이력만 실행할 수 있습니다.')
+    case 'RESTORE_CONFIRMATION_TEXT_MISMATCH':
+      return getFallbackMessage(response.message, RESTORE_PREPARATION_CONFIRMATION_ERROR)
+    case 'RESTORE_ITEM_SELECTION_INVALID':
+      return getFallbackMessage(response.message, 'DATABASE 복원 대상을 다시 확인해주세요.')
+    case 'RESTORE_UNSUPPORTED_ITEM_TYPE':
+      return getFallbackMessage(response.message, RESTORE_EXECUTION_SCOPE_GUIDE)
+    case 'RESTORE_UNSUPPORTED_DATASOURCE':
+      return getFallbackMessage(response.message, '현재 버전에서는 MariaDB/MySQL DATABASE 복원만 지원합니다.')
+    case 'RESTORE_ARCHIVE_UNAVAILABLE':
+      return getFallbackMessage(response.message, '저장된 복원 ZIP 파일을 사용할 수 없습니다.')
+    default:
+      return getFallbackMessage(response.message, GENERIC_RESTORE_EXECUTE_ERROR_MESSAGE)
+  }
+}
+
 function mapDialogFieldErrors(response: ApiResponse<unknown> | undefined): DialogFieldErrors {
   return (response?.fieldErrors ?? []).reduce<DialogFieldErrors>((errors, fieldError) => {
     if (fieldError.field === 'reason') {
@@ -224,10 +264,18 @@ function getBackupStatusChipStyle(status: BackupStatus): CSSProperties {
 function getRestoreStatusChipStyle(status: RestoreStatus): CSSProperties {
   switch (status) {
     case 'VALIDATED':
+    case 'SUCCESS':
       return {
         color: '#1d6a53',
         background: '#dff1ea',
       }
+    case 'PRE_BACKUP_RUNNING':
+    case 'RESTORING':
+      return {
+        color: '#805200',
+        background: '#fff1cf',
+      }
+    case 'PRE_BACKUP_FAILED':
     case 'FAILED':
       return {
         color: '#9d2f2f',
@@ -303,6 +351,28 @@ function formatOptionalNumber(value: number | null) {
   }
 
   return String(value)
+}
+
+function getRestorePreparationStatusChipStyle(isReady: boolean): CSSProperties {
+  if (isReady) {
+    return {
+      color: '#1d6a53',
+      background: '#dff1ea',
+    }
+  }
+
+  return {
+    color: '#9d2f2f',
+    background: '#f8e1e1',
+  }
+}
+
+function getRestoreGroupRelativePaths(detectedItems: RestoreDetectedItem[], itemType: RestoreDetectedItemType) {
+  return detectedItems.find((item) => item.itemType === itemType)?.relativePaths ?? []
+}
+
+function getDefaultSelectedRestoreGroups(detectedItems: RestoreDetectedItem[]) {
+  return RESTORE_EXECUTABLE_ITEM_TYPES.filter((itemType) => getRestoreGroupRelativePaths(detectedItems, itemType).length > 0)
 }
 
 interface RestoreDetectedItemsCardsProps {
@@ -399,6 +469,10 @@ export function BackupManagementBoard() {
   const [restoreDetail, setRestoreDetail] = useState<RestoreDetail | null>(null)
   const [restoreDetailLoading, setRestoreDetailLoading] = useState(false)
   const [restoreDetailError, setRestoreDetailError] = useState<DetailError>(null)
+  const [restorePreparationNotice, setRestorePreparationNotice] = useState<Notice>(null)
+  const [selectedRestoreGroups, setSelectedRestoreGroups] = useState<RestoreExecutableItemType[]>([])
+  const [restoreConfirmationText, setRestoreConfirmationText] = useState('')
+  const [restoreExecuting, setRestoreExecuting] = useState(false)
 
   const loadBackups = useCallback(async () => {
     setLoading(true)
@@ -442,6 +516,24 @@ export function BackupManagementBoard() {
     }
   }, [restorePage])
 
+  const loadRestoreDetailById = useCallback(async (restoreId: number) => {
+    setRestoreDetailLoading(true)
+    setRestoreDetail(null)
+    setRestoreDetailError(null)
+
+    try {
+      const response = await fetchRestoreDetail(restoreId)
+
+      setRestoreDetail(response)
+      setRestoreDetailError(null)
+    } catch (error) {
+      setRestoreDetail(null)
+      setRestoreDetailError(getRestoreDetailError(getApiResponse(error)))
+    } finally {
+      setRestoreDetailLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void loadBackups()
   }, [loadBackups])
@@ -458,44 +550,23 @@ export function BackupManagementBoard() {
       return
     }
 
-    const restoreId = selectedRestoreId
-    let cancelled = false
+    void loadRestoreDetailById(selectedRestoreId)
+  }, [loadRestoreDetailById, selectedRestoreId])
 
-    async function run() {
-      setRestoreDetailLoading(true)
-      setRestoreDetail(null)
-      setRestoreDetailError(null)
-
-      try {
-        const response = await fetchRestoreDetail(restoreId)
-
-        if (cancelled) {
-          return
-        }
-
-        setRestoreDetail(response)
-      } catch (error) {
-        if (cancelled) {
-          return
-        }
-
-        setRestoreDetail(null)
-        setRestoreDetailError(getRestoreDetailError(getApiResponse(error)))
-      } finally {
-        if (cancelled) {
-          return
-        }
-
-        setRestoreDetailLoading(false)
-      }
-    }
-
-    void run()
-
-    return () => {
-      cancelled = true
-    }
+  useEffect(() => {
+    setRestorePreparationNotice(null)
+    setSelectedRestoreGroups([])
+    setRestoreConfirmationText('')
   }, [selectedRestoreId])
+
+  useEffect(() => {
+    if (!restoreDetail || restoreDetail.id !== selectedRestoreId || restoreDetail.status !== 'VALIDATED') {
+      setSelectedRestoreGroups([])
+      return
+    }
+
+    setSelectedRestoreGroups(getDefaultSelectedRestoreGroups(restoreDetail.detectedItems))
+  }, [restoreDetail, selectedRestoreId])
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -593,6 +664,17 @@ export function BackupManagementBoard() {
     setRestoreNotice(null)
   }
 
+  function selectRestoreHistory(restoreId: number) {
+    if (selectedRestoreId === restoreId) {
+      return
+    }
+
+    setSelectedRestoreId(restoreId)
+    setRestoreDetail(null)
+    setRestoreDetailError(null)
+    setRestoreDetailLoading(true)
+  }
+
   async function handleRestoreUpload() {
     if (restoreUploading) {
       return
@@ -616,7 +698,7 @@ export function BackupManagementBoard() {
         type: 'success',
         text: `${result.fileName} 업로드가 완료되었습니다. restoreId ${result.restoreId} 상세를 확인하세요.`,
       })
-      setSelectedRestoreId(result.restoreId)
+      selectRestoreHistory(result.restoreId)
       setRestoreUploadFile(null)
 
       if (restoreFileInputRef.current) {
@@ -638,6 +720,52 @@ export function BackupManagementBoard() {
     }
   }
 
+  async function reloadRestoreExecutionState(restoreId: number) {
+    await Promise.allSettled([loadRestoreHistories(), loadRestoreDetailById(restoreId)])
+  }
+
+  function handleRestoreGroupToggle(itemType: RestoreExecutableItemType) {
+    setRestorePreparationNotice(null)
+    setSelectedRestoreGroups((prev) =>
+      prev.includes(itemType) ? prev.filter((value) => value !== itemType) : [...prev, itemType],
+    )
+  }
+
+  function handleRestoreConfirmationChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
+    setRestorePreparationNotice(null)
+    setRestoreConfirmationText(event.target.value)
+  }
+
+  async function handleRestorePreparationClick() {
+    if (!restorePreparationReady || selectedRestoreId == null || restoreExecuting) {
+      return
+    }
+
+    setRestoreExecuting(true)
+    setRestorePreparationNotice(null)
+
+    try {
+      const result = await executeRestore(selectedRestoreId, {
+        selectedItemTypes: activeSelectedRestoreGroups,
+        confirmationText: restoreConfirmationText,
+      })
+
+      setRestorePreparationNotice({
+        type: result.status === 'SUCCESS' ? 'success' : 'error',
+        text: result.message,
+      })
+      await reloadRestoreExecutionState(selectedRestoreId)
+    } catch (error) {
+      setRestorePreparationNotice({
+        type: 'error',
+        text: getRestoreExecuteErrorMessage(getApiResponse(error)),
+      })
+      await reloadRestoreExecutionState(selectedRestoreId)
+    } finally {
+      setRestoreExecuting(false)
+    }
+  }
+
   const items = historyPage?.items ?? []
   const currentPage = historyPage?.page ?? page
   const totalPages = historyPage && historyPage.totalPages > 0 ? historyPage.totalPages : 1
@@ -647,6 +775,43 @@ export function BackupManagementBoard() {
   const restoreItems = restoreHistoryPage?.items ?? []
   const restoreCurrentPage = restoreHistoryPage?.page ?? restorePage
   const restoreTotalPages = restoreHistoryPage && restoreHistoryPage.totalPages > 0 ? restoreHistoryPage.totalPages : 1
+  const restoreDetectedItems = restoreDetail?.detectedItems ?? []
+  const executableRestoreGroups = getDefaultSelectedRestoreGroups(restoreDetectedItems)
+  const activeSelectedRestoreGroups = selectedRestoreGroups.filter((itemType) => executableRestoreGroups.includes(itemType))
+  const persistedSelectedRestoreGroups = restoreDetail?.selectedItemTypes ?? []
+  const isValidatedRestoreDetail = restoreDetail?.status === 'VALIDATED'
+  const restorePreparationBlockedMessage =
+    selectedRestoreId == null
+      ? '복원 검증 이력을 선택하면 복원 실행 준비를 시작할 수 있습니다.'
+      : restoreDetailLoading
+        ? '복원 검증 상세를 불러온 뒤 복원 실행 준비를 진행할 수 있습니다.'
+        : restoreDetailError
+          ? '복원 검증 상세를 확인할 수 없어 복원 실행 준비를 진행할 수 없습니다.'
+          : !restoreDetail
+            ? '복원 검증 상세를 불러오지 못했습니다.'
+            : !isValidatedRestoreDetail
+              ? RESTORE_PREPARATION_SELECTION_GUIDE
+              : executableRestoreGroups.length === 0
+                ? RESTORE_PREPARATION_EMPTY_GROUPS_GUIDE
+                : null
+  const restorePreparationInputDisabled =
+    selectedRestoreId == null ||
+    restoreDetailLoading ||
+    !!restoreDetailError ||
+    !restoreDetail ||
+    !isValidatedRestoreDetail ||
+    executableRestoreGroups.length === 0
+  const restoreConfirmationMatches = restoreConfirmationText === RESTORE_PREPARATION_CONFIRMATION_TEXT
+  const restorePreparationReady =
+    isValidatedRestoreDetail && activeSelectedRestoreGroups.length > 0 && restoreConfirmationMatches
+  const selectedRestoreGroupCount =
+    activeSelectedRestoreGroups.length > 0 ? activeSelectedRestoreGroups.length : persistedSelectedRestoreGroups.length
+  const selectedRestoreGroupSummary =
+    activeSelectedRestoreGroups.length > 0
+      ? activeSelectedRestoreGroups.join(', ')
+      : persistedSelectedRestoreGroups.length > 0
+        ? persistedSelectedRestoreGroups.join(', ')
+        : '선택된 그룹 없음'
 
   return (
     <div className="stack">
@@ -909,7 +1074,7 @@ export function BackupManagementBoard() {
         <div className="stack" style={{ gap: 8 }}>
           <strong>복원 ZIP 업로드</strong>
           <p className="muted" style={{ margin: 0 }}>
-            기존 관리자 화면 안에서 복원 검증 결과만 확인합니다. 실제 복원 실행은 이번 단계에 포함하지 않습니다.
+            기존 관리자 화면 안에서 복원 검증 결과를 확인하고, VALIDATED 된 이력에 대해 DATABASE 복원 실행까지 이어서 진행합니다.
           </p>
         </div>
 
@@ -1003,7 +1168,7 @@ export function BackupManagementBoard() {
                       aria-selected={selected}
                       className="clickable-row"
                       key={item.id}
-                      onClick={() => setSelectedRestoreId(item.id)}
+                      onClick={() => selectRestoreHistory(item.id)}
                       style={selected ? { background: '#eef8f3' } : undefined}
                     >
                       <td>{item.id}</td>
@@ -1138,6 +1303,10 @@ export function BackupManagementBoard() {
                 <strong>{restoreDetail.validatedAt}</strong>
               </div>
               <div className="field" style={{ margin: 0 }}>
+                <span>실행 시각</span>
+                <strong>{restoreDetail.executedAt}</strong>
+              </div>
+              <div className="field" style={{ margin: 0 }}>
                 <span>업로드 사용자명</span>
                 <strong>{restoreDetail.uploadedByName}</strong>
               </div>
@@ -1153,9 +1322,28 @@ export function BackupManagementBoard() {
                 <span>backupId</span>
                 <strong>{formatOptionalNumber(restoreDetail.backupId)}</strong>
               </div>
+              <div className="field" style={{ margin: 0 }}>
+                <span>선택된 실행 항목</span>
+                <strong>{restoreDetail.selectedItemTypes.length > 0 ? restoreDetail.selectedItemTypes.join(', ') : '-'}</strong>
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <span>preBackupId</span>
+                <strong>{formatOptionalNumber(restoreDetail.preBackupId)}</strong>
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <span>preBackupFileName</span>
+                <strong
+                  style={{
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {restoreDetail.preBackupFileName}
+                </strong>
+              </div>
             </div>
 
-            {restoreDetail.status === 'FAILED' ? (
+            {restoreDetail.status === 'FAILED' || restoreDetail.status === 'PRE_BACKUP_FAILED' ? (
               <>
                 <div
                   style={{
@@ -1203,6 +1391,310 @@ export function BackupManagementBoard() {
             복원 검증 상세를 불러오지 못했습니다.
           </p>
         )}
+      </div>
+
+      <div className="card stack" style={{ borderColor: '#d7c09b' }}>
+        <div className="toolbar" style={{ marginBottom: 0 }}>
+          <strong>복원 실행 준비</strong>
+          <span className="muted">서버가 자동 백업과 DATABASE 복원 실행을 담당하고, 프론트는 선택값과 결과만 표시합니다.</span>
+        </div>
+
+        {restorePreparationNotice ? (
+          restorePreparationNotice.type === 'success' ? (
+            <div className="success-panel" role="status">
+              {restorePreparationNotice.text}
+            </div>
+          ) : (
+            <div className="error-text" role="alert">
+              {restorePreparationNotice.text}
+            </div>
+          )
+        ) : null}
+
+        <section
+          className="stack"
+          style={{
+            gap: 12,
+            padding: 16,
+            border: '1px solid #d8e1ea',
+            borderRadius: 14,
+            background: '#fbfdff',
+          }}
+        >
+          <div className="toolbar" style={{ marginBottom: 0 }}>
+            <strong>1. 복원 대상 항목 체크박스</strong>
+            <span className="muted">{RESTORE_EXECUTION_SCOPE_GUIDE}</span>
+          </div>
+
+          {restorePreparationBlockedMessage ? (
+            <div
+              style={{
+                padding: '12px 14px',
+                border: '1px solid #d8e1ea',
+                borderRadius: 12,
+                background: '#f5f9fc',
+              }}
+            >
+              <span className="muted">{restorePreparationBlockedMessage}</span>
+            </div>
+          ) : null}
+
+          {selectedRestoreId != null && !restoreDetailLoading && !restoreDetailError && restoreDetail ? (
+            <>
+              <div
+                style={{
+                  display: 'grid',
+                  gap: 12,
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                }}
+              >
+                {RESTORE_DETECTED_ITEM_TYPES.map((itemType) => {
+                  const relativePaths = getRestoreGroupRelativePaths(restoreDetectedItems, itemType)
+                  const executable = RESTORE_EXECUTABLE_ITEM_TYPES.includes(itemType as RestoreExecutableItemType)
+                  const checked = executable && activeSelectedRestoreGroups.includes(itemType as RestoreExecutableItemType)
+                  const disabled = restorePreparationInputDisabled || relativePaths.length === 0 || !executable
+
+                  return (
+                    <label
+                      key={itemType}
+                      style={{
+                        display: 'grid',
+                        gap: 10,
+                        padding: 16,
+                        border: '1px solid #d8e1ea',
+                        borderRadius: 14,
+                        background: disabled ? '#f7f9fb' : '#ffffff',
+                        color: disabled ? '#7c8ea1' : '#163750',
+                      }}
+                    >
+                      <div className="actions" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            gap: 10,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <input
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={() => handleRestoreGroupToggle(itemType as RestoreExecutableItemType)}
+                            type="checkbox"
+                          />
+                          <strong>{itemType}</strong>
+                        </span>
+                        <span
+                          className="muted"
+                          style={
+                            executable
+                              ? undefined
+                              : {
+                                  color: '#805200',
+                                  background: '#fff1cf',
+                                  padding: '4px 8px',
+                                  borderRadius: 999,
+                                }
+                          }
+                        >
+                          {executable ? `${relativePaths.length}개` : RESTORE_EXECUTION_EXCLUDED_BADGE}
+                        </span>
+                      </div>
+
+                      {relativePaths.length === 0 ? (
+                        <span className="muted">relativePaths 없음</span>
+                      ) : (
+                        <ul
+                          style={{
+                            margin: 0,
+                            paddingLeft: 18,
+                            display: 'grid',
+                            gap: 6,
+                          }}
+                        >
+                          {relativePaths.map((relativePath) => (
+                            <li
+                              key={`${itemType}-${relativePath}`}
+                              style={{
+                                wordBreak: 'break-word',
+                              }}
+                            >
+                              {relativePath}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {!executable && relativePaths.length > 0 ? <span className="muted">{RESTORE_EXECUTION_SCOPE_GUIDE}</span> : null}
+                    </label>
+                  )
+                })}
+              </div>
+
+              <div
+                style={{
+                  padding: '12px 14px',
+                  border: '1px solid #dde6ee',
+                  borderRadius: 12,
+                  background: '#f8fbfd',
+                }}
+              >
+                <div className="stack" style={{ gap: 6 }}>
+                  <strong>현재 선택 {selectedRestoreGroupCount}개</strong>
+                  <span className="muted">{selectedRestoreGroupSummary}</span>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </section>
+
+        <section
+          className="stack"
+          style={{
+            gap: 12,
+            padding: 16,
+            border: '1px solid #d8e1ea',
+            borderRadius: 14,
+            background: '#fbfdff',
+          }}
+        >
+          <div className="toolbar" style={{ marginBottom: 0 }}>
+            <strong>2. 확인 문구 입력</strong>
+            <span className="muted">정확히 일치할 때만 실행 준비 완료로 판단합니다.</span>
+          </div>
+
+          <label className="field" style={{ margin: 0 }}>
+            <span>확인 문구</span>
+            <textarea
+              aria-label="복원 실행 확인 문구"
+              disabled={restorePreparationInputDisabled}
+              onChange={handleRestoreConfirmationChange}
+              placeholder={RESTORE_PREPARATION_CONFIRMATION_TEXT}
+              rows={3}
+              value={restoreConfirmationText}
+            />
+            <span className="field-hint">{RESTORE_PREPARATION_CONFIRMATION_GUIDE}</span>
+            {restorePreparationInputDisabled ? (
+              <span className="muted">입력 가능 상태가 되면 확인 문구를 정확히 입력해주세요.</span>
+            ) : restoreConfirmationText.length === 0 ? (
+              <span className="muted">확인 문구를 정확히 입력해야 실행 준비 상태가 활성화됩니다.</span>
+            ) : restoreConfirmationMatches ? (
+              <span className="success-text">확인 문구가 정확히 일치합니다.</span>
+            ) : (
+              <span className="field-error">{RESTORE_PREPARATION_CONFIRMATION_ERROR}</span>
+            )}
+          </label>
+        </section>
+
+        <section
+          className="stack"
+          style={{
+            gap: 12,
+            padding: 16,
+            border: '1px solid #d8e1ea',
+            borderRadius: 14,
+            background: '#fbfdff',
+          }}
+        >
+          <div className="toolbar" style={{ marginBottom: 0 }}>
+            <strong>3. 실행 전 요약/검토</strong>
+            <span className="muted">실행 시 서버가 pre-backup 이후 DATABASE 복원을 순차적으로 수행합니다.</span>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gap: 16,
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            }}
+          >
+            <div className="field" style={{ margin: 0 }}>
+              <span>restoreId</span>
+              <strong>{selectedRestoreId ?? '-'}</strong>
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <span>상태</span>
+              {restoreDetail ? (
+                <span className="status-chip" style={getRestoreStatusChipStyle(restoreDetail.status)}>
+                  {restoreDetail.status}
+                </span>
+              ) : (
+                <strong>-</strong>
+              )}
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <span>fileName</span>
+              <strong
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {restoreDetail?.fileName ?? '-'}
+              </strong>
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <span>datasourceType</span>
+              <strong>{restoreDetail?.datasourceType ?? '-'}</strong>
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <span>backupId</span>
+              <strong>{formatOptionalNumber(restoreDetail?.backupId ?? null)}</strong>
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <span>선택된 복원 항목 그룹</span>
+              <strong
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {selectedRestoreGroupSummary}
+              </strong>
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <span>선택된 그룹 수</span>
+              <strong>{selectedRestoreGroupCount}</strong>
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <span>확인 문구 일치 여부</span>
+              <span className="status-chip" style={getRestorePreparationStatusChipStyle(restoreConfirmationMatches)}>
+                {restoreConfirmationMatches ? '일치' : '불일치'}
+              </span>
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <span>실행 준비 상태</span>
+              <span className="status-chip" style={getRestorePreparationStatusChipStyle(restorePreparationReady)}>
+                {restorePreparationReady ? '실행 준비 가능' : '실행 준비 불가'}
+              </span>
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <span>마지막 실행 시각</span>
+              <strong>{restoreDetail?.executedAt ?? '-'}</strong>
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <span>preBackupFileName</span>
+              <strong
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {restoreDetail?.preBackupFileName ?? '-'}
+              </strong>
+            </div>
+          </div>
+
+          <div className="actions">
+            <button
+              className="danger-button"
+              disabled={!restorePreparationReady || restoreExecuting}
+              onClick={() => void handleRestorePreparationClick()}
+              type="button"
+            >
+              {restoreExecuting ? '복원 실행 중...' : '복원 실행'}
+            </button>
+            <span className="muted">실행 중에는 중복 클릭을 막고, 완료 후 목록과 상세를 다시 불러옵니다.</span>
+          </div>
+        </section>
       </div>
 
       <ConfirmDialog

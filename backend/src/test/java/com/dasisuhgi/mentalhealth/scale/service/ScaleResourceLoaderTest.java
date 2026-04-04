@@ -78,6 +78,34 @@ class ScaleResourceLoaderTest {
                 .hasMessageContaining("missing-scales");
     }
 
+    @Test
+    void loadsPdfAlignedIesrDefinitionAndThresholds() {
+        ScaleProperties scaleProperties = new ScaleProperties();
+        scaleProperties.setResourcePath(null);
+        ScaleResourceLoader loader = new ScaleResourceLoader(objectMapper, resourceLoader, scaleProperties);
+
+        ScaleResourceLoader.LoadedScaleResources loaded = loader.load();
+
+        assertThat(loaded.definitions()).containsKey("IESR");
+
+        var iesr = loaded.definitions().get("IESR");
+
+        assertThat(iesr.questionCount()).isEqualTo(22);
+        assertThat(iesr.screeningThreshold()).isEqualTo(18);
+        assertThat(iesr.items()).hasSize(22);
+        assertThat(iesr.items().get(0).text()).isEqualTo("그 사건을 떠올리게 하는 어떤 것이 나에게 그때의 감정을 다시 불러 일으켰다");
+        assertThat(iesr.items().get(iesr.items().size() - 1).text()).isEqualTo("나는 그 사건에 대해 이야기하지 않으려고 노력했다.");
+        assertThat(iesr.items().get(0).options())
+                .extracting(option -> option.label())
+                .containsExactly("전혀 아니다", "약간 그렇다", "그런 편이다", "꽤 그렇다", "매우 그렇다");
+        assertThat(iesr.interpretationRules())
+                .extracting(rule -> rule.label())
+                .containsExactly("정상", "약간 충격", "심한 충격", "매우 심한 충격");
+        assertThat(iesr.alertRules())
+                .extracting(rule -> rule.message())
+                .containsExactly("주의 필요", "상담 권고 또는 고위험 경고");
+    }
+
     private String readClasspathResource(String location) throws IOException {
         return new String(
                 resourceLoader.getResource(Objects.requireNonNull(location, "location")).getInputStream().readAllBytes(),
