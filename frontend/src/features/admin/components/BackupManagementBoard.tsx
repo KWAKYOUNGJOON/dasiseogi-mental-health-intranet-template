@@ -951,16 +951,15 @@ export function BackupManagementBoard() {
           : !restoreDetail
             ? '복원 검증 상세를 불러오지 못했습니다.'
             : restorePreparation?.blockedReason ?? (!isValidatedRestoreDetail ? RESTORE_PREPARATION_SELECTION_GUIDE : null)
-  const hasSelectableRestoreGroups = restorePreparationGroups.some((group) => group.selectable)
-  const restorePreparationInputDisabled =
+  const restorePreparationInteractionDisabled =
     selectedRestoreId == null ||
     restoreDetailLoading ||
-    restorePreparationLoading ||
     !!restoreDetailError ||
     !!restorePreparationError ||
     !restoreDetail ||
-    !isValidatedRestoreDetail ||
-    !hasSelectableRestoreGroups
+    !isValidatedRestoreDetail
+  const restorePreparationInputDisabled =
+    restorePreparationInteractionDisabled || restoreConfirmationStatus === 'NOT_APPLICABLE'
   const restoreDisplayOnlyDetectedItems =
     restoreDetail?.detectedItems.filter((item) => !isRestoreExecutableItemType(item.itemType)) ?? []
   const restoreConfirmationMatches = restorePreparation?.confirmationTextMatched ?? false
@@ -1668,7 +1667,7 @@ export function BackupManagementBoard() {
               >
                 {restorePreparationGroups.map((group) => {
                   const checked = group.selected
-                  const disabled = restorePreparationInputDisabled || !group.selectable
+                  const disabled = restorePreparationInteractionDisabled || !group.selectable
 
                   return (
                     <label
@@ -1825,8 +1824,10 @@ export function BackupManagementBoard() {
             <span className="field-hint">{`확인 문구는 ${restoreConfirmationRequiredText} 와 정확히 일치해야 합니다.`}</span>
             {restoreConfirmationStatus === 'NOT_APPLICABLE' ? (
               <span className="muted">{RESTORE_CONFIRMATION_SKIPPED_GUIDE}</span>
-            ) : restorePreparationInputDisabled ? (
+            ) : restorePreparationInteractionDisabled ? (
               <span className="muted">입력 가능 상태가 되면 확인 문구를 정확히 입력해주세요.</span>
+            ) : restorePreparationLoading ? (
+              <span className="muted">최근 입력값을 서버 기준으로 다시 확인하는 중입니다.</span>
             ) : restoreConfirmationStatus === 'WAITING_INPUT' ? (
               <span className="muted">확인 문구를 정확히 입력해야 실행 준비 상태가 활성화됩니다.</span>
             ) : restoreConfirmationMatches ? (
