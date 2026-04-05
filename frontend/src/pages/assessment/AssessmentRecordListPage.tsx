@@ -20,6 +20,7 @@ const ASSESSMENT_RECORD_SCALE_DESCRIPTION_BY_CODE: Record<string, string> = {
   ISIK: '불면',
   AUDITK: '알코올 사용',
   IESR: '외상 후 스트레스(PTSD)',
+  CRI: '정신과적 위기 분류',
 }
 
 interface RecordFilters {

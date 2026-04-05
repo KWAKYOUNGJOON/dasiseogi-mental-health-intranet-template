@@ -17,6 +17,7 @@ export const RESTORE_EXECUTABLE_ITEM_TYPES = ['DATABASE'] as const
 export type RestoreStatus = (typeof RESTORE_STATUS_OPTIONS)[number]
 export type RestoreDetectedItemType = (typeof RESTORE_DETECTED_ITEM_TYPES)[number]
 export type RestoreExecutableItemType = (typeof RESTORE_EXECUTABLE_ITEM_TYPES)[number]
+export type RestoreConfirmationTextStatus = 'NOT_APPLICABLE' | 'WAITING_INPUT' | 'MATCHED' | 'MISMATCHED'
 
 interface RestoreHistoryListItemResponse {
   restoreId: number
@@ -86,9 +87,38 @@ interface RestoreExecuteResponse {
   failureReason: string | null
 }
 
+interface RestorePreparationGroupResponse {
+  itemType: RestoreExecutableItemType | string
+  relativePaths: string[] | null
+  selectable: boolean
+  selected: boolean
+  blockedReason: string | null
+}
+
+interface RestorePreparationResponse {
+  restoreId: number
+  status: RestoreStatus
+  confirmationRequiredText: string
+  confirmationTextStatus: RestoreConfirmationTextStatus
+  itemGroups: RestorePreparationGroupResponse[]
+  selectedItemTypes: string[] | null
+  selectedGroupCount: number
+  confirmationTextMatched: boolean
+  readyToExecute: boolean
+  blockedReason: string | null
+}
+
 export interface RestoreDetectedItem {
   itemType: RestoreDetectedItemType | string
   relativePaths: string[]
+}
+
+export interface RestorePreparationGroup {
+  itemType: RestoreExecutableItemType | string
+  relativePaths: string[]
+  selectable: boolean
+  selected: boolean
+  blockedReason: string | null
 }
 
 export interface RestoreHistoryItem {
@@ -164,9 +194,27 @@ export interface RestoreExecuteResult {
   failureReason: string
 }
 
+export interface RestorePreparation {
+  restoreId: number
+  status: RestoreStatus
+  confirmationRequiredText: string
+  confirmationTextStatus: RestoreConfirmationTextStatus
+  itemGroups: RestorePreparationGroup[]
+  selectedItemTypes: string[]
+  selectedGroupCount: number
+  confirmationTextMatched: boolean
+  readyToExecute: boolean
+  blockedReason: string | null
+}
+
 function normalizeText(value: string | null | undefined) {
   const trimmed = value?.trim()
   return trimmed ? trimmed : '-'
+}
+
+function normalizeNullableText(value: string | null | undefined) {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
 }
 
 function normalizeArray(values: string[] | null | undefined) {
@@ -190,6 +238,16 @@ function mapDetectedItem(item: RestoreDetectedItemResponse): RestoreDetectedItem
   return {
     itemType: item.itemType,
     relativePaths: item.relativePaths ?? [],
+  }
+}
+
+function mapPreparationGroup(item: RestorePreparationGroupResponse): RestorePreparationGroup {
+  return {
+    itemType: item.itemType,
+    relativePaths: item.relativePaths ?? [],
+    selectable: item.selectable,
+    selected: item.selected,
+    blockedReason: normalizeNullableText(item.blockedReason),
   }
 }
 
@@ -266,6 +324,21 @@ function mapRestoreExecuteResult(response: RestoreExecuteResponse): RestoreExecu
   }
 }
 
+function mapRestorePreparation(response: RestorePreparationResponse): RestorePreparation {
+  return {
+    restoreId: response.restoreId,
+    status: response.status,
+    confirmationRequiredText: response.confirmationRequiredText,
+    confirmationTextStatus: response.confirmationTextStatus,
+    itemGroups: response.itemGroups.map(mapPreparationGroup),
+    selectedItemTypes: normalizeArray(response.selectedItemTypes),
+    selectedGroupCount: response.selectedGroupCount,
+    confirmationTextMatched: response.confirmationTextMatched,
+    readyToExecute: response.readyToExecute,
+    blockedReason: normalizeNullableText(response.blockedReason),
+  }
+}
+
 export async function fetchRestoreHistoryPage(params?: RestoreHistoryQuery) {
   const response = await http.get<ApiResponse<RestoreHistoryPageResponse>>('/admin/restores', { params })
   return mapRestoreHistoryPage(response.data.data)
@@ -274,6 +347,11 @@ export async function fetchRestoreHistoryPage(params?: RestoreHistoryQuery) {
 export async function fetchRestoreDetail(restoreId: number) {
   const response = await http.get<ApiResponse<RestoreDetailResponse>>(`/admin/restores/${restoreId}`)
   return mapRestoreDetail(response.data.data)
+}
+
+export async function fetchRestorePreparation(restoreId: number, payload: RestoreExecuteParams) {
+  const response = await http.post<ApiResponse<RestorePreparationResponse>>(`/admin/restores/${restoreId}/preparation`, payload)
+  return mapRestorePreparation(response.data.data)
 }
 
 export async function uploadRestoreZip(file: File) {

@@ -943,6 +943,94 @@ class CoreWorkflowIntegrationTest {
     }
 
     @Test
+    void saveCriSessionClassifiesExtremeCrisisAndPersistsResultDetails() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+        Client client = findClient("김대상", LocalDate.of(1982, 7, 13));
+
+        MvcResult saveResult = mockMvc.perform(post("/api/v1/assessment-sessions")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(sessionSaveRequest(client.getId(), "CRI A 판정", List.of(
+                                scaleRequest("CRI", criAnswersForExtremeCrisis())
+                        )))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.scaleCount").value(1))
+                .andExpect(jsonPath("$.data.hasAlert").value(false))
+                .andReturn();
+
+        long sessionId = body(saveResult).path("data").path("sessionId").asLong();
+
+        mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}", sessionId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scales[0].scaleCode").value("CRI"))
+                .andExpect(jsonPath("$.data.scales[0].scaleName").value("정신과적 위기 분류 평정척도 (CRI)"))
+                .andExpect(jsonPath("$.data.scales[0].totalScore").value(2))
+                .andExpect(jsonPath("$.data.scales[0].resultLevel").value("A - 극도의 위기"))
+                .andExpect(jsonPath("$.data.scales[0].resultDetails[0].key").value("selfOtherTotal"))
+                .andExpect(jsonPath("$.data.scales[0].resultDetails[0].value").value("2"))
+                .andExpect(jsonPath("$.data.scales[0].resultDetails[1].value").value("0"))
+                .andExpect(jsonPath("$.data.scales[0].resultDetails[2].value").value("0"))
+                .andExpect(jsonPath("$.data.scales[0].resultDetails[3].value").value("0"))
+                .andExpect(jsonPath("$.data.scales[0].resultDetails[4].value").value("1"))
+                .andExpect(jsonPath("$.data.scales[0].answers.length()").value(23));
+
+        mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}/print-data", sessionId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scales[0].scaleCode").value("CRI"))
+                .andExpect(jsonPath("$.data.scales[0].resultLevel").value("A - 극도의 위기"))
+                .andExpect(jsonPath("$.data.scales[0].resultDetails[0].label").value("자타해 위험 합계"))
+                .andExpect(jsonPath("$.data.scales[0].resultDetails[4].value").value("1"));
+    }
+
+    @Test
+    void saveCriSessionClassifiesCrisisCaseAsB() throws Exception {
+        assertCriResultLevel("CRI B 판정", criAnswersForCrisis(), "B - 위기", 2);
+    }
+
+    @Test
+    void saveCriSessionClassifiesHighRiskCaseAsC() throws Exception {
+        assertCriResultLevel("CRI C 판정", criAnswersForHighRisk(), "C - 고위험", 2);
+    }
+
+    @Test
+    void saveCriSessionClassifiesCautionCaseAsD() throws Exception {
+        assertCriResultLevel("CRI D 판정", criAnswersForCaution(), "D - 주의", 1);
+    }
+
+    @Test
+    void saveCriSessionClassifiesNonCrisisCaseAsE() throws Exception {
+        assertCriResultLevel("CRI E 판정", criAnswersForNoCrisis(), "E - 위기상황 아님", 0);
+    }
+
+    @Test
+    void saveCriSessionAppliesReverseScoringForSupportItems() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+        Client client = findClient("김대상", LocalDate.of(1982, 7, 13));
+
+        MvcResult saveResult = mockMvc.perform(post("/api/v1/assessment-sessions")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(sessionSaveRequest(client.getId(), "CRI 지지체계 역채점", List.of(
+                                scaleRequest("CRI", criAnswersForSupportReverseScore())
+                        )))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        long sessionId = body(saveResult).path("data").path("sessionId").asLong();
+
+        mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}", sessionId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scales[0].totalScore").value(1))
+                .andExpect(jsonPath("$.data.scales[0].resultLevel").value("E - 위기상황 아님"))
+                .andExpect(jsonPath("$.data.scales[0].resultDetails[3].key").value("supportTotal"))
+                .andExpect(jsonPath("$.data.scales[0].resultDetails[3].value").value("1"))
+                .andExpect(jsonPath("$.data.scales[0].answers[21].answerLabel").value("없다"))
+                .andExpect(jsonPath("$.data.scales[0].answers[21].scoreValue").value(1))
+                .andExpect(jsonPath("$.data.scales[0].answers[22].answerLabel").value("있다"))
+                .andExpect(jsonPath("$.data.scales[0].answers[22].scoreValue").value(0));
+    }
+
+    @Test
     void saveMkpq16SessionUsesYesCountRule() throws Exception {
         MockHttpSession session = login("usera", "Test1234!");
         Client client = findClient("김대상", LocalDate.of(1982, 7, 13));
@@ -2021,6 +2109,28 @@ class CoreWorkflowIntegrationTest {
         return sessionSaveRequest(clientId, memo, List.of(scaleRequest("PHQ9", 0, 0, 0, 0, 0, 0, 0, 0, 1)));
     }
 
+    private void assertCriResultLevel(String memo, int[] answers, String expectedResultLevel, int expectedTotalScore) throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+        Client client = findClient("김대상", LocalDate.of(1982, 7, 13));
+
+        MvcResult saveResult = mockMvc.perform(post("/api/v1/assessment-sessions")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(sessionSaveRequest(client.getId(), memo, List.of(
+                                scaleRequest("CRI", answers)
+                        )))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        long sessionId = body(saveResult).path("data").path("sessionId").asLong();
+
+        mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}", sessionId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scales[0].scaleCode").value("CRI"))
+                .andExpect(jsonPath("$.data.scales[0].totalScore").value(expectedTotalScore))
+                .andExpect(jsonPath("$.data.scales[0].resultLevel").value(expectedResultLevel));
+    }
+
     private Map<String, Object> sessionSaveRequest(Long clientId, String memo, List<Map<String, Object>> selectedScales) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("clientId", clientId);
@@ -2064,6 +2174,46 @@ class CoreWorkflowIntegrationTest {
         answer.put("questionNo", questionNo);
         answer.put("answerValue", answerValue);
         return answer;
+    }
+
+    private int[] criAnswersForExtremeCrisis() {
+        int[] answers = criAnswersForNoCrisis();
+        answers[0] = 1;
+        answers[7] = 1;
+        return answers;
+    }
+
+    private int[] criAnswersForCrisis() {
+        int[] answers = criAnswersForNoCrisis();
+        answers[0] = 1;
+        answers[1] = 1;
+        return answers;
+    }
+
+    private int[] criAnswersForHighRisk() {
+        int[] answers = criAnswersForNoCrisis();
+        answers[1] = 1;
+        answers[7] = 1;
+        return answers;
+    }
+
+    private int[] criAnswersForCaution() {
+        int[] answers = criAnswersForNoCrisis();
+        answers[1] = 1;
+        return answers;
+    }
+
+    private int[] criAnswersForSupportReverseScore() {
+        int[] answers = criAnswersForNoCrisis();
+        answers[21] = 1;
+        return answers;
+    }
+
+    private int[] criAnswersForNoCrisis() {
+        int[] answers = new int[23];
+        answers[21] = 0;
+        answers[22] = 0;
+        return answers;
     }
 
     private JsonNode body(MvcResult result) throws Exception {

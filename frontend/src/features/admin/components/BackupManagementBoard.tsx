@@ -22,13 +22,16 @@ import {
   RESTORE_EXECUTABLE_ITEM_TYPES,
   executeRestore,
   fetchRestoreDetail,
+  fetchRestorePreparation,
   fetchRestoreHistoryPage,
   uploadRestoreZip,
+  type RestoreConfirmationTextStatus,
   type RestoreDetectedItem,
   type RestoreDetail,
-  type RestoreDetectedItemType,
   type RestoreExecutableItemType,
   type RestoreHistoryPage,
+  type RestorePreparation,
+  type RestorePreparationGroup,
   type RestoreStatus,
 } from '../api/restoreManagementApi'
 
@@ -71,11 +74,11 @@ const RESTORE_FAILED_DETECTED_ITEMS_GUIDE = '실패 상태여도 검증 완료�
 const RESTORE_VALIDATED_DETECTED_ITEMS_GUIDE = '검증된 항목은 그룹별 relativePaths 기준으로 확인할 수 있습니다.'
 const RESTORE_PREPARATION_CONFIRMATION_TEXT = '전체 복원을 실행합니다'
 const RESTORE_PREPARATION_SELECTION_GUIDE = 'VALIDATED 상태의 복원 검증 상세에서만 DATABASE 복원 실행을 진행할 수 있습니다.'
-const RESTORE_PREPARATION_EMPTY_GROUPS_GUIDE = 'detectedItems 에 DATABASE 항목이 없어 실제 복원을 실행할 수 없습니다.'
-const RESTORE_PREPARATION_CONFIRMATION_GUIDE = `확인 문구는 ${RESTORE_PREPARATION_CONFIRMATION_TEXT} 와 정확히 일치해야 합니다.`
 const RESTORE_PREPARATION_CONFIRMATION_ERROR = '확인 문구가 정확히 일치하지 않습니다.'
 const RESTORE_EXECUTION_SCOPE_GUIDE = '현재 버전에서는 DATABASE 그룹만 실제 복원 가능합니다.'
-const RESTORE_EXECUTION_EXCLUDED_BADGE = '현재 버전 복원 제외'
+const RESTORE_PREPARATION_LOADING_MESSAGE = '서버 기준 복원 실행 준비 상태를 계산하는 중입니다.'
+const RESTORE_PREPARATION_DISPLAY_ONLY_GUIDE = 'CONFIG, SCALES, METADATA 는 검증 참고용이며 현재 체크 가능한 복원 대상이 아닙니다.'
+const RESTORE_CONFIRMATION_SKIPPED_GUIDE = '현재는 복원 실행 자체가 불가하여 확인 문구를 판단하지 않습니다.'
 const BACKUP_TYPE_FILTER_LABELS: Readonly<Partial<Record<BackupType, string>>> = {
   AUTO: '자동 백업',
   MANUAL: '수동 백업',
@@ -237,6 +240,24 @@ function getRestoreExecuteErrorMessage(response: ApiResponse<unknown> | undefine
   }
 }
 
+function getRestorePreparationErrorMessage(response: ApiResponse<unknown> | undefined) {
+  if (!response) {
+    return GENERIC_RESTORE_DETAIL_ERROR_MESSAGE
+  }
+
+  switch (response.errorCode) {
+    case 'FORBIDDEN':
+    case 'RESTORE_PREPARATION_FORBIDDEN':
+      return getFallbackMessage(response.message, '복원 실행 준비 상태를 조회할 권한이 없습니다.')
+    case 'RESTORE_HISTORY_NOT_FOUND':
+      return getFallbackMessage(response.message, '복원 검증 이력을 찾을 수 없습니다.')
+    case 'RESTORE_ARCHIVE_UNAVAILABLE':
+      return getFallbackMessage(response.message, '저장된 복원 ZIP 파일을 사용할 수 없습니다.')
+    default:
+      return getFallbackMessage(response.message, GENERIC_RESTORE_DETAIL_ERROR_MESSAGE)
+  }
+}
+
 function mapDialogFieldErrors(response: ApiResponse<unknown> | undefined): DialogFieldErrors {
   return (response?.fieldErrors ?? []).reduce<DialogFieldErrors>((errors, fieldError) => {
     if (fieldError.field === 'reason') {
@@ -367,12 +388,89 @@ function getRestorePreparationStatusChipStyle(isReady: boolean): CSSProperties {
   }
 }
 
-function getRestoreGroupRelativePaths(detectedItems: RestoreDetectedItem[], itemType: RestoreDetectedItemType) {
-  return detectedItems.find((item) => item.itemType === itemType)?.relativePaths ?? []
+function getRestoreConfirmationStatusChipStyle(status: RestoreConfirmationTextStatus): CSSProperties {
+  switch (status) {
+    case 'MATCHED':
+      return {
+        color: '#1d6a53',
+        background: '#dff1ea',
+      }
+    case 'MISMATCHED':
+      return {
+        color: '#9d2f2f',
+        background: '#f8e1e1',
+      }
+    case 'WAITING_INPUT':
+      return {
+        color: '#1d537d',
+        background: '#dceaf7',
+      }
+    default:
+      return {
+        color: '#805200',
+        background: '#fff1cf',
+      }
+  }
 }
 
-function getDefaultSelectedRestoreGroups(detectedItems: RestoreDetectedItem[]) {
-  return RESTORE_EXECUTABLE_ITEM_TYPES.filter((itemType) => getRestoreGroupRelativePaths(detectedItems, itemType).length > 0)
+function getRestoreConfirmationStatusLabel(status: RestoreConfirmationTextStatus) {
+  switch (status) {
+    case 'MATCHED':
+      return '일치'
+    case 'MISMATCHED':
+      return '불일치'
+    case 'WAITING_INPUT':
+      return '입력 대기'
+    default:
+      return '판단 제외'
+  }
+}
+
+function getRestoreConfirmationStatusMessage(
+  status: RestoreConfirmationTextStatus,
+  confirmationRequiredText: string,
+) {
+  switch (status) {
+    case 'MATCHED':
+      return '서버 기준 확인 문구가 정확히 일치합니다.'
+    case 'MISMATCHED':
+      return RESTORE_PREPARATION_CONFIRMATION_ERROR
+    case 'WAITING_INPUT':
+      return `확인 문구를 ${confirmationRequiredText} 로 정확히 입력해주세요.`
+    default:
+      return RESTORE_CONFIRMATION_SKIPPED_GUIDE
+  }
+}
+
+function getRestoreGroupAvailabilityLabel(group: RestorePreparationGroup) {
+  if (group.selectable) {
+    return `선택 가능 (${group.relativePaths.length}개)`
+  }
+  return group.relativePaths.length > 0 ? '실행 불가' : '대상 없음'
+}
+
+function getRestoreSelectedGroupSummary(
+  preparationGroups: RestorePreparationGroup[],
+  selectedItemTypes: RestoreExecutableItemType[],
+  preparationLoaded: boolean,
+) {
+  if (selectedItemTypes.length > 0) {
+    return selectedItemTypes.join(', ')
+  }
+
+  if (!preparationLoaded) {
+    return '서버 준비 상태 확인 전'
+  }
+
+  if (preparationGroups.length === 0) {
+    return '선택 가능한 그룹 계산 전'
+  }
+
+  return '선택된 그룹 없음'
+}
+
+function isRestoreExecutableItemType(value: string): value is RestoreExecutableItemType {
+  return RESTORE_EXECUTABLE_ITEM_TYPES.includes(value as RestoreExecutableItemType)
 }
 
 interface RestoreDetectedItemsCardsProps {
@@ -469,6 +567,10 @@ export function BackupManagementBoard() {
   const [restoreDetail, setRestoreDetail] = useState<RestoreDetail | null>(null)
   const [restoreDetailLoading, setRestoreDetailLoading] = useState(false)
   const [restoreDetailError, setRestoreDetailError] = useState<DetailError>(null)
+  const restorePreparationRequestRef = useRef(0)
+  const [restorePreparation, setRestorePreparation] = useState<RestorePreparation | null>(null)
+  const [restorePreparationLoading, setRestorePreparationLoading] = useState(false)
+  const [restorePreparationError, setRestorePreparationError] = useState<string | null>(null)
   const [restorePreparationNotice, setRestorePreparationNotice] = useState<Notice>(null)
   const [selectedRestoreGroups, setSelectedRestoreGroups] = useState<RestoreExecutableItemType[]>([])
   const [restoreConfirmationText, setRestoreConfirmationText] = useState('')
@@ -516,23 +618,66 @@ export function BackupManagementBoard() {
     }
   }, [restorePage])
 
+  const loadRestorePreparationState = useCallback(
+    async (restoreId: number, selectedItemTypes: RestoreExecutableItemType[], confirmationText: string) => {
+      const requestId = restorePreparationRequestRef.current + 1
+      restorePreparationRequestRef.current = requestId
+      setRestorePreparationLoading(true)
+      setRestorePreparationError(null)
+
+      try {
+        const response = await fetchRestorePreparation(restoreId, {
+          selectedItemTypes,
+          confirmationText,
+        })
+
+        if (restorePreparationRequestRef.current !== requestId) {
+          return
+        }
+
+        setRestorePreparation(response)
+        setSelectedRestoreGroups(response.selectedItemTypes.filter(isRestoreExecutableItemType))
+        setRestorePreparationError(null)
+      } catch (error) {
+        if (restorePreparationRequestRef.current !== requestId) {
+          return
+        }
+
+        setRestorePreparationError(getRestorePreparationErrorMessage(getApiResponse(error)))
+      } finally {
+        if (restorePreparationRequestRef.current === requestId) {
+          setRestorePreparationLoading(false)
+        }
+      }
+    },
+    [],
+  )
+
   const loadRestoreDetailById = useCallback(async (restoreId: number) => {
     setRestoreDetailLoading(true)
     setRestoreDetail(null)
     setRestoreDetailError(null)
+    setRestorePreparation(null)
+    setRestorePreparationError(null)
+    setRestorePreparationLoading(false)
 
     try {
       const response = await fetchRestoreDetail(restoreId)
+      const nextSelectedGroups = response.selectedItemTypes.filter(isRestoreExecutableItemType)
 
       setRestoreDetail(response)
       setRestoreDetailError(null)
+      setSelectedRestoreGroups(nextSelectedGroups)
+      setRestoreConfirmationText('')
+      await loadRestorePreparationState(restoreId, nextSelectedGroups, '')
     } catch (error) {
       setRestoreDetail(null)
       setRestoreDetailError(getRestoreDetailError(getApiResponse(error)))
+      setRestorePreparation(null)
     } finally {
       setRestoreDetailLoading(false)
     }
-  }, [])
+  }, [loadRestorePreparationState])
 
   useEffect(() => {
     void loadBackups()
@@ -544,9 +689,13 @@ export function BackupManagementBoard() {
 
   useEffect(() => {
     if (selectedRestoreId == null) {
+      restorePreparationRequestRef.current += 1
       setRestoreDetail(null)
       setRestoreDetailError(null)
       setRestoreDetailLoading(false)
+      setRestorePreparation(null)
+      setRestorePreparationLoading(false)
+      setRestorePreparationError(null)
       return
     }
 
@@ -554,19 +703,14 @@ export function BackupManagementBoard() {
   }, [loadRestoreDetailById, selectedRestoreId])
 
   useEffect(() => {
+    restorePreparationRequestRef.current += 1
     setRestorePreparationNotice(null)
+    setRestorePreparation(null)
+    setRestorePreparationError(null)
+    setRestorePreparationLoading(false)
     setSelectedRestoreGroups([])
     setRestoreConfirmationText('')
   }, [selectedRestoreId])
-
-  useEffect(() => {
-    if (!restoreDetail || restoreDetail.id !== selectedRestoreId || restoreDetail.status !== 'VALIDATED') {
-      setSelectedRestoreGroups([])
-      return
-    }
-
-    setSelectedRestoreGroups(getDefaultSelectedRestoreGroups(restoreDetail.detectedItems))
-  }, [restoreDetail, selectedRestoreId])
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -726,14 +870,28 @@ export function BackupManagementBoard() {
 
   function handleRestoreGroupToggle(itemType: RestoreExecutableItemType) {
     setRestorePreparationNotice(null)
-    setSelectedRestoreGroups((prev) =>
-      prev.includes(itemType) ? prev.filter((value) => value !== itemType) : [...prev, itemType],
-    )
+    setRestorePreparationError(null)
+    const nextSelectedGroups = selectedRestoreGroups.includes(itemType)
+      ? selectedRestoreGroups.filter((value) => value !== itemType)
+      : [...selectedRestoreGroups, itemType]
+
+    setSelectedRestoreGroups(nextSelectedGroups)
+
+    if (selectedRestoreId != null) {
+      void loadRestorePreparationState(selectedRestoreId, nextSelectedGroups, restoreConfirmationText)
+    }
   }
 
   function handleRestoreConfirmationChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
     setRestorePreparationNotice(null)
-    setRestoreConfirmationText(event.target.value)
+    setRestorePreparationError(null)
+    const nextConfirmationText = event.target.value
+
+    setRestoreConfirmationText(nextConfirmationText)
+
+    if (selectedRestoreId != null) {
+      void loadRestorePreparationState(selectedRestoreId, selectedRestoreGroups, nextConfirmationText)
+    }
   }
 
   async function handleRestorePreparationClick() {
@@ -775,43 +933,55 @@ export function BackupManagementBoard() {
   const restoreItems = restoreHistoryPage?.items ?? []
   const restoreCurrentPage = restoreHistoryPage?.page ?? restorePage
   const restoreTotalPages = restoreHistoryPage && restoreHistoryPage.totalPages > 0 ? restoreHistoryPage.totalPages : 1
-  const restoreDetectedItems = restoreDetail?.detectedItems ?? []
-  const executableRestoreGroups = getDefaultSelectedRestoreGroups(restoreDetectedItems)
-  const activeSelectedRestoreGroups = selectedRestoreGroups.filter((itemType) => executableRestoreGroups.includes(itemType))
-  const persistedSelectedRestoreGroups = restoreDetail?.selectedItemTypes ?? []
+  const restorePreparationGroups = restorePreparation?.itemGroups ?? []
+  const activeSelectedRestoreGroups = restorePreparation?.selectedItemTypes.filter(isRestoreExecutableItemType) ?? []
+  const restoreConfirmationStatus = restorePreparation?.confirmationTextStatus ?? 'NOT_APPLICABLE'
   const isValidatedRestoreDetail = restoreDetail?.status === 'VALIDATED'
   const restorePreparationBlockedMessage =
     selectedRestoreId == null
       ? '복원 검증 이력을 선택하면 복원 실행 준비를 시작할 수 있습니다.'
       : restoreDetailLoading
         ? '복원 검증 상세를 불러온 뒤 복원 실행 준비를 진행할 수 있습니다.'
+        : restorePreparationLoading
+          ? RESTORE_PREPARATION_LOADING_MESSAGE
         : restoreDetailError
           ? '복원 검증 상세를 확인할 수 없어 복원 실행 준비를 진행할 수 없습니다.'
+          : restorePreparationError
+            ? restorePreparationError
           : !restoreDetail
             ? '복원 검증 상세를 불러오지 못했습니다.'
-            : !isValidatedRestoreDetail
-              ? RESTORE_PREPARATION_SELECTION_GUIDE
-              : executableRestoreGroups.length === 0
-                ? RESTORE_PREPARATION_EMPTY_GROUPS_GUIDE
-                : null
+            : restorePreparation?.blockedReason ?? (!isValidatedRestoreDetail ? RESTORE_PREPARATION_SELECTION_GUIDE : null)
+  const hasSelectableRestoreGroups = restorePreparationGroups.some((group) => group.selectable)
   const restorePreparationInputDisabled =
     selectedRestoreId == null ||
     restoreDetailLoading ||
+    restorePreparationLoading ||
     !!restoreDetailError ||
+    !!restorePreparationError ||
     !restoreDetail ||
     !isValidatedRestoreDetail ||
-    executableRestoreGroups.length === 0
-  const restoreConfirmationMatches = restoreConfirmationText === RESTORE_PREPARATION_CONFIRMATION_TEXT
-  const restorePreparationReady =
-    isValidatedRestoreDetail && activeSelectedRestoreGroups.length > 0 && restoreConfirmationMatches
-  const selectedRestoreGroupCount =
-    activeSelectedRestoreGroups.length > 0 ? activeSelectedRestoreGroups.length : persistedSelectedRestoreGroups.length
-  const selectedRestoreGroupSummary =
-    activeSelectedRestoreGroups.length > 0
-      ? activeSelectedRestoreGroups.join(', ')
-      : persistedSelectedRestoreGroups.length > 0
-        ? persistedSelectedRestoreGroups.join(', ')
-        : '선택된 그룹 없음'
+    !hasSelectableRestoreGroups
+  const restoreDisplayOnlyDetectedItems =
+    restoreDetail?.detectedItems.filter((item) => !isRestoreExecutableItemType(item.itemType)) ?? []
+  const restoreConfirmationMatches = restorePreparation?.confirmationTextMatched ?? false
+  const restorePreparationReady = restorePreparation?.readyToExecute ?? false
+  const selectedRestoreGroupCount = restorePreparation?.selectedGroupCount ?? 0
+  const selectedRestoreGroupSummary = getRestoreSelectedGroupSummary(
+    restorePreparationGroups,
+    activeSelectedRestoreGroups,
+    restorePreparation != null,
+  )
+  const restoreConfirmationRequiredText = restorePreparation?.confirmationRequiredText ?? RESTORE_PREPARATION_CONFIRMATION_TEXT
+  const restoreConfirmationInputPlaceholder =
+    restoreConfirmationStatus === 'NOT_APPLICABLE'
+      ? '현재는 확인 문구 입력 대상이 아닙니다.'
+      : restoreConfirmationRequiredText
+  const restoreConfirmationStatusMessage = getRestoreConfirmationStatusMessage(
+    restoreConfirmationStatus,
+    restoreConfirmationRequiredText,
+  )
+  const restoreExecutionBlockingSummary =
+    restorePreparationBlockedMessage ?? '서버 기준 복원 실행 차단 사유가 없습니다.'
 
   return (
     <div className="stack">
@@ -1426,6 +1596,46 @@ export function BackupManagementBoard() {
             <span className="muted">{RESTORE_EXECUTION_SCOPE_GUIDE}</span>
           </div>
 
+          {restoreDisplayOnlyDetectedItems.length > 0 ? (
+            <div
+              style={{
+                padding: '12px 14px',
+                border: '1px solid #dde6ee',
+                borderRadius: 12,
+                background: '#f8fbfd',
+              }}
+            >
+              <div className="stack" style={{ gap: 10 }}>
+                <div className="toolbar" style={{ marginBottom: 0 }}>
+                  <strong>표시 전용 detectedItems</strong>
+                  <span className="muted">{RESTORE_PREPARATION_DISPLAY_ONLY_GUIDE}</span>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                  }}
+                >
+                  {restoreDisplayOnlyDetectedItems.map((item) => (
+                    <span
+                      key={`display-only-${item.itemType}`}
+                      className="muted"
+                      style={{
+                        color: '#4d6478',
+                        background: '#edf4fa',
+                        padding: '6px 10px',
+                        borderRadius: 999,
+                      }}
+                    >
+                      {`${item.itemType} ${item.relativePaths.length}개`}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {restorePreparationBlockedMessage ? (
             <div
               style={{
@@ -1435,11 +1645,19 @@ export function BackupManagementBoard() {
                 background: '#f5f9fc',
               }}
             >
-              <span className="muted">{restorePreparationBlockedMessage}</span>
+              <span
+                className="muted"
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {restorePreparationBlockedMessage}
+              </span>
             </div>
           ) : null}
 
-          {selectedRestoreId != null && !restoreDetailLoading && !restoreDetailError && restoreDetail ? (
+          {selectedRestoreId != null && !restoreDetailLoading && !restoreDetailError && restoreDetail && restorePreparationGroups.length > 0 ? (
             <>
               <div
                 style={{
@@ -1448,15 +1666,13 @@ export function BackupManagementBoard() {
                   gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
                 }}
               >
-                {RESTORE_DETECTED_ITEM_TYPES.map((itemType) => {
-                  const relativePaths = getRestoreGroupRelativePaths(restoreDetectedItems, itemType)
-                  const executable = RESTORE_EXECUTABLE_ITEM_TYPES.includes(itemType as RestoreExecutableItemType)
-                  const checked = executable && activeSelectedRestoreGroups.includes(itemType as RestoreExecutableItemType)
-                  const disabled = restorePreparationInputDisabled || relativePaths.length === 0 || !executable
+                {restorePreparationGroups.map((group) => {
+                  const checked = group.selected
+                  const disabled = restorePreparationInputDisabled || !group.selectable
 
                   return (
                     <label
-                      key={itemType}
+                      key={group.itemType}
                       style={{
                         display: 'grid',
                         gap: 10,
@@ -1475,18 +1691,32 @@ export function BackupManagementBoard() {
                             alignItems: 'center',
                           }}
                         >
-                          <input
-                            checked={checked}
-                            disabled={disabled}
-                            onChange={() => handleRestoreGroupToggle(itemType as RestoreExecutableItemType)}
-                            type="checkbox"
-                          />
-                          <strong>{itemType}</strong>
+                          {group.selectable ? (
+                            <input
+                              checked={checked}
+                              disabled={disabled}
+                              onChange={() => handleRestoreGroupToggle(group.itemType as RestoreExecutableItemType)}
+                              type="checkbox"
+                            />
+                          ) : (
+                            <span
+                              className="muted"
+                              style={{
+                                color: '#805200',
+                                background: '#fff1cf',
+                                padding: '4px 8px',
+                                borderRadius: 999,
+                              }}
+                            >
+                              실행 대상 유형
+                            </span>
+                          )}
+                          <strong>{group.itemType}</strong>
                         </span>
                         <span
                           className="muted"
                           style={
-                            executable
+                            group.selectable
                               ? undefined
                               : {
                                   color: '#805200',
@@ -1496,11 +1726,11 @@ export function BackupManagementBoard() {
                                 }
                           }
                         >
-                          {executable ? `${relativePaths.length}개` : RESTORE_EXECUTION_EXCLUDED_BADGE}
+                          {getRestoreGroupAvailabilityLabel(group)}
                         </span>
                       </div>
 
-                      {relativePaths.length === 0 ? (
+                      {group.relativePaths.length === 0 ? (
                         <span className="muted">relativePaths 없음</span>
                       ) : (
                         <ul
@@ -1511,9 +1741,9 @@ export function BackupManagementBoard() {
                             gap: 6,
                           }}
                         >
-                          {relativePaths.map((relativePath) => (
+                          {group.relativePaths.map((relativePath) => (
                             <li
-                              key={`${itemType}-${relativePath}`}
+                              key={`${group.itemType}-${relativePath}`}
                               style={{
                                 wordBreak: 'break-word',
                               }}
@@ -1523,7 +1753,17 @@ export function BackupManagementBoard() {
                           ))}
                         </ul>
                       )}
-                      {!executable && relativePaths.length > 0 ? <span className="muted">{RESTORE_EXECUTION_SCOPE_GUIDE}</span> : null}
+                      {group.blockedReason ? (
+                        <span
+                          className="muted"
+                          style={{
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {group.blockedReason}
+                        </span>
+                      ) : null}
                     </label>
                   )
                 })}
@@ -1543,6 +1783,17 @@ export function BackupManagementBoard() {
                 </div>
               </div>
             </>
+          ) : selectedRestoreId != null && !restoreDetailLoading && !restoreDetailError && restoreDetail ? (
+            <div
+              style={{
+                padding: '12px 14px',
+                border: '1px solid #d8e1ea',
+                borderRadius: 12,
+                background: '#f5f9fc',
+              }}
+            >
+              <span className="muted">서버가 선택 가능한 복원 그룹을 계산하면 여기에 표시됩니다.</span>
+            </div>
           ) : null}
         </section>
 
@@ -1567,14 +1818,16 @@ export function BackupManagementBoard() {
               aria-label="복원 실행 확인 문구"
               disabled={restorePreparationInputDisabled}
               onChange={handleRestoreConfirmationChange}
-              placeholder={RESTORE_PREPARATION_CONFIRMATION_TEXT}
+              placeholder={restoreConfirmationInputPlaceholder}
               rows={3}
               value={restoreConfirmationText}
             />
-            <span className="field-hint">{RESTORE_PREPARATION_CONFIRMATION_GUIDE}</span>
-            {restorePreparationInputDisabled ? (
+            <span className="field-hint">{`확인 문구는 ${restoreConfirmationRequiredText} 와 정확히 일치해야 합니다.`}</span>
+            {restoreConfirmationStatus === 'NOT_APPLICABLE' ? (
+              <span className="muted">{RESTORE_CONFIRMATION_SKIPPED_GUIDE}</span>
+            ) : restorePreparationInputDisabled ? (
               <span className="muted">입력 가능 상태가 되면 확인 문구를 정확히 입력해주세요.</span>
-            ) : restoreConfirmationText.length === 0 ? (
+            ) : restoreConfirmationStatus === 'WAITING_INPUT' ? (
               <span className="muted">확인 문구를 정확히 입력해야 실행 준비 상태가 활성화됩니다.</span>
             ) : restoreConfirmationMatches ? (
               <span className="success-text">확인 문구가 정확히 일치합니다.</span>
@@ -1655,9 +1908,9 @@ export function BackupManagementBoard() {
               <strong>{selectedRestoreGroupCount}</strong>
             </div>
             <div className="field" style={{ margin: 0 }}>
-              <span>확인 문구 일치 여부</span>
-              <span className="status-chip" style={getRestorePreparationStatusChipStyle(restoreConfirmationMatches)}>
-                {restoreConfirmationMatches ? '일치' : '불일치'}
+              <span>확인 문구 상태</span>
+              <span className="status-chip" style={getRestoreConfirmationStatusChipStyle(restoreConfirmationStatus)}>
+                {getRestoreConfirmationStatusLabel(restoreConfirmationStatus)}
               </span>
             </div>
             <div className="field" style={{ margin: 0 }}>
@@ -1680,6 +1933,58 @@ export function BackupManagementBoard() {
               >
                 {restoreDetail?.preBackupFileName ?? '-'}
               </strong>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gap: 12,
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            }}
+          >
+            <div
+              style={{
+                padding: '12px 14px',
+                border: '1px solid #dde6ee',
+                borderRadius: 12,
+                background: '#f8fbfd',
+              }}
+            >
+              <div className="stack" style={{ gap: 6 }}>
+                <strong>복원 실행 차단 사유</strong>
+                <span
+                  className="muted"
+                  style={{
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {restoreExecutionBlockingSummary}
+                </span>
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: '12px 14px',
+                border: '1px solid #dde6ee',
+                borderRadius: 12,
+                background: '#f8fbfd',
+              }}
+            >
+              <div className="stack" style={{ gap: 6 }}>
+                <strong>확인 문구 상태 안내</strong>
+                <span
+                  className="muted"
+                  style={{
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {restoreConfirmationStatusMessage}
+                </span>
+              </div>
             </div>
           </div>
 

@@ -7,6 +7,7 @@ public record AssessmentSessionPrintScaleResponse(
         String scaleName,
         int totalScore,
         String resultLevel,
+        List<SessionScaleResultDetailResponse> resultDetails,
         List<String> alertMessages
 ) {
 }

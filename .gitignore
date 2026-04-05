@@ -18,3 +18,6 @@ logs/
 *.lock.db
 *.sqlite
 *.sqlite3
+
+# GitHub 100MB limit: keep the oversized original CRI reference PDF local-only.
+resources/scales/9. CRI/01_original/한국형_정신과적_위기분류_평정척도(CRI)_표준화_및_효과성_평가_최종보고서_웹용.pdf

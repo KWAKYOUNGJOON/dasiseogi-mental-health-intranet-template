@@ -63,6 +63,14 @@
       "isActive": true,
       "implemented": true,
       "definitionFile": "classpath:scales/iesr.json"
+    },
+    {
+      "scaleCode": "CRI",
+      "scaleName": "정신과적 위기 분류 평정척도 (CRI)",
+      "displayOrder": 9,
+      "isActive": true,
+      "implemented": true,
+      "definitionFile": "classpath:scales/cri.json"
     }
   ]
 }

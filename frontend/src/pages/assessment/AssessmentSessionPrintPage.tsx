@@ -111,7 +111,20 @@ export function AssessmentSessionPrintPage() {
               <tr key={scale.scaleCode}>
                 <td>{scale.scaleName}</td>
                 <td>{scale.totalScore}</td>
-                <td>{scale.resultLevel}</td>
+                <td>
+                  <div style={{ display: 'grid', gap: 4 }}>
+                    <strong>{scale.resultLevel}</strong>
+                    {scale.resultDetails?.length ? (
+                      <div className="muted" style={{ display: 'grid', gap: 2 }}>
+                        {scale.resultDetails.map((detail) => (
+                          <span key={detail.key}>
+                            {detail.label}: {detail.value}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </td>
                 <td>{scale.alertMessages.length > 0 ? scale.alertMessages.join(' / ') : '-'}</td>
               </tr>
             ))}

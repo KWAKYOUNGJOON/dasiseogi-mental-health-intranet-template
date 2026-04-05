@@ -22,6 +22,7 @@ vi.mock('../src/features/admin/api/restoreManagementApi', () => ({
   RESTORE_EXECUTABLE_ITEM_TYPES: ['DATABASE'],
   fetchRestoreHistoryPage: vi.fn(),
   fetchRestoreDetail: vi.fn(),
+  fetchRestorePreparation: vi.fn(),
   uploadRestoreZip: vi.fn(),
   executeRestore: vi.fn(),
 }))
@@ -40,6 +41,7 @@ import {
 import {
   executeRestore,
   fetchRestoreDetail,
+  fetchRestorePreparation,
   fetchRestoreHistoryPage,
 } from '../src/features/admin/api/restoreManagementApi'
 
@@ -48,6 +50,7 @@ const mockedFetchLatestBackupHistory = vi.mocked(fetchLatestBackupHistory)
 const mockedRunManualBackup = vi.mocked(runManualBackup)
 const mockedFetchRestoreHistoryPage = vi.mocked(fetchRestoreHistoryPage)
 const mockedFetchRestoreDetail = vi.mocked(fetchRestoreDetail)
+const mockedFetchRestorePreparation = vi.mocked(fetchRestorePreparation)
 const mockedExecuteRestore = vi.mocked(executeRestore)
 
 function createAdminUser(role: 'ADMIN' | 'USER' = 'ADMIN') {
@@ -157,6 +160,32 @@ function createRestoreDetail(
   }
 }
 
+function createRestorePreparation(
+  overrides?: Partial<Awaited<ReturnType<typeof fetchRestorePreparation>>>,
+) {
+  return {
+    restoreId: 71,
+    status: 'VALIDATED' as const,
+    confirmationRequiredText: '전체 복원을 실행합니다',
+    confirmationTextStatus: 'WAITING_INPUT' as const,
+    itemGroups: [
+      {
+        itemType: 'DATABASE',
+        relativePaths: ['db/database.sql'],
+        selectable: true,
+        selected: false,
+        blockedReason: null,
+      },
+    ],
+    selectedItemTypes: [],
+    selectedGroupCount: 0,
+    confirmationTextMatched: false,
+    readyToExecute: false,
+    blockedReason: '복원 대상 항목을 하나 이상 선택해주세요.',
+    ...overrides,
+  }
+}
+
 function renderAdminBackupsPage() {
   return render(
     <MemoryRouter>
@@ -178,6 +207,7 @@ beforeEach(() => {
   mockedRunManualBackup.mockReset()
   mockedFetchRestoreHistoryPage.mockReset()
   mockedFetchRestoreDetail.mockReset()
+  mockedFetchRestorePreparation.mockReset()
   mockedExecuteRestore.mockReset()
   mockedFetchRestoreHistoryPage.mockResolvedValue(createRestoreHistoryPage([]))
 })
@@ -358,6 +388,120 @@ describe('admin backups', () => {
     expect(mockedFetchBackupHistoryPage).not.toHaveBeenCalled()
   })
 
+  it('shows the server blocked reason when the uploaded restore zip is incompatible', async () => {
+    const user = userEvent.setup()
+
+    mockedFetchBackupHistoryPage.mockResolvedValue(createBackupHistoryPage([createBackupHistoryItem()]))
+    mockedFetchLatestBackupHistory.mockResolvedValue(createBackupHistoryItem())
+    mockedFetchRestoreHistoryPage.mockResolvedValue(createRestoreHistoryPage([createRestoreHistoryItem({
+      fileName: 'backup-20260404-173219-snapshot-full-v1.zip',
+      datasourceType: 'H2',
+      backupId: 4,
+    })]))
+    mockedFetchRestoreDetail.mockResolvedValue(createRestoreDetail({
+      fileName: 'backup-20260404-173219-snapshot-full-v1.zip',
+      datasourceType: 'H2',
+      backupId: 4,
+      detectedItems: [
+        { itemType: 'CONFIG', relativePaths: ['config/application.yml'] },
+        { itemType: 'SCALES', relativePaths: ['scales/test-scale.json'] },
+        { itemType: 'METADATA', relativePaths: ['metadata/summary.json'] },
+      ],
+    }))
+    mockedFetchRestorePreparation.mockResolvedValue(createRestorePreparation({
+      confirmationTextStatus: 'NOT_APPLICABLE',
+      itemGroups: [
+        {
+          itemType: 'DATABASE',
+          relativePaths: [],
+          selectable: false,
+          selected: false,
+          blockedReason: '업로드한 ZIP 에 db/database.sql 이 없어 DATABASE 복원 그룹을 만들 수 없습니다.\n업로드한 ZIP datasourceType=H2 는 현재 버전에서 지원하지 않습니다.',
+        },
+      ],
+      blockedReason: '업로드한 ZIP 에 db/database.sql 이 없어 DATABASE 복원 그룹을 만들 수 없습니다.\n업로드한 ZIP datasourceType=H2 는 현재 버전에서 지원하지 않습니다.',
+    }))
+
+    renderAdminBackupsPage()
+
+    await screen.findByText('backup-20260404-173219-snapshot-full-v1.zip')
+
+    await user.click(screen.getByText('backup-20260404-173219-snapshot-full-v1.zip'))
+
+    expect(await screen.findByText('표시 전용 detectedItems')).toBeTruthy()
+    expect(screen.getByText('CONFIG 1개')).toBeTruthy()
+    expect(screen.getByText('SCALES 1개')).toBeTruthy()
+    expect(screen.getByText('METADATA 1개')).toBeTruthy()
+    expect(screen.getByText('실행 대상 유형')).toBeTruthy()
+    expect(screen.getByText('대상 없음')).toBeTruthy()
+    expect(screen.getByText('판단 제외')).toBeTruthy()
+    expect(screen.getByText('복원 실행 차단 사유')).toBeTruthy()
+    expect((await screen.findAllByText(/db\/database\.sql/)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/datasourceType=H2/)).length).toBeGreaterThan(0)
+    expect(screen.getByText('확인 문구 상태 안내')).toBeTruthy()
+    expect((await screen.findAllByText('현재는 복원 실행 자체가 불가하여 확인 문구를 판단하지 않습니다.')).length).toBeGreaterThan(0)
+    expect(screen.getByLabelText('복원 실행 확인 문구')).toBeDisabled()
+    expect(screen.queryByText('확인 문구가 정확히 일치하지 않습니다.')).toBeNull()
+    expect(screen.getAllByText('선택된 그룹 없음').length).toBeGreaterThan(0)
+    expect(screen.getByText('실행 준비 불가')).toBeTruthy()
+  })
+
+  it('shows confirmation mismatch separately when restore is otherwise selectable', async () => {
+    const user = userEvent.setup()
+
+    mockedFetchBackupHistoryPage.mockResolvedValue(createBackupHistoryPage([createBackupHistoryItem()]))
+    mockedFetchLatestBackupHistory.mockResolvedValue(createBackupHistoryItem())
+    mockedFetchRestoreHistoryPage.mockResolvedValue(createRestoreHistoryPage([createRestoreHistoryItem()]))
+    mockedFetchRestoreDetail.mockResolvedValue(createRestoreDetail())
+    mockedFetchRestorePreparation
+      .mockResolvedValueOnce(createRestorePreparation())
+      .mockResolvedValueOnce(createRestorePreparation({
+        itemGroups: [
+          {
+            itemType: 'DATABASE',
+            relativePaths: ['db/database.sql'],
+            selectable: true,
+            selected: true,
+            blockedReason: null,
+          },
+        ],
+        selectedItemTypes: ['DATABASE'],
+        selectedGroupCount: 1,
+        blockedReason: '확인 문구를 입력해주세요.',
+      }))
+      .mockResolvedValueOnce(createRestorePreparation({
+        itemGroups: [
+          {
+            itemType: 'DATABASE',
+            relativePaths: ['db/database.sql'],
+            selectable: true,
+            selected: true,
+            blockedReason: null,
+          },
+        ],
+        confirmationTextStatus: 'MISMATCHED',
+        selectedItemTypes: ['DATABASE'],
+        selectedGroupCount: 1,
+        blockedReason: '확인 문구는 정확히 전체 복원을 실행합니다 이어야 합니다.',
+      }))
+
+    renderAdminBackupsPage()
+
+    await screen.findByText('restore-validated.zip')
+
+    await user.click(screen.getByText('restore-validated.zip'))
+    await user.click(await screen.findByRole('checkbox'))
+    fireEvent.change(screen.getByLabelText('복원 실행 확인 문구'), { target: { value: '틀린 문구' } })
+
+    expect(await screen.findByText('불일치')).toBeTruthy()
+    expect(screen.getByText('복원 실행 차단 사유')).toBeTruthy()
+    expect(screen.getByText('확인 문구 상태 안내')).toBeTruthy()
+    expect((await screen.findAllByText('확인 문구는 정확히 전체 복원을 실행합니다 이어야 합니다.')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('확인 문구가 정확히 일치하지 않습니다.').length).toBeGreaterThan(0)
+    expect(screen.getByLabelText('복원 실행 확인 문구')).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: '복원 실행' })).toBeDisabled()
+  })
+
   it('executes restore through the existing preparation block and reloads list/detail', async () => {
     const user = userEvent.setup()
 
@@ -377,6 +521,58 @@ describe('admin backups', () => {
           preBackupFileName: 'backup-20260404-091000-snapshot-full-v1.zip',
         }),
       )
+    mockedFetchRestorePreparation
+      .mockResolvedValueOnce(createRestorePreparation())
+      .mockResolvedValueOnce(createRestorePreparation({
+        itemGroups: [
+          {
+            itemType: 'DATABASE',
+            relativePaths: ['db/database.sql'],
+            selectable: true,
+            selected: true,
+            blockedReason: null,
+          },
+        ],
+        confirmationTextStatus: 'MISMATCHED',
+        selectedItemTypes: ['DATABASE'],
+        selectedGroupCount: 1,
+        blockedReason: '확인 문구는 정확히 전체 복원을 실행합니다 이어야 합니다.',
+      }))
+      .mockResolvedValueOnce(createRestorePreparation({
+        itemGroups: [
+          {
+            itemType: 'DATABASE',
+            relativePaths: ['db/database.sql'],
+            selectable: true,
+            selected: true,
+            blockedReason: null,
+          },
+        ],
+        confirmationTextStatus: 'MATCHED',
+        selectedItemTypes: ['DATABASE'],
+        selectedGroupCount: 1,
+        confirmationTextMatched: true,
+        readyToExecute: true,
+        blockedReason: null,
+      }))
+      .mockResolvedValueOnce(createRestorePreparation({
+        status: 'SUCCESS' as const,
+        itemGroups: [
+          {
+            itemType: 'DATABASE',
+            relativePaths: ['db/database.sql'],
+            selectable: false,
+            selected: true,
+            blockedReason: 'VALIDATED 상태의 복원 검증 상세에서만 DATABASE 복원 실행을 진행할 수 있습니다.',
+          },
+        ],
+        confirmationTextStatus: 'NOT_APPLICABLE',
+        selectedItemTypes: ['DATABASE'],
+        selectedGroupCount: 1,
+        confirmationTextMatched: false,
+        readyToExecute: false,
+        blockedReason: 'VALIDATED 상태의 복원 검증 상세에서만 DATABASE 복원 실행을 진행할 수 있습니다.',
+      }))
     mockedExecuteRestore.mockResolvedValue({
       restoreId: 71,
       status: 'SUCCESS',
@@ -395,13 +591,17 @@ describe('admin backups', () => {
     await user.click(screen.getByText('restore-validated.zip'))
 
     expect((await screen.findAllByText('db/database.sql')).length).toBeGreaterThan(0)
-    expect(screen.getAllByText('현재 버전 복원 제외').length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('복원 대상 항목을 하나 이상 선택해주세요.')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('선택된 그룹 없음').length).toBeGreaterThan(0)
 
     const executeButton = screen.getByRole('button', { name: '복원 실행' })
     expect(executeButton).toBeDisabled()
 
-    await user.type(screen.getByLabelText('복원 실행 확인 문구'), '전체 복원을 실행합니다')
-    expect(screen.getByRole('button', { name: '복원 실행' })).toBeEnabled()
+    await user.click(screen.getByRole('checkbox'))
+    fireEvent.change(screen.getByLabelText('복원 실행 확인 문구'), { target: { value: '전체 복원을 실행합니다' } })
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '복원 실행' })).toBeEnabled()
+    })
     await user.click(executeButton)
 
     await waitFor(() => {
@@ -413,6 +613,7 @@ describe('admin backups', () => {
     await waitFor(() => {
       expect(mockedFetchRestoreHistoryPage).toHaveBeenCalledTimes(2)
       expect(mockedFetchRestoreDetail).toHaveBeenCalledTimes(2)
+      expect(mockedFetchRestorePreparation).toHaveBeenCalledTimes(4)
     })
 
     expect(await screen.findByText('복원 실행이 완료되었습니다.')).toBeTruthy()

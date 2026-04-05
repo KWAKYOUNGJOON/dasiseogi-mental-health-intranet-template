@@ -13,6 +13,7 @@ import com.dasisuhgi.mentalhealth.assessment.dto.SessionStatusChangeResponse;
 import com.dasisuhgi.mentalhealth.assessment.dto.SessionAlertResponse;
 import com.dasisuhgi.mentalhealth.assessment.dto.SessionAnswerResponse;
 import com.dasisuhgi.mentalhealth.assessment.dto.SessionSaveResponse;
+import com.dasisuhgi.mentalhealth.assessment.dto.SessionScaleResultDetailResponse;
 import com.dasisuhgi.mentalhealth.assessment.dto.SessionScaleResponse;
 import com.dasisuhgi.mentalhealth.assessment.entity.AlertType;
 import com.dasisuhgi.mentalhealth.assessment.entity.AssessmentSession;
@@ -46,6 +47,7 @@ import com.dasisuhgi.mentalhealth.scale.registry.ScaleQuestion;
 import com.dasisuhgi.mentalhealth.scale.service.ScaleService;
 import com.dasisuhgi.mentalhealth.user.entity.User;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -69,8 +71,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class AssessmentService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final String KMDQ_SCALE_CODE = "KMDQ";
+    private static final String CRI_SCALE_CODE = "CRI";
     private static final int KMDQ_SYMPTOM_QUESTION_END_NO = 13;
     private static final int KMDQ_SAME_PERIOD_QUESTION_NO = 14;
+    private static final int CRI_SELF_OTHER_END_NO = 8;
+    private static final int CRI_MENTAL_END_NO = 14;
+    private static final int CRI_FUNCTION_END_NO = 21;
+    private static final int CRI_SELF_OTHER_RISK_PRESENT_QUESTION_NO = 1;
+    private static final int CRI_SELF_OTHER_RISK_EIGHT_QUESTION_NO = 8;
 
     private final AssessmentSessionRepository assessmentSessionRepository;
     private final SessionScaleRepository sessionScaleRepository;
@@ -245,6 +253,7 @@ public class AssessmentService {
                         scale.getTotalScore().intValue(),
                         scale.getResultLevel(),
                         scale.isHasAlert(),
+                        readResultDetails(scale),
                         answersByScale.getOrDefault(scale.getId(), List.of()).stream()
                                 .map(answer -> new SessionAnswerResponse(
                                         answer.getQuestionNo(),
@@ -304,6 +313,7 @@ public class AssessmentService {
                         scale.getScaleName(),
                         scale.getTotalScore().intValue(),
                         scale.getResultLevel(),
+                        readResultDetails(scale),
                         alertsByScale.getOrDefault(scale.getId(), List.of()).stream()
                                 .map(SessionAlert::getAlertMessage)
                                 .toList()
@@ -426,6 +436,9 @@ public class AssessmentService {
         if (KMDQ_SCALE_CODE.equals(scaleCode)) {
             return evaluateKmdqScale(definition, answerMap);
         }
+        if (CRI_SCALE_CODE.equals(scaleCode)) {
+            return evaluateCriScale(definition, answerMap);
+        }
 
         if (answerMap.size() != definition.questionCount()) {
             throw answerIncomplete();
@@ -484,6 +497,66 @@ public class AssessmentService {
         return buildScaleEvaluation(definition, symptomYesCount, evaluatedAnswers);
     }
 
+    private ScaleEvaluation evaluateCriScale(ScaleDefinition definition, Map<Integer, AnswerRequest> answerMap) {
+        if (answerMap.size() != definition.questionCount()) {
+            throw answerIncomplete();
+        }
+
+        List<EvaluatedAnswer> evaluatedAnswers = new ArrayList<>();
+        Map<Integer, Integer> scoreByQuestionNo = new LinkedHashMap<>();
+        int totalScore = 0;
+        int selfOtherTotal = 0;
+        int mentalTotal = 0;
+        int functionTotal = 0;
+        int supportTotal = 0;
+
+        for (ScaleQuestion question : definition.items()) {
+            AnswerRequest answerRequest = answerMap.get(question.questionNo());
+            if (answerRequest == null) {
+                throw answerIncomplete();
+            }
+
+            EvaluatedAnswer evaluatedAnswer = evaluateAnswer(question, answerRequest);
+            int appliedScore = evaluatedAnswer.appliedScore();
+
+            evaluatedAnswers.add(evaluatedAnswer);
+            scoreByQuestionNo.put(question.questionNo(), appliedScore);
+            totalScore += appliedScore;
+
+            if (question.questionNo() <= CRI_SELF_OTHER_END_NO) {
+                selfOtherTotal += appliedScore;
+            } else if (question.questionNo() <= CRI_MENTAL_END_NO) {
+                mentalTotal += appliedScore;
+            } else if (question.questionNo() <= CRI_FUNCTION_END_NO) {
+                functionTotal += appliedScore;
+            } else {
+                supportTotal += appliedScore;
+            }
+        }
+
+        int risk8PlusMental = scoreByQuestionNo.getOrDefault(CRI_SELF_OTHER_RISK_EIGHT_QUESTION_NO, 0) + mentalTotal;
+        String resultLevel = resolveCriResultLevel(
+                scoreByQuestionNo.getOrDefault(CRI_SELF_OTHER_RISK_PRESENT_QUESTION_NO, 0),
+                scoreByQuestionNo.getOrDefault(CRI_SELF_OTHER_RISK_EIGHT_QUESTION_NO, 0),
+                selfOtherTotal,
+                mentalTotal
+        );
+
+        return buildScaleEvaluation(
+                definition,
+                totalScore,
+                resultLevel,
+                evaluatedAnswers,
+                List.of(
+                        new ResultDetail("selfOtherTotal", "자타해 위험 합계", Integer.toString(selfOtherTotal)),
+                        new ResultDetail("mentalTotal", "정신상태 합계", Integer.toString(mentalTotal)),
+                        new ResultDetail("functionTotal", "기능수준 합계", Integer.toString(functionTotal)),
+                        new ResultDetail("supportTotal", "지지체계 합계", Integer.toString(supportTotal)),
+                        new ResultDetail("risk8PlusMental", "자타해 위험 8번 + 정신상태 합계", Integer.toString(risk8PlusMental))
+                )
+        );
+    }
+
     private void validateAnswerQuestionNumbers(Map<Integer, AnswerRequest> answerMap, Map<Integer, ScaleQuestion> questionsByNo) {
         for (Integer questionNo : answerMap.keySet()) {
             if (!questionsByNo.containsKey(questionNo)) {
@@ -509,6 +582,26 @@ public class AssessmentService {
                 .findFirst()
                 .orElse("미분류");
 
+        return buildScaleEvaluation(definition, totalScore, resultLevel, evaluatedAnswers, List.of());
+    }
+
+    private ScaleEvaluation buildScaleEvaluation(
+            ScaleDefinition definition,
+            int totalScore,
+            String resultLevel,
+            List<EvaluatedAnswer> evaluatedAnswers,
+            List<ResultDetail> resultDetails
+    ) {
+        List<SessionAlertData> alerts = buildAlertData(definition, totalScore, evaluatedAnswers);
+
+        return new ScaleEvaluation(definition, totalScore, resultLevel, !alerts.isEmpty(), evaluatedAnswers, alerts, resultDetails);
+    }
+
+    private List<SessionAlertData> buildAlertData(
+            ScaleDefinition definition,
+            int totalScore,
+            List<EvaluatedAnswer> evaluatedAnswers
+    ) {
         List<SessionAlertData> alerts = new ArrayList<>();
         for (ScaleAlertRule rule : definition.alertRules()) {
             List<String> targetQuestionKeys = resolveTargetQuestionKeys(rule);
@@ -535,7 +628,7 @@ public class AssessmentService {
             }
         }
 
-        return new ScaleEvaluation(definition, totalScore, resultLevel, !alerts.isEmpty(), evaluatedAnswers, alerts);
+        return alerts;
     }
 
     private AppException answerIncomplete() {
@@ -573,6 +666,11 @@ public class AssessmentService {
                 "answerValue", answer.option().value(),
                 "scoreValue", answer.appliedScore()
         )).toList());
+        snapshot.put("resultDetails", evaluation.resultDetails().stream().map(detail -> Map.of(
+                "key", detail.key(),
+                "label", detail.label(),
+                "value", detail.value()
+        )).toList());
         snapshot.put("alerts", evaluation.alerts().stream().map(alert -> Map.of(
                 "code", alert.code(),
                 "type", alert.alertType().name(),
@@ -609,6 +707,47 @@ public class AssessmentService {
         return value.trim();
     }
 
+    private String resolveCriResultLevel(
+            int selfOtherQuestionOneScore,
+            int selfOtherQuestionEightScore,
+            int selfOtherTotal,
+            int mentalTotal
+    ) {
+        int risk8PlusMental = selfOtherQuestionEightScore + mentalTotal;
+
+        if (selfOtherQuestionOneScore == 1 && selfOtherTotal >= 2) {
+            return risk8PlusMental >= 1 ? "A - 극도의 위기" : "B - 위기";
+        }
+        if (selfOtherTotal >= 1) {
+            return risk8PlusMental >= 1 ? "C - 고위험" : "D - 주의";
+        }
+        return "E - 위기상황 아님";
+    }
+
+    private List<SessionScaleResultDetailResponse> readResultDetails(SessionScale scale) {
+        try {
+            JsonNode root = objectMapper.readTree(scale.getRawResultSnapshot());
+            JsonNode resultDetailsNode = root.path("resultDetails");
+            if (!resultDetailsNode.isArray()) {
+                return List.of();
+            }
+
+            List<SessionScaleResultDetailResponse> resultDetails = new ArrayList<>();
+            for (JsonNode item : resultDetailsNode) {
+                String key = item.path("key").asText(null);
+                String label = item.path("label").asText(null);
+                String value = item.path("value").asText(null);
+                if (key == null || label == null || value == null) {
+                    continue;
+                }
+                resultDetails.add(new SessionScaleResultDetailResponse(key, label, value));
+            }
+            return resultDetails;
+        } catch (JsonProcessingException exception) {
+            return List.of();
+        }
+    }
+
     private int reverseScore(int rawScore, List<ScaleOption> options) {
         int minScore = options.stream().mapToInt(ScaleOption::score).min()
                 .orElseThrow(() -> new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "SCALE_OPTION_INVALID", "척도 옵션 구성이 올바르지 않습니다."));
@@ -635,7 +774,15 @@ public class AssessmentService {
             String resultLevel,
             boolean hasAlert,
             List<EvaluatedAnswer> answers,
-            List<SessionAlertData> alerts
+            List<SessionAlertData> alerts,
+            List<ResultDetail> resultDetails
+    ) {
+    }
+
+    private record ResultDetail(
+            String key,
+            String label,
+            String value
     ) {
     }
 }

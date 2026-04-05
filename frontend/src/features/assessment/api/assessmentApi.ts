@@ -53,6 +53,11 @@ export interface SessionDetail {
     totalScore: number
     resultLevel: string
     hasAlert: boolean
+    resultDetails?: Array<{
+      key: string
+      label: string
+      value: string
+    }>
     answers: Array<{
       questionNo: number
       questionKey: string
@@ -101,6 +106,11 @@ export interface SessionPrintData {
     scaleName: string
     totalScore: number
     resultLevel: string
+    resultDetails?: Array<{
+      key: string
+      label: string
+      value: string
+    }>
     alertMessages: string[]
   }>
   hasAlert: boolean

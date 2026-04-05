@@ -218,6 +218,51 @@ describe('assessment session detail page', () => {
     expect(normalCard.getAttribute('data-highlighted')).toBe('false')
   })
 
+  it('renders server-provided result details when a scale includes them', async () => {
+    mockedFetchSessionDetail.mockResolvedValueOnce(
+      createSessionDetail({
+        scales: [
+          {
+            sessionScaleId: 9003,
+            scaleCode: 'CRI',
+            scaleName: '정신과적 위기 분류 평정척도 (CRI)',
+            displayOrder: 9,
+            totalScore: 2,
+            resultLevel: 'A - 극도의 위기',
+            hasAlert: false,
+            resultDetails: [
+              { key: 'selfOtherTotal', label: '자타해 위험 합계', value: '2' },
+              { key: 'mentalTotal', label: '정신상태 합계', value: '0' },
+            ],
+            answers: [
+              {
+                questionNo: 1,
+                questionKey: 'cri_self_other_1',
+                questionText: '현재 자타해 폭력위험(기물파손, 욕설, 고함 등 명백한 폭력 위험)',
+                answerValue: '1',
+                answerLabel: '있다',
+                scoreValue: 1,
+              },
+            ],
+            alerts: [],
+          },
+        ],
+        alerts: [],
+        hasAlert: false,
+      }),
+    )
+
+    renderAssessmentSessionDetailPage()
+
+    const scaleCard = await screen.findByTestId('session-scale-CRI')
+
+    expect(scaleCard.textContent).toContain('A - 극도의 위기')
+    expect(screen.getByText('자타해 위험 합계')).toBeTruthy()
+    expect(screen.getByText('정신상태 합계')).toBeTruthy()
+    expect(screen.getByText('2')).toBeTruthy()
+    expect(screen.getByText('0')).toBeTruthy()
+  })
+
   it('uses the provided assessment record return path when it is valid', async () => {
     renderAssessmentSessionDetailPage(
       '/assessments/sessions/501?highlightScaleCode=GAD7&returnTo=%2Fassessment-records%3FclientName%3D%EA%B9%80%EB%8C%80%EC%83%81%26page%3D2',

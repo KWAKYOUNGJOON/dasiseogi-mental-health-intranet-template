@@ -7,6 +7,7 @@ import com.dasisuhgi.mentalhealth.audit.entity.ActivityTargetType;
 import com.dasisuhgi.mentalhealth.audit.repository.ActivityLogQueryRepository;
 import com.dasisuhgi.mentalhealth.audit.repository.ActivityLogRepository;
 import com.dasisuhgi.mentalhealth.common.api.PageResponse;
+import com.dasisuhgi.mentalhealth.common.config.ActivityLogSchemaSynchronizer;
 import com.dasisuhgi.mentalhealth.common.error.AppException;
 import com.dasisuhgi.mentalhealth.common.security.AccessPolicyService;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
@@ -15,6 +16,7 @@ import com.dasisuhgi.mentalhealth.user.entity.User;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -33,16 +35,20 @@ public class ActivityLogService {
     private final AccessPolicyService accessPolicyService;
     private final RequestMetadataService requestMetadataService;
     private final TransactionTemplate requiresNewTransactionTemplate;
+    private final ActivityLogSchemaSynchronizer activityLogSchemaSynchronizer;
+    private final AtomicBoolean schemaSynchronized = new AtomicBoolean(false);
 
     public ActivityLogService(
             ActivityLogRepository activityLogRepository,
             ActivityLogQueryRepository activityLogQueryRepository,
+            ActivityLogSchemaSynchronizer activityLogSchemaSynchronizer,
             AccessPolicyService accessPolicyService,
             RequestMetadataService requestMetadataService,
             PlatformTransactionManager transactionManager
     ) {
         this.activityLogRepository = activityLogRepository;
         this.activityLogQueryRepository = activityLogQueryRepository;
+        this.activityLogSchemaSynchronizer = activityLogSchemaSynchronizer;
         this.accessPolicyService = accessPolicyService;
         this.requestMetadataService = requestMetadataService;
         this.requiresNewTransactionTemplate =
@@ -72,6 +78,7 @@ public class ActivityLogService {
             String description,
             String ipAddress
     ) {
+        ensureSchemaSynchronized();
         activityLogRepository.save(Objects.requireNonNull(
                 buildActivityLog(user, actionType, targetType, targetId, targetLabel, description, ipAddress),
                 "activityLog"
@@ -98,6 +105,7 @@ public class ActivityLogService {
             String description,
             String ipAddress
     ) {
+        ensureSchemaSynchronized();
         ActivityLog activityLog = buildActivityLog(user, actionType, targetType, targetId, targetLabel, description, ipAddress);
 
         try {
@@ -159,5 +167,19 @@ public class ActivityLogService {
         activityLog.setDescription(description);
         activityLog.setIpAddress(ipAddress == null || ipAddress.isBlank() ? requestMetadataService.getClientIpAddress() : ipAddress);
         return activityLog;
+    }
+
+    private void ensureSchemaSynchronized() {
+        if (schemaSynchronized.get()) {
+            return;
+        }
+
+        synchronized (schemaSynchronized) {
+            if (schemaSynchronized.get()) {
+                return;
+            }
+            activityLogSchemaSynchronizer.synchronizeIfNeeded();
+            schemaSynchronized.set(true);
+        }
     }
 }

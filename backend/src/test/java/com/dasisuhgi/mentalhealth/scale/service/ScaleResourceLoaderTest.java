@@ -106,6 +106,33 @@ class ScaleResourceLoaderTest {
                 .containsExactly("주의 필요", "상담 권고 또는 고위험 경고");
     }
 
+    @Test
+    void loadsCriDefinitionWithTwentyThreeQuestionsAndReverseScoredSupportItems() {
+        ScaleProperties scaleProperties = new ScaleProperties();
+        scaleProperties.setResourcePath(null);
+        ScaleResourceLoader loader = new ScaleResourceLoader(objectMapper, resourceLoader, scaleProperties);
+
+        ScaleResourceLoader.LoadedScaleResources loaded = loader.load();
+
+        assertThat(loaded.registryItems()).containsKey("CRI");
+        assertThat(loaded.definitions()).containsKey("CRI");
+
+        var cri = loaded.definitions().get("CRI");
+
+        assertThat(cri.scaleName()).isEqualTo("정신과적 위기 분류 평정척도 (CRI)");
+        assertThat(cri.displayOrder()).isEqualTo(9);
+        assertThat(cri.questionCount()).isEqualTo(23);
+        assertThat(cri.items()).hasSize(23);
+        assertThat(cri.items().get(0).text()).isEqualTo("현재 자타해 폭력위험(기물파손, 욕설, 고함 등 명백한 폭력 위험)");
+        assertThat(cri.items().get(22).text()).isEqualTo("현재 도움을 주지는 않으나 제공가능한 가족, 친구, 기타의 존재가 있습니까?");
+        assertThat(cri.items().subList(21, 23))
+                .extracting(item -> item.reverseScored())
+                .containsExactly(true, true);
+        assertThat(cri.items().subList(21, 23))
+                .flatExtracting(item -> item.options().stream().map(option -> option.label()).toList())
+                .containsExactly("없다", "있다", "없다", "있다");
+    }
+
     private String readClasspathResource(String location) throws IOException {
         return new String(
                 resourceLoader.getResource(Objects.requireNonNull(location, "location")).getInputStream().readAllBytes(),

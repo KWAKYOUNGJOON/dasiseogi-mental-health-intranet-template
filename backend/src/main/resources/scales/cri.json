@@ -1,0 +1,244 @@
+{
+  "scaleCode": "CRI",
+  "scaleName": "정신과적 위기 분류 평정척도 (CRI)",
+  "version": "1.0.0",
+  "displayOrder": 9,
+  "isActive": true,
+  "questionCount": 23,
+  "screeningThreshold": null,
+  "screeningLabel": null,
+  "items": [
+    {
+      "questionNo": 1,
+      "questionKey": "cri_self_other_1",
+      "text": "현재 자타해 폭력위험(기물파손, 욕설, 고함 등 명백한 폭력 위험)",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 2,
+      "questionKey": "cri_self_other_2",
+      "text": "최근 1년내 자살시도",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 3,
+      "questionKey": "cri_self_other_3",
+      "text": "자타해 폭력 강도 혹은 치명도(경증상해수준 이상 또는 전치2주 이상)",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "높다", "score": 1 },
+        { "value": "0", "label": "낮다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 4,
+      "questionKey": "cri_self_other_4",
+      "text": "고의성 혹은 계획성 수준(자타해 의지, 사전준비, 일정조율, 도구확인 등)",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "높다", "score": 1 },
+        { "value": "0", "label": "낮다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 5,
+      "questionKey": "cri_self_other_5",
+      "text": "최근 1년 내 자타해 위험으로 인한 경찰개입 여부",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 6,
+      "questionKey": "cri_self_other_6",
+      "text": "최근 일주일내 폭력",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 7,
+      "questionKey": "cri_self_other_7",
+      "text": "과거 범죄 이력(폭행, 성폭력, 방화, 타살 등)",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 8,
+      "questionKey": "cri_self_other_8",
+      "text": "과거 또는 현재 환청(또는 약물, 알코올, 마약 등)에 의한 공격성 여부",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 9,
+      "questionKey": "cri_mental_1",
+      "text": "현재 정신증 증상을 보입니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "그렇다", "score": 1 },
+        { "value": "0", "label": "아니다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 10,
+      "questionKey": "cri_mental_2",
+      "text": "현재 기분장애 증상을 보입니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "그렇다", "score": 1 },
+        { "value": "0", "label": "아니다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 11,
+      "questionKey": "cri_mental_3",
+      "text": "현재 조증(경조증) 증상을 보입니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "그렇다", "score": 1 },
+        { "value": "0", "label": "아니다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 12,
+      "questionKey": "cri_mental_4",
+      "text": "정신과 진단을 받거나 과거 입원한 적이 있습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 13,
+      "questionKey": "cri_mental_5",
+      "text": "알코올/흥분제/환각제/흡입제/대마초/마약 등의 물질관련 문제가 있습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 14,
+      "questionKey": "cri_mental_6",
+      "text": "정신건강문제에 대한 자각 또는 통찰력에 문제가 있습니까?",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 15,
+      "questionKey": "cri_function_1",
+      "text": "의사소통(언어기능/상호소통)의 손상",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 16,
+      "questionKey": "cri_function_2",
+      "text": "주의나 자각 손상(부주의, 주의산만, 물건을 잘 잃어버림, 잘 넘어지거나 부딪힘, 깜빡함 등)",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 17,
+      "questionKey": "cri_function_3",
+      "text": "기억능력 손상(심한 건망증 포함)",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 18,
+      "questionKey": "cri_function_4",
+      "text": "일상적인 의사결정 손상(무엇을 먹을지, 무슨 옷을 입을지, 어떤 생일선물을 사줄지 등)",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 19,
+      "questionKey": "cri_function_5",
+      "text": "인지적 기능의 급격한 변화 여부",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 20,
+      "questionKey": "cri_function_6",
+      "text": "일상 자조능력 상실(약물관리 포함 의식주 관련)",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 21,
+      "questionKey": "cri_function_7",
+      "text": "가정/대인관계/업무 적응력 손상",
+      "reverseScored": false,
+      "options": [
+        { "value": "1", "label": "있다", "score": 1 },
+        { "value": "0", "label": "없다", "score": 0 }
+      ]
+    },
+    {
+      "questionNo": 22,
+      "questionKey": "cri_support_1",
+      "text": "실제 도움과 지지를 제공하는 가족, 친구, 기타의 존재가 있습니까?",
+      "reverseScored": true,
+      "options": [
+        { "value": "1", "label": "없다", "score": 0 },
+        { "value": "0", "label": "있다", "score": 1 }
+      ]
+    },
+    {
+      "questionNo": 23,
+      "questionKey": "cri_support_2",
+      "text": "현재 도움을 주지는 않으나 제공가능한 가족, 친구, 기타의 존재가 있습니까?",
+      "reverseScored": true,
+      "options": [
+        { "value": "1", "label": "없다", "score": 0 },
+        { "value": "0", "label": "있다", "score": 1 }
+      ]
+    }
+  ],
+  "interpretationRules": [],
+  "alertRules": []
+}

@@ -136,6 +136,23 @@ function getAlertScaleLabel(session: SessionDetail, scaleCode: string) {
   return session.scales.find((scale) => scale.scaleCode === scaleCode)?.scaleName ?? scaleCode
 }
 
+function renderResultDetails(resultDetails?: Array<{ key: string; label: string; value: string }>) {
+  if (!resultDetails || resultDetails.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="grid-2">
+      {resultDetails.map((detail) => (
+        <div className="field" key={detail.key}>
+          <span className="muted">{detail.label}</span>
+          <strong>{detail.value}</strong>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function AssessmentSessionDetailPage() {
   const { sessionId } = useParams()
   const { user } = useAuth()
@@ -532,6 +549,7 @@ export function AssessmentSessionDetailPage() {
                     ))}
                   </div>
                 ) : null}
+                {renderResultDetails(scale.resultDetails)}
                 <table className="table">
                   <thead>
                     <tr>

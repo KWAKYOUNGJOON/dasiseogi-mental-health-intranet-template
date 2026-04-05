@@ -15,6 +15,8 @@ import com.dasisuhgi.mentalhealth.restore.dto.RestoreDetailResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreExecuteRequest;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreExecuteResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreHistoryListItemResponse;
+import com.dasisuhgi.mentalhealth.restore.dto.RestorePreparationGroupResponse;
+import com.dasisuhgi.mentalhealth.restore.dto.RestorePreparationResponse;
 import com.dasisuhgi.mentalhealth.restore.dto.RestoreUploadResponse;
 import com.dasisuhgi.mentalhealth.restore.entity.RestoreHistory;
 import com.dasisuhgi.mentalhealth.restore.entity.RestoreStatus;
@@ -61,6 +63,10 @@ public class RestoreService {
     private static final String DATABASE_ITEM_TYPE = "DATABASE";
     private static final String DATABASE_SQL_PATH = "db/database.sql";
     private static final String EXECUTE_CONFIRMATION_TEXT = "전체 복원을 실행합니다";
+    private static final String CONFIRMATION_STATUS_NOT_APPLICABLE = "NOT_APPLICABLE";
+    private static final String CONFIRMATION_STATUS_WAITING_INPUT = "WAITING_INPUT";
+    private static final String CONFIRMATION_STATUS_MATCHED = "MATCHED";
+    private static final String CONFIRMATION_STATUS_MISMATCHED = "MISMATCHED";
     private static final Set<String> EXECUTABLE_ITEM_TYPES = Set.of(DATABASE_ITEM_TYPE);
     private static final long MAX_UPLOAD_SIZE_BYTES = 500L * 1024L * 1024L;
     private static final long DEFAULT_IMPORT_TIMEOUT_SECONDS = 60L;
@@ -141,7 +147,8 @@ public class RestoreService {
         RestoreHistory history = restoreHistoryRepository.findById(restoreId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "RESTORE_HISTORY_NOT_FOUND", "복원 검증 이력을 찾을 수 없습니다."));
 
-        List<RestoreDetectedItemResponse> detectedItems = canInspectArchive(history) ? recalculateDetectedItems(history) : List.of();
+        ValidationResult validationResult = canInspectArchive(history) ? resolveDetailValidationResult(history) : null;
+        List<RestoreDetectedItemResponse> detectedItems = validationResult == null ? List.of() : validationResult.detectedItems();
 
         return new RestoreDetailResponse(
                 history.getId(),
@@ -160,6 +167,20 @@ public class RestoreService {
                 history.getFailureReason(),
                 detectedItems
         );
+    }
+
+    @Transactional(readOnly = true)
+    public RestorePreparationResponse getRestorePreparation(Long restoreId, RestoreExecuteRequest request, SessionUser sessionUser) {
+        User currentUser = accessPolicyService.getCurrentUser(sessionUser);
+        if (!accessPolicyService.isAdmin(currentUser)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "RESTORE_PREPARATION_FORBIDDEN", "복원 실행 준비 상태를 조회할 권한이 없습니다.");
+        }
+
+        RestoreHistory history = restoreHistoryRepository.findById(restoreId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "RESTORE_HISTORY_NOT_FOUND", "복원 검증 이력을 찾을 수 없습니다."));
+
+        ValidationResult validationResult = canInspectArchive(history) ? resolveDetailValidationResult(history) : null;
+        return buildPreparationResponse(history, validationResult, request);
     }
 
     @Transactional(noRollbackFor = Exception.class)
@@ -387,13 +408,13 @@ public class RestoreService {
         return StringUtils.hasText(history.getFilePath()) && StringUtils.hasText(history.getFormatVersion());
     }
 
-    private List<RestoreDetectedItemResponse> recalculateDetectedItems(RestoreHistory history) {
+    private ValidationResult resolveDetailValidationResult(RestoreHistory history) {
         if (!StringUtils.hasText(history.getFilePath())) {
             throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "RESTORE_ARCHIVE_UNAVAILABLE", "저장된 복원 ZIP 파일을 사용할 수 없습니다.");
         }
 
         try {
-            return inspectStoredZip(Path.of(history.getFilePath()), history.getFileName()).detectedItems();
+            return inspectStoredZip(Path.of(history.getFilePath()), history.getFileName());
         } catch (AppException exception) {
             throw mapRestoreDetailInspectionException(exception);
         } catch (RuntimeException exception) {
@@ -417,6 +438,123 @@ public class RestoreService {
         } catch (Exception exception) {
             throw new AppException(HttpStatus.CONFLICT, "RESTORE_ARCHIVE_UNAVAILABLE", "저장된 복원 ZIP 파일을 사용할 수 없습니다.");
         }
+    }
+
+    private RestorePreparationResponse buildPreparationResponse(
+            RestoreHistory history,
+            ValidationResult validationResult,
+            RestoreExecuteRequest request
+    ) {
+        List<String> requestedSelections = normalizeSelectedItemTypes(request == null ? null : request.selectedItemTypes());
+        List<String> supportedSelections = requestedSelections.stream()
+                .filter(EXECUTABLE_ITEM_TYPES::contains)
+                .toList();
+        List<String> unsupportedSelections = requestedSelections.stream()
+                .filter(itemType -> !EXECUTABLE_ITEM_TYPES.contains(itemType))
+                .toList();
+        String confirmationText = request == null ? null : request.confirmationText();
+
+        String archiveDatasourceType = normalizeDatasourceType(validationResult == null ? history.getDatasourceType() : validationResult.datasourceType());
+        String runtimeDatasourceType = determineDatasourceType(datasourceUrl);
+        boolean statusAllowsExecution = history.getStatus() == RestoreStatus.VALIDATED;
+        boolean archiveDatasourceSupported = isSupportedImportDatasource(archiveDatasourceType);
+        boolean runtimeDatasourceSupported = isSupportedImportDatasource(runtimeDatasourceType);
+        List<String> databasePaths = findDetectedItemPaths(validationResult == null ? List.of() : validationResult.detectedItems(), DATABASE_ITEM_TYPE);
+        boolean hasDatabaseGroup = !databasePaths.isEmpty();
+        boolean databaseSelected = hasDatabaseGroup && supportedSelections.contains(DATABASE_ITEM_TYPE);
+        int selectedGroupCount = databaseSelected ? 1 : 0;
+
+        List<String> groupBlockedReasons = new ArrayList<>();
+        if (!statusAllowsExecution) {
+            groupBlockedReasons.add("VALIDATED 상태의 복원 검증 상세에서만 DATABASE 복원 실행을 진행할 수 있습니다.");
+        }
+        if (!hasDatabaseGroup) {
+            groupBlockedReasons.add("업로드한 ZIP 에 db/database.sql 이 없어 DATABASE 복원 그룹을 만들 수 없습니다.");
+        }
+        if (StringUtils.hasText(archiveDatasourceType) && !archiveDatasourceSupported) {
+            groupBlockedReasons.add("업로드한 ZIP datasourceType=" + archiveDatasourceType
+                    + " 는 현재 버전에서 지원하지 않습니다. MariaDB/MySQL DATABASE 복원만 지원합니다.");
+        }
+        if (!runtimeDatasourceSupported) {
+            groupBlockedReasons.add("현재 서버 datasourceType=" + runtimeDatasourceType
+                    + " 에서는 실제 복원을 실행할 수 없습니다. MariaDB/MySQL DATABASE 복원만 지원합니다.");
+        }
+
+        List<RestorePreparationGroupResponse> itemGroups = validationResult == null
+                ? List.of()
+                : List.of(new RestorePreparationGroupResponse(
+                        DATABASE_ITEM_TYPE,
+                        databasePaths,
+                        groupBlockedReasons.isEmpty(),
+                        databaseSelected,
+                        joinReasons(groupBlockedReasons)
+                ));
+
+        String confirmationTextStatus = determineConfirmationTextStatus(groupBlockedReasons, confirmationText);
+        boolean confirmationTextMatched = CONFIRMATION_STATUS_MATCHED.equals(confirmationTextStatus);
+        List<String> blockedReasons = new ArrayList<>(groupBlockedReasons);
+        if (blockedReasons.isEmpty() && !unsupportedSelections.isEmpty()) {
+            blockedReasons.add("현재 버전에서는 DATABASE 그룹만 실제 복원할 수 있습니다.");
+        }
+        if (blockedReasons.isEmpty() && !supportedSelections.isEmpty() && !hasDatabaseGroup) {
+            blockedReasons.add("선택한 복원 대상이 저장된 ZIP 에 존재하지 않습니다.");
+        }
+        if (blockedReasons.isEmpty() && selectedGroupCount == 0) {
+            blockedReasons.add("복원 대상 항목을 하나 이상 선택해주세요.");
+        }
+        if (blockedReasons.isEmpty() && CONFIRMATION_STATUS_WAITING_INPUT.equals(confirmationTextStatus)) {
+            blockedReasons.add("확인 문구를 입력해주세요.");
+        }
+        if (blockedReasons.isEmpty() && CONFIRMATION_STATUS_MISMATCHED.equals(confirmationTextStatus)) {
+            blockedReasons.add("확인 문구는 정확히 " + EXECUTE_CONFIRMATION_TEXT + " 이어야 합니다.");
+        }
+
+        return new RestorePreparationResponse(
+                history.getId(),
+                history.getStatus().name(),
+                EXECUTE_CONFIRMATION_TEXT,
+                confirmationTextStatus,
+                itemGroups,
+                databaseSelected ? List.of(DATABASE_ITEM_TYPE) : List.of(),
+                selectedGroupCount,
+                confirmationTextMatched,
+                blockedReasons.isEmpty(),
+                joinReasons(blockedReasons)
+        );
+    }
+
+    private String determineConfirmationTextStatus(List<String> groupBlockedReasons, String confirmationText) {
+        if (!groupBlockedReasons.isEmpty()) {
+            return CONFIRMATION_STATUS_NOT_APPLICABLE;
+        }
+        if (!StringUtils.hasText(confirmationText)) {
+            return CONFIRMATION_STATUS_WAITING_INPUT;
+        }
+        return EXECUTE_CONFIRMATION_TEXT.equals(confirmationText)
+                ? CONFIRMATION_STATUS_MATCHED
+                : CONFIRMATION_STATUS_MISMATCHED;
+    }
+
+    private List<String> findDetectedItemPaths(List<RestoreDetectedItemResponse> detectedItems, String itemType) {
+        return detectedItems.stream()
+                .filter(item -> itemType.equals(item.itemType()))
+                .findFirst()
+                .map(RestoreDetectedItemResponse::relativePaths)
+                .orElse(List.of());
+    }
+
+    private String joinReasons(List<String> reasons) {
+        List<String> normalizedReasons = reasons.stream()
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+        if (normalizedReasons.isEmpty()) {
+            return null;
+        }
+        if (normalizedReasons.size() == 1) {
+            return normalizedReasons.get(0);
+        }
+        return String.join("\n", normalizedReasons);
     }
 
     private void assertExecutableSelection(List<String> selectedItemTypes, List<RestoreDetectedItemResponse> detectedItems) {

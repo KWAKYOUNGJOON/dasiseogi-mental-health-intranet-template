@@ -10,6 +10,7 @@ public record SessionScaleResponse(
         int totalScore,
         String resultLevel,
         boolean hasAlert,
+        List<SessionScaleResultDetailResponse> resultDetails,
         List<SessionAnswerResponse> answers,
         List<SessionAlertResponse> alerts
 ) {
