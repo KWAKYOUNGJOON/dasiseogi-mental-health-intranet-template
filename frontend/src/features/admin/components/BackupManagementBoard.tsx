@@ -20,6 +20,7 @@ import {
 import {
   RESTORE_DETECTED_ITEM_TYPES,
   RESTORE_EXECUTABLE_ITEM_TYPES,
+  RESTORE_STATUS_OPTIONS,
   executeRestore,
   fetchRestoreDetail,
   fetchRestorePreparation,
@@ -29,7 +30,9 @@ import {
   type RestoreDetectedItem,
   type RestoreDetail,
   type RestoreExecutableItemType,
+  type RestoreExecutionCapability,
   type RestoreHistoryPage,
+  type RestoreHistoryQuery,
   type RestorePreparation,
   type RestorePreparationGroup,
   type RestoreStatus,
@@ -46,9 +49,28 @@ interface FilterState {
   dateTo: string
 }
 
+interface RestoreFilterState {
+  status: '' | RestoreStatus
+  dateFrom: string
+  dateTo: string
+}
+
+interface DateRangeFilterState {
+  dateFrom: string
+  dateTo: string
+}
+
 function createDefaultFilters(): FilterState {
   return {
     backupType: '',
+    status: '',
+    dateFrom: '',
+    dateTo: '',
+  }
+}
+
+function createDefaultRestoreFilters(): RestoreFilterState {
+  return {
     status: '',
     dateFrom: '',
     dateTo: '',
@@ -59,6 +81,7 @@ const PAGE_SIZE = 20
 const RESTORE_PAGE_SIZE = 20
 const EMPTY_STATE_MESSAGE = '조건에 맞는 백업 이력이 없습니다.'
 const RESTORE_EMPTY_STATE_MESSAGE = '등록된 복원 검증 이력이 없습니다.'
+const RESTORE_FILTERED_EMPTY_STATE_MESSAGE = '조건에 맞는 복원 검증 이력이 없습니다.'
 const INVALID_DATE_RANGE_MESSAGE = '조회 기간을 다시 확인해주세요. 시작일은 종료일보다 늦을 수 없습니다.'
 const GENERIC_VALIDATION_MESSAGE = '입력값을 다시 확인해주세요.'
 const GENERIC_LIST_ERROR_MESSAGE = '백업 이력을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
@@ -84,6 +107,15 @@ const BACKUP_TYPE_FILTER_LABELS: Readonly<Partial<Record<BackupType, string>>> =
   MANUAL: '수동 백업',
 }
 const BACKUP_STATUS_FILTER_LABELS: Readonly<Partial<Record<BackupStatus, string>>> = {
+  SUCCESS: '성공',
+  FAILED: '실패',
+}
+const RESTORE_STATUS_FILTER_LABELS: Readonly<Partial<Record<RestoreStatus, string>>> = {
+  UPLOADED: '업로드 완료',
+  VALIDATED: '검증 완료',
+  PRE_BACKUP_RUNNING: '사전 백업 진행 중',
+  PRE_BACKUP_FAILED: '사전 백업 실패',
+  RESTORING: '복원 진행 중',
   SUCCESS: '성공',
   FAILED: '실패',
 }
@@ -167,6 +199,8 @@ function getRestoreListErrorMessage(response: ApiResponse<unknown> | undefined) 
   switch (response.errorCode) {
     case 'FORBIDDEN':
       return getFallbackMessage(response.message, '관리자 권한이 필요합니다.')
+    case 'INVALID_DATE_RANGE':
+      return getFallbackMessage(response.message, '조회 기간을 다시 확인해주세요.')
     case 'VALIDATION_ERROR':
       return getFallbackMessage(response.message, GENERIC_VALIDATION_MESSAGE)
     default:
@@ -330,6 +364,16 @@ function formatBackupStatusFilterOptionLabel(status: string) {
   return `${status} (${description})`
 }
 
+function formatRestoreStatusFilterOptionLabel(status: string) {
+  const description = RESTORE_STATUS_FILTER_LABELS[status as RestoreStatus]
+
+  if (!description) {
+    return status
+  }
+
+  return `${status} (${description})`
+}
+
 function buildQuery(filters: FilterState): Omit<BackupHistoryQuery, 'page' | 'size'> {
   return {
     backupType: filters.backupType || undefined,
@@ -339,7 +383,15 @@ function buildQuery(filters: FilterState): Omit<BackupHistoryQuery, 'page' | 'si
   }
 }
 
-function hasInvalidDateRange(filters: FilterState) {
+function buildRestoreHistoryQuery(filters: RestoreFilterState): Omit<RestoreHistoryQuery, 'page' | 'size'> {
+  return {
+    status: filters.status || undefined,
+    dateFrom: toValidDateText(filters.dateFrom) || undefined,
+    dateTo: toValidDateText(filters.dateTo) || undefined,
+  }
+}
+
+function hasInvalidDateRange(filters: DateRangeFilterState) {
   const dateFrom = toValidDateText(filters.dateFrom)
   const dateTo = toValidDateText(filters.dateTo)
 
@@ -348,6 +400,10 @@ function hasInvalidDateRange(filters: FilterState) {
   }
 
   return dateFrom > dateTo
+}
+
+function hasRestoreHistoryFilters(filters: RestoreFilterState) {
+  return Boolean(filters.status || toValidDateText(filters.dateFrom) || toValidDateText(filters.dateTo))
 }
 
 function getLatestBackupTimestamp(latestBackup: BackupHistoryItem | null) {
@@ -386,6 +442,42 @@ function getRestorePreparationStatusChipStyle(isReady: boolean): CSSProperties {
     color: '#9d2f2f',
     background: '#f8e1e1',
   }
+}
+
+function getRestoreExecutionCapabilityChipStyle(capability: RestoreExecutionCapability): CSSProperties {
+  if (capability === 'EXECUTABLE') {
+    return {
+      color: '#1d6a53',
+      background: '#dff1ea',
+    }
+  }
+
+  return {
+    color: '#9d2f2f',
+    background: '#f8e1e1',
+  }
+}
+
+function getRestoreExecutionCapabilityLabel(capability: RestoreExecutionCapability) {
+  return capability === 'EXECUTABLE' ? '실행 가능' : '실행 불가'
+}
+
+function normalizeInlineText(value: string | null) {
+  return value ? value.replaceAll('\n', ' / ') : null
+}
+
+function buildRestoreUploadSuccessNotice(result: {
+  fileName: string
+  restoreId: number
+  executionCapability: RestoreExecutionCapability
+  executionBlockedReason: string | null
+}) {
+  const executionSummary =
+    result.executionCapability === 'EXECUTABLE'
+      ? '현재 버전에서 복원 실행 가능합니다.'
+      : `현재 버전에서는 복원 실행이 불가합니다. 사유: ${normalizeInlineText(result.executionBlockedReason) ?? '상세 화면에서 사유를 확인해주세요.'}`
+
+  return `${result.fileName} 업로드/검증이 완료되었습니다. ${executionSummary} restoreId ${result.restoreId} 상세를 확인하세요.`
 }
 
 function getRestoreConfirmationStatusChipStyle(status: RestoreConfirmationTextStatus): CSSProperties {
@@ -558,9 +650,12 @@ export function BackupManagementBoard() {
   const restoreFileInputRef = useRef<HTMLInputElement | null>(null)
   const [restoreUploadFile, setRestoreUploadFile] = useState<File | null>(null)
   const [restoreNotice, setRestoreNotice] = useState<Notice>(null)
+  const [restoreFilters, setRestoreFilters] = useState<RestoreFilterState>(() => createDefaultRestoreFilters())
+  const [restoreQuery, setRestoreQuery] = useState<RestoreFilterState>(() => createDefaultRestoreFilters())
   const [restorePage, setRestorePage] = useState(1)
   const [restoreHistoryPage, setRestoreHistoryPage] = useState<RestoreHistoryPage | null>(null)
   const [restoreListLoading, setRestoreListLoading] = useState(true)
+  const [restoreFilterError, setRestoreFilterError] = useState<string | null>(null)
   const [restoreListError, setRestoreListError] = useState<string | null>(null)
   const [restoreUploading, setRestoreUploading] = useState(false)
   const [selectedRestoreId, setSelectedRestoreId] = useState<number | null>(null)
@@ -604,6 +699,7 @@ export function BackupManagementBoard() {
 
     try {
       const response = await fetchRestoreHistoryPage({
+        ...buildRestoreHistoryQuery(restoreQuery),
         page: restorePage,
         size: RESTORE_PAGE_SIZE,
       })
@@ -616,7 +712,7 @@ export function BackupManagementBoard() {
     } finally {
       setRestoreListLoading(false)
     }
-  }, [restorePage])
+  }, [restorePage, restoreQuery])
 
   const loadRestorePreparationState = useCallback(
     async (restoreId: number, selectedItemTypes: RestoreExecutableItemType[], confirmationText: string) => {
@@ -741,6 +837,34 @@ export function BackupManagementBoard() {
     setPage(1)
   }
 
+  function handleRestoreSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (hasInvalidDateRange(restoreFilters)) {
+      setRestoreFilterError(INVALID_DATE_RANGE_MESSAGE)
+      return
+    }
+
+    setRestoreFilterError(null)
+    setRestoreListError(null)
+    setRestoreQuery({
+      status: restoreFilters.status,
+      dateFrom: restoreFilters.dateFrom,
+      dateTo: restoreFilters.dateTo,
+    })
+    setRestorePage(1)
+  }
+
+  function handleRestoreReset() {
+    const nextFilters = createDefaultRestoreFilters()
+
+    setRestoreFilters(nextFilters)
+    setRestoreQuery(nextFilters)
+    setRestoreFilterError(null)
+    setRestoreListError(null)
+    setRestorePage(1)
+  }
+
   function openDialog() {
     if (processing) {
       return
@@ -840,7 +964,7 @@ export function BackupManagementBoard() {
 
       setRestoreNotice({
         type: 'success',
-        text: `${result.fileName} 업로드가 완료되었습니다. restoreId ${result.restoreId} 상세를 확인하세요.`,
+        text: buildRestoreUploadSuccessNotice(result),
       })
       selectRestoreHistory(result.restoreId)
       setRestoreUploadFile(null)
@@ -933,6 +1057,9 @@ export function BackupManagementBoard() {
   const restoreItems = restoreHistoryPage?.items ?? []
   const restoreCurrentPage = restoreHistoryPage?.page ?? restorePage
   const restoreTotalPages = restoreHistoryPage && restoreHistoryPage.totalPages > 0 ? restoreHistoryPage.totalPages : 1
+  const restoreEmptyStateMessage = hasRestoreHistoryFilters(restoreQuery)
+    ? RESTORE_FILTERED_EMPTY_STATE_MESSAGE
+    : RESTORE_EMPTY_STATE_MESSAGE
   const restorePreparationGroups = restorePreparation?.itemGroups ?? []
   const activeSelectedRestoreGroups = restorePreparation?.selectedItemTypes.filter(isRestoreExecutableItemType) ?? []
   const restoreConfirmationStatus = restorePreparation?.confirmationTextStatus ?? 'NOT_APPLICABLE'
@@ -1053,7 +1180,7 @@ export function BackupManagementBoard() {
         </div>
       </div>
 
-      <form className="card stack" noValidate onSubmit={handleSearch}>
+      <form aria-label="백업 이력 필터" className="card stack" noValidate onSubmit={handleSearch}>
         <div className="management-filter-grid">
           <label className="field">
             <span>백업 유형</span>
@@ -1279,10 +1406,65 @@ export function BackupManagementBoard() {
         </div>
       </div>
 
+      <form aria-label="복원 검증 이력 필터" className="card stack" noValidate onSubmit={handleRestoreSearch}>
+        <div className="management-filter-grid">
+          <label className="field">
+            <span>상태</span>
+            <select
+              aria-label="상태"
+              onChange={(event) =>
+                setRestoreFilters((prev) => ({
+                  ...prev,
+                  status: event.target.value as RestoreFilterState['status'],
+                }))
+              }
+              value={restoreFilters.status}
+            >
+              <option value="">전체 상태</option>
+              {RESTORE_STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>
+                  {formatRestoreStatusFilterOptionLabel(status)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>시작일</span>
+            <DateTextInput
+              aria-label="시작일"
+              onChange={(dateFrom) => setRestoreFilters((prev) => ({ ...prev, dateFrom }))}
+              value={restoreFilters.dateFrom}
+            />
+          </label>
+          <label className="field">
+            <span>종료일</span>
+            <DateTextInput
+              aria-label="종료일"
+              onChange={(dateTo) => setRestoreFilters((prev) => ({ ...prev, dateTo }))}
+              value={restoreFilters.dateTo}
+            />
+          </label>
+          <div className="actions" style={{ alignSelf: 'end' }}>
+            <button className="primary-button" disabled={restoreListLoading} type="submit">
+              조회
+            </button>
+            <button className="secondary-button" disabled={restoreListLoading} onClick={handleRestoreReset} type="button">
+              초기화
+            </button>
+          </div>
+        </div>
+
+        {restoreFilterError ? (
+          <div className="error-text" role="alert">
+            {restoreFilterError}
+          </div>
+        ) : null}
+      </form>
+
       <div className="card stack">
         <div className="toolbar" style={{ marginBottom: 0 }}>
           <strong>복원 검증 이력 {restoreHistoryPage?.totalItems ?? 0}건</strong>
-          <span className="muted">기본 정렬과 필터는 서버 기본값을 그대로 사용합니다.</span>
+          <span className="muted">상태와 기간 필터는 기존 복원 검증 이력 목록 API를 그대로 사용합니다.</span>
           <button className="secondary-button" disabled={restoreListLoading} onClick={() => void loadRestoreHistories()} type="button">
             재조회
           </button>
@@ -1305,6 +1487,7 @@ export function BackupManagementBoard() {
               <tr>
                 <th>restoreId</th>
                 <th>상태</th>
+                <th>실행 가능 여부</th>
                 <th>파일명</th>
                 <th>파일크기</th>
                 <th>업로드 시각</th>
@@ -1318,14 +1501,14 @@ export function BackupManagementBoard() {
             <tbody>
               {restoreListLoading ? (
                 <tr>
-                  <td className="muted" colSpan={10}>
+                  <td className="muted" colSpan={11}>
                     복원 검증 이력을 불러오는 중입니다.
                   </td>
                 </tr>
               ) : restoreItems.length === 0 ? (
                 <tr>
-                  <td className="muted" colSpan={10}>
-                    {RESTORE_EMPTY_STATE_MESSAGE}
+                  <td className="muted" colSpan={11}>
+                    {restoreEmptyStateMessage}
                   </td>
                 </tr>
               ) : (
@@ -1345,6 +1528,28 @@ export function BackupManagementBoard() {
                         <span className="status-chip" style={getRestoreStatusChipStyle(item.status)}>
                           {item.status}
                         </span>
+                      </td>
+                      <td>
+                        <div style={{ minWidth: 150 }}>
+                          <span className="status-chip" style={getRestoreExecutionCapabilityChipStyle(item.executionCapability)}>
+                            {getRestoreExecutionCapabilityLabel(item.executionCapability)}
+                          </span>
+                          {item.executionCapability === 'BLOCKED' && item.executionBlockedReason ? (
+                            <div
+                              className="muted"
+                              style={{
+                                marginTop: 6,
+                                maxWidth: 220,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={item.executionBlockedReason}
+                            >
+                              {normalizeInlineText(item.executionBlockedReason)}
+                            </div>
+                          ) : null}
+                        </div>
                       </td>
                       <td>
                         <div
@@ -1453,6 +1658,12 @@ export function BackupManagementBoard() {
                 </span>
               </div>
               <div className="field" style={{ margin: 0 }}>
+                <span>실행 가능 여부</span>
+                <span className="status-chip" style={getRestoreExecutionCapabilityChipStyle(restoreDetail.executionCapability)}>
+                  {getRestoreExecutionCapabilityLabel(restoreDetail.executionCapability)}
+                </span>
+              </div>
+              <div className="field" style={{ margin: 0 }}>
                 <span>파일명</span>
                 <strong
                   style={{
@@ -1490,6 +1701,17 @@ export function BackupManagementBoard() {
               <div className="field" style={{ margin: 0 }}>
                 <span>backupId</span>
                 <strong>{formatOptionalNumber(restoreDetail.backupId)}</strong>
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <span>실행 불가 사유</span>
+                <strong
+                  style={{
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {restoreDetail.executionBlockedReason ?? '-'}
+                </strong>
               </div>
               <div className="field" style={{ margin: 0 }}>
                 <span>선택된 실행 항목</span>

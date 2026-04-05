@@ -3,18 +3,31 @@ package com.dasisuhgi.mentalhealth;
 import com.dasisuhgi.mentalhealth.restore.entity.RestoreHistory;
 import com.dasisuhgi.mentalhealth.restore.entity.RestoreStatus;
 import com.dasisuhgi.mentalhealth.restore.repository.RestoreHistoryRepository;
+import com.dasisuhgi.mentalhealth.restore.service.RestoreService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +52,9 @@ class RestoreHistoryListIntegrationTest {
 
     @Autowired
     private RestoreHistoryRepository restoreHistoryRepository;
+
+    @Autowired
+    private RestoreService restoreService;
 
     @Test
     void onlyAdminCanViewRestoreHistoryList() throws Exception {
@@ -107,6 +123,63 @@ class RestoreHistoryListIntegrationTest {
                 .andExpect(jsonPath("$.data.items[0].backupId").value(44))
                 .andExpect(jsonPath("$.data.items[0].failureReason").doesNotExist())
                 .andExpect(jsonPath("$.data.items[0].detectedItems").doesNotExist());
+    }
+
+    @Test
+    void returnsExecutionCapabilityAlongsideValidatedStatusInRestoreHistoryList() throws Exception {
+        MockHttpSession adminSession = login("admina", "Test1234!");
+        Path blockedArchive = writeRestoreArchive(
+                standardManifest(manifestEntries(minimalPayloadEntries()), false, "H2", 81L),
+                minimalPayloadEntries()
+        );
+        Path executableArchive = writeRestoreArchive(
+                standardManifest(manifestEntries(payloadEntriesWithDatabaseDump()), true, "MYSQL", 82L),
+                payloadEntriesWithDatabaseDump()
+        );
+
+        try {
+            saveHistory(
+                    RestoreStatus.VALIDATED,
+                    "backup-20260404-173219-snapshot-full-v1.zip",
+                    Files.size(blockedArchive),
+                    blockedArchive.toString(),
+                    LocalDateTime.of(2026, 4, 4, 11, 45, 0),
+                    LocalDateTime.of(2026, 4, 4, 11, 46, 0),
+                    "FULL_BACKUP_ZIP_V1",
+                    "H2",
+                    81L,
+                    null
+            );
+            saveHistory(
+                    RestoreStatus.VALIDATED,
+                    "backup-20260404-173219-db-dump-full-v1.zip",
+                    Files.size(executableArchive),
+                    executableArchive.toString(),
+                    LocalDateTime.of(2026, 4, 4, 11, 40, 0),
+                    LocalDateTime.of(2026, 4, 4, 11, 41, 0),
+                    "FULL_BACKUP_ZIP_V1",
+                    "MYSQL",
+                    82L,
+                    null
+            );
+
+            withField(restoreService, "datasourceUrl", "jdbc:mysql://127.0.0.1:3306/mentalhealth", () ->
+                    mockMvc.perform(get("/api/v1/admin/restores").session(adminSession))
+                            .andExpect(status().isOk())
+                            .andExpect(jsonPath("$.data.items.length()").value(2))
+                            .andExpect(jsonPath("$.data.items[0].status").value("VALIDATED"))
+                            .andExpect(jsonPath("$.data.items[0].executionCapability").value("BLOCKED"))
+                            .andExpect(jsonPath("$.data.items[0].executionBlockedReason").value(org.hamcrest.Matchers.allOf(
+                                    org.hamcrest.Matchers.containsString("db/database.sql"),
+                                    org.hamcrest.Matchers.containsString("datasourceType=H2")
+                            )))
+                            .andExpect(jsonPath("$.data.items[1].status").value("VALIDATED"))
+                            .andExpect(jsonPath("$.data.items[1].executionCapability").value("EXECUTABLE"))
+                            .andExpect(jsonPath("$.data.items[1].executionBlockedReason").doesNotExist()));
+        } finally {
+            Files.deleteIfExists(blockedArchive);
+            Files.deleteIfExists(executableArchive);
+        }
     }
 
     @Test
@@ -391,10 +464,36 @@ class RestoreHistoryListIntegrationTest {
             Long backupId,
             String failureReason
     ) {
+        return saveHistory(
+                status,
+                fileName,
+                fileSizeBytes,
+                "/tmp/restores/" + fileName,
+                uploadedAt,
+                validatedAt,
+                formatVersion,
+                datasourceType,
+                backupId,
+                failureReason
+        );
+    }
+
+    private RestoreHistory saveHistory(
+            RestoreStatus status,
+            String fileName,
+            Long fileSizeBytes,
+            String filePath,
+            LocalDateTime uploadedAt,
+            LocalDateTime validatedAt,
+            String formatVersion,
+            String datasourceType,
+            Long backupId,
+            String failureReason
+    ) {
         RestoreHistory history = new RestoreHistory();
         history.setStatus(status);
         history.setFileName(fileName);
-        history.setFilePath("/tmp/restores/" + fileName);
+        history.setFilePath(filePath);
         history.setFileSizeBytes(fileSizeBytes);
         history.setUploadedAt(uploadedAt);
         history.setValidatedAt(validatedAt);
@@ -438,5 +537,127 @@ class RestoreHistoryListIntegrationTest {
 
     private String json(Object value) throws Exception {
         return objectMapper.writeValueAsString(value);
+    }
+
+    private void withField(Object target, String fieldName, Object value, ThrowingRunnable runnable) throws Exception {
+        Object originalValue = ReflectionTestUtils.getField(target, fieldName);
+        ReflectionTestUtils.setField(target, fieldName, value);
+        try {
+            runnable.run();
+        } finally {
+            ReflectionTestUtils.setField(target, fieldName, originalValue);
+        }
+    }
+
+    private Map<String, byte[]> minimalPayloadEntries() {
+        Map<String, byte[]> entries = new LinkedHashMap<>();
+        entries.put("config/application.yml", "app:\n  name: test\n".getBytes(StandardCharsets.UTF_8));
+        entries.put("config/application-prod.yml", "spring:\n  profiles: prod\n".getBytes(StandardCharsets.UTF_8));
+        entries.put("scales/test-scale.json", "{\"code\":\"TEST\"}".getBytes(StandardCharsets.UTF_8));
+        entries.put("metadata/summary.json", "{\"summary\":\"ok\"}".getBytes(StandardCharsets.UTF_8));
+        return entries;
+    }
+
+    private Map<String, byte[]> payloadEntriesWithDatabaseDump() {
+        Map<String, byte[]> entries = new LinkedHashMap<>(minimalPayloadEntries());
+        entries.put("db/database.sql", "create table test (id bigint);\n".getBytes(StandardCharsets.UTF_8));
+        return entries;
+    }
+
+    private Map<String, Object> standardManifest(
+            List<Map<String, Object>> entries,
+            boolean includesDatabaseDump,
+            String datasourceType,
+            long backupId
+    ) {
+        Map<String, Object> manifest = new LinkedHashMap<>();
+        manifest.put("formatVersion", "FULL_BACKUP_ZIP_V1");
+        manifest.put("createdAt", "2026-04-04T12:00:00+09:00");
+        manifest.put("datasourceType", datasourceType);
+        manifest.put("appVersion", "unknown");
+        manifest.put("backupId", backupId);
+        manifest.put("executedBy", Map.of("loginId", "admina", "name", "관리자A"));
+        manifest.put("profile", "test");
+        manifest.put("environment", "test");
+        manifest.put("summary", Map.of(
+                "backupType", "MANUAL",
+                "backupMethod", includesDatabaseDump ? "DB_DUMP" : "SNAPSHOT",
+                "datasourceType", datasourceType,
+                "includesDatabaseDump", includesDatabaseDump,
+                "userCount", 3,
+                "clientCount", 2,
+                "sessionCount", 1,
+                "reason", "restore list test"
+        ));
+        manifest.put("entries", entries);
+        return manifest;
+    }
+
+    private List<Map<String, Object>> manifestEntries(Map<String, byte[]> payloadEntries) {
+        List<Map<String, Object>> manifestEntries = new ArrayList<>();
+        for (Map.Entry<String, byte[]> entry : payloadEntries.entrySet()) {
+            Map<String, Object> manifestEntry = new HashMap<>();
+            manifestEntry.put("itemType", itemType(entry.getKey()));
+            manifestEntry.put("relativePath", entry.getKey());
+            manifestEntry.put("size", entry.getValue().length);
+            manifestEntry.put("sha256", sha256(entry.getValue()));
+            manifestEntries.add(manifestEntry);
+        }
+        return manifestEntries;
+    }
+
+    private String itemType(String relativePath) {
+        if ("db/database.sql".equals(relativePath)) {
+            return "DATABASE_DUMP";
+        }
+        if (relativePath.startsWith("config/")) {
+            return "CONFIG_FILE";
+        }
+        if (relativePath.startsWith("scales/")) {
+            return "SCALE_JSON";
+        }
+        if (relativePath.startsWith("metadata/")) {
+            return "METADATA_SUMMARY";
+        }
+        return "FILE";
+    }
+
+    private Path writeRestoreArchive(Map<String, Object> manifest, Map<String, byte[]> payloadEntries) throws Exception {
+        Path archive = Files.createTempFile("restore-history-", ".zip");
+        Files.write(archive, createStandardZip(manifest, payloadEntries));
+        return archive;
+    }
+
+    private byte[] createStandardZip(Map<String, Object> manifest, Map<String, byte[]> payloadEntries) throws Exception {
+        Map<String, byte[]> zipEntries = new LinkedHashMap<>();
+        zipEntries.put("manifest.json", objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(manifest));
+        zipEntries.putAll(payloadEntries);
+        return createZip(zipEntries);
+    }
+
+    private byte[] createZip(Map<String, byte[]> entries) throws IOException {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try (ZipOutputStream zipOutputStream = new ZipOutputStream(outputStream, StandardCharsets.UTF_8)) {
+            for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+                zipOutputStream.putNextEntry(new ZipEntry(entry.getKey()));
+                zipOutputStream.write(entry.getValue());
+                zipOutputStream.closeEntry();
+            }
+        }
+        return outputStream.toByteArray();
+    }
+
+    private String sha256(byte[] bytes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(bytes));
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    @FunctionalInterface
+    private interface ThrowingRunnable {
+        void run() throws Exception;
     }
 }

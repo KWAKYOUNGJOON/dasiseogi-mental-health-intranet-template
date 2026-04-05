@@ -11,6 +11,8 @@ public record RestoreHistoryListItemResponse(
         String formatVersion,
         String datasourceType,
         Long backupId,
-        String failureReason
+        String failureReason,
+        String executionCapability,
+        String executionBlockedReason
 ) {
 }

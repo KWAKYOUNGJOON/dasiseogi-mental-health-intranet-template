@@ -124,4 +124,35 @@ describe('assessment scale select page', () => {
     expect(draftState.clientId).toBe(42)
     expect(draftState.selectedScaleCodes).toEqual(['PHQ9', 'GAD7'])
   })
+
+  it('shows CRI in the scale list, stores only CRI in the draft, and moves to the input step', async () => {
+    const user = userEvent.setup()
+
+    mockedFetchScales.mockResolvedValue([
+      createScaleListItem(),
+      createScaleListItem({
+        scaleCode: 'CRI',
+        scaleName: '정신과적 위기 분류 평정척도 (CRI)',
+        displayOrder: 9,
+      }),
+    ])
+
+    renderAssessmentScaleSelectPage()
+
+    const criCheckbox = await screen.findByRole('checkbox', { name: /정신과적 위기 분류 평정척도 \(CRI\)/ })
+
+    expect(screen.getByText('정신과적 위기 분류 평정척도 (CRI)')).toBeTruthy()
+
+    await user.click(criCheckbox)
+    await user.click(screen.getByRole('button', { name: '검사 시작' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-display').textContent).toBe('/assessments/start/42/input')
+    })
+
+    const draftState = useAssessmentDraftStore.getState()
+
+    expect(draftState.clientId).toBe(42)
+    expect(draftState.selectedScaleCodes).toEqual(['CRI'])
+  })
 })

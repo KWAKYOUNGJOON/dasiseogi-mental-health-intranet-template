@@ -63,6 +63,10 @@ public class RestoreService {
     private static final String DATABASE_ITEM_TYPE = "DATABASE";
     private static final String DATABASE_SQL_PATH = "db/database.sql";
     private static final String EXECUTE_CONFIRMATION_TEXT = "전체 복원을 실행합니다";
+    private static final String EXECUTION_CAPABILITY_EXECUTABLE = "EXECUTABLE";
+    private static final String EXECUTION_CAPABILITY_BLOCKED = "BLOCKED";
+    private static final String EXECUTION_CAPABILITY_UNAVAILABLE_REASON = "ZIP 구조 검증이 완료되지 않아 현재 버전 실행 가능 여부를 확인할 수 없습니다.";
+    private static final String EXECUTION_CAPABILITY_RECHECK_UNAVAILABLE_REASON = "저장된 복원 ZIP 파일을 다시 확인할 수 없어 현재 버전 실행 가능 여부를 확인할 수 없습니다.";
     private static final String CONFIRMATION_STATUS_NOT_APPLICABLE = "NOT_APPLICABLE";
     private static final String CONFIRMATION_STATUS_WAITING_INPUT = "WAITING_INPUT";
     private static final String CONFIRMATION_STATUS_MATCHED = "MATCHED";
@@ -134,7 +138,17 @@ public class RestoreService {
 
         User currentUser = accessPolicyService.getCurrentUser(sessionUser);
         accessPolicyService.assertAdmin(currentUser);
-        return restoreHistoryQueryRepository.findRestoreHistories(parseRestoreStatus(status), dateFrom, dateTo, page, size);
+        PageResponse<RestoreHistory> historyPage = restoreHistoryQueryRepository.findRestoreHistories(
+                parseRestoreStatus(status),
+                dateFrom,
+                dateTo,
+                page,
+                size
+        );
+        List<RestoreHistoryListItemResponse> items = historyPage.items().stream()
+                .map(this::buildRestoreHistoryListItemResponse)
+                .toList();
+        return new PageResponse<>(items, historyPage.page(), historyPage.size(), historyPage.totalItems(), historyPage.totalPages());
     }
 
     @Transactional(readOnly = true)
@@ -149,6 +163,7 @@ public class RestoreService {
 
         ValidationResult validationResult = canInspectArchive(history) ? resolveDetailValidationResult(history) : null;
         List<RestoreDetectedItemResponse> detectedItems = validationResult == null ? List.of() : validationResult.detectedItems();
+        ExecutionCapabilityResult executionCapability = resolveExecutionCapability(history, validationResult);
 
         return new RestoreDetailResponse(
                 history.getId(),
@@ -165,7 +180,9 @@ public class RestoreService {
                 history.getPreBackupId(),
                 history.getPreBackupFileName(),
                 history.getFailureReason(),
-                detectedItems
+                detectedItems,
+                executionCapability.executionCapability(),
+                executionCapability.executionBlockedReason()
         );
     }
 
@@ -215,6 +232,7 @@ public class RestoreService {
             history.setBackupId(validationResult.backupId());
             history.setFailureReason(null);
             restoreHistoryRepository.save(history);
+            ExecutionCapabilityResult executionCapability = resolveExecutionCapability(validationResult);
 
             activityLogService.log(
                     currentUser,
@@ -234,7 +252,9 @@ public class RestoreService {
                     history.getDatasourceType(),
                     history.getBackupId(),
                     validationResult.detectedItems(),
-                    null
+                    null,
+                    executionCapability.executionCapability(),
+                    executionCapability.executionBlockedReason()
             );
         } catch (Exception exception) {
             history.setStatus(RestoreStatus.FAILED);
@@ -455,11 +475,9 @@ public class RestoreService {
         String confirmationText = request == null ? null : request.confirmationText();
 
         String archiveDatasourceType = normalizeDatasourceType(validationResult == null ? history.getDatasourceType() : validationResult.datasourceType());
-        String runtimeDatasourceType = determineDatasourceType(datasourceUrl);
         boolean statusAllowsExecution = history.getStatus() == RestoreStatus.VALIDATED;
-        boolean archiveDatasourceSupported = isSupportedImportDatasource(archiveDatasourceType);
-        boolean runtimeDatasourceSupported = isSupportedImportDatasource(runtimeDatasourceType);
         List<String> databasePaths = findDetectedItemPaths(validationResult == null ? List.of() : validationResult.detectedItems(), DATABASE_ITEM_TYPE);
+        ExecutionCapabilityResult executionCapability = evaluateExecutionCapability(archiveDatasourceType, databasePaths);
         boolean hasDatabaseGroup = !databasePaths.isEmpty();
         boolean databaseSelected = hasDatabaseGroup && supportedSelections.contains(DATABASE_ITEM_TYPE);
         int selectedGroupCount = databaseSelected ? 1 : 0;
@@ -468,17 +486,7 @@ public class RestoreService {
         if (!statusAllowsExecution) {
             groupBlockedReasons.add("VALIDATED 상태의 복원 검증 상세에서만 DATABASE 복원 실행을 진행할 수 있습니다.");
         }
-        if (!hasDatabaseGroup) {
-            groupBlockedReasons.add("업로드한 ZIP 에 db/database.sql 이 없어 DATABASE 복원 그룹을 만들 수 없습니다.");
-        }
-        if (StringUtils.hasText(archiveDatasourceType) && !archiveDatasourceSupported) {
-            groupBlockedReasons.add("업로드한 ZIP datasourceType=" + archiveDatasourceType
-                    + " 는 현재 버전에서 지원하지 않습니다. MariaDB/MySQL DATABASE 복원만 지원합니다.");
-        }
-        if (!runtimeDatasourceSupported) {
-            groupBlockedReasons.add("현재 서버 datasourceType=" + runtimeDatasourceType
-                    + " 에서는 실제 복원을 실행할 수 없습니다. MariaDB/MySQL DATABASE 복원만 지원합니다.");
-        }
+        groupBlockedReasons.addAll(executionCapability.blockedReasons());
 
         List<RestorePreparationGroupResponse> itemGroups = validationResult == null
                 ? List.of()
@@ -541,6 +549,87 @@ public class RestoreService {
                 .findFirst()
                 .map(RestoreDetectedItemResponse::relativePaths)
                 .orElse(List.of());
+    }
+
+    private RestoreHistoryListItemResponse buildRestoreHistoryListItemResponse(RestoreHistory history) {
+        ExecutionCapabilityResult executionCapability = resolveListExecutionCapability(history);
+        return new RestoreHistoryListItemResponse(
+                history.getId(),
+                history.getStatus().name(),
+                history.getFileName(),
+                history.getFileSizeBytes(),
+                SeoulDateTimeSupport.formatDateTime(history.getUploadedAt()),
+                SeoulDateTimeSupport.formatDateTime(history.getValidatedAt()),
+                history.getUploadedByNameSnapshot(),
+                history.getFormatVersion(),
+                history.getDatasourceType(),
+                history.getBackupId(),
+                history.getFailureReason(),
+                executionCapability.executionCapability(),
+                executionCapability.executionBlockedReason()
+        );
+    }
+
+    private ExecutionCapabilityResult resolveListExecutionCapability(RestoreHistory history) {
+        if (!canInspectArchive(history)) {
+            return blockedExecutionCapability(EXECUTION_CAPABILITY_UNAVAILABLE_REASON);
+        }
+        try {
+            return resolveExecutionCapability(history, resolveStoredValidationResult(history));
+        } catch (RuntimeException exception) {
+            return blockedExecutionCapability(EXECUTION_CAPABILITY_RECHECK_UNAVAILABLE_REASON);
+        }
+    }
+
+    private ExecutionCapabilityResult resolveExecutionCapability(RestoreHistory history, ValidationResult validationResult) {
+        if (validationResult == null) {
+            return blockedExecutionCapability(EXECUTION_CAPABILITY_UNAVAILABLE_REASON);
+        }
+        return resolveExecutionCapability(validationResult);
+    }
+
+    private ExecutionCapabilityResult resolveExecutionCapability(ValidationResult validationResult) {
+        return evaluateExecutionCapability(
+                validationResult.datasourceType(),
+                findDetectedItemPaths(validationResult.detectedItems(), DATABASE_ITEM_TYPE)
+        );
+    }
+
+    private ExecutionCapabilityResult evaluateExecutionCapability(String archiveDatasourceType, List<String> databasePaths) {
+        String normalizedArchiveDatasourceType = normalizeDatasourceType(archiveDatasourceType);
+        String runtimeDatasourceType = determineDatasourceType(datasourceUrl);
+        boolean archiveDatasourceSupported = isSupportedImportDatasource(normalizedArchiveDatasourceType);
+        boolean runtimeDatasourceSupported = isSupportedImportDatasource(runtimeDatasourceType);
+        List<String> blockedReasons = new ArrayList<>();
+
+        if (databasePaths.isEmpty()) {
+            blockedReasons.add("업로드한 ZIP 에 db/database.sql 이 없어 DATABASE 복원 그룹을 만들 수 없습니다.");
+        }
+        if (StringUtils.hasText(normalizedArchiveDatasourceType) && !archiveDatasourceSupported) {
+            blockedReasons.add("업로드한 ZIP datasourceType=" + normalizedArchiveDatasourceType
+                    + " 는 현재 버전에서 지원하지 않습니다. MariaDB/MySQL DATABASE 복원만 지원합니다.");
+        }
+        if (!runtimeDatasourceSupported) {
+            blockedReasons.add("현재 서버 datasourceType=" + runtimeDatasourceType
+                    + " 에서는 실제 복원을 실행할 수 없습니다. MariaDB/MySQL DATABASE 복원만 지원합니다.");
+        }
+
+        if (blockedReasons.isEmpty()) {
+            return new ExecutionCapabilityResult(EXECUTION_CAPABILITY_EXECUTABLE, null, List.of());
+        }
+        return new ExecutionCapabilityResult(
+                EXECUTION_CAPABILITY_BLOCKED,
+                joinReasons(blockedReasons),
+                List.copyOf(blockedReasons)
+        );
+    }
+
+    private ExecutionCapabilityResult blockedExecutionCapability(String reason) {
+        return new ExecutionCapabilityResult(
+                EXECUTION_CAPABILITY_BLOCKED,
+                reason,
+                List.of(reason)
+        );
     }
 
     private String joinReasons(List<String> reasons) {
@@ -1104,6 +1193,13 @@ public class RestoreService {
             String datasourceType,
             Long backupId,
             List<RestoreDetectedItemResponse> detectedItems
+    ) {
+    }
+
+    private record ExecutionCapabilityResult(
+            String executionCapability,
+            String executionBlockedReason,
+            List<String> blockedReasons
     ) {
     }
 

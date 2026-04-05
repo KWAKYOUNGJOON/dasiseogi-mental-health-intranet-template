@@ -18,6 +18,8 @@ public record RestoreDetailResponse(
         Long preBackupId,
         String preBackupFileName,
         String failureReason,
-        List<RestoreDetectedItemResponse> detectedItems
+        List<RestoreDetectedItemResponse> detectedItems,
+        String executionCapability,
+        String executionBlockedReason
 ) {
 }

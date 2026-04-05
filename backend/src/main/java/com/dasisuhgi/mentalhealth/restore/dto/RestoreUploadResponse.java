@@ -12,6 +12,8 @@ public record RestoreUploadResponse(
         String datasourceType,
         Long backupId,
         List<RestoreDetectedItemResponse> detectedItems,
-        String failureReason
+        String failureReason,
+        String executionCapability,
+        String executionBlockedReason
 ) {
 }

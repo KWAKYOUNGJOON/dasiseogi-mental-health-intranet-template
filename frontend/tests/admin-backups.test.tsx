@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
@@ -20,6 +20,7 @@ vi.mock('../src/features/admin/api/backupManagementApi', () => ({
 vi.mock('../src/features/admin/api/restoreManagementApi', () => ({
   RESTORE_DETECTED_ITEM_TYPES: ['DATABASE', 'CONFIG', 'SCALES', 'METADATA'],
   RESTORE_EXECUTABLE_ITEM_TYPES: ['DATABASE'],
+  RESTORE_STATUS_OPTIONS: ['UPLOADED', 'VALIDATED', 'PRE_BACKUP_RUNNING', 'PRE_BACKUP_FAILED', 'RESTORING', 'SUCCESS', 'FAILED'],
   fetchRestoreHistoryPage: vi.fn(),
   fetchRestoreDetail: vi.fn(),
   fetchRestorePreparation: vi.fn(),
@@ -43,6 +44,7 @@ import {
   fetchRestoreDetail,
   fetchRestorePreparation,
   fetchRestoreHistoryPage,
+  uploadRestoreZip,
 } from '../src/features/admin/api/restoreManagementApi'
 
 const mockedFetchBackupHistoryPage = vi.mocked(fetchBackupHistoryPage)
@@ -52,6 +54,7 @@ const mockedFetchRestoreHistoryPage = vi.mocked(fetchRestoreHistoryPage)
 const mockedFetchRestoreDetail = vi.mocked(fetchRestoreDetail)
 const mockedFetchRestorePreparation = vi.mocked(fetchRestorePreparation)
 const mockedExecuteRestore = vi.mocked(executeRestore)
+const mockedUploadRestoreZip = vi.mocked(uploadRestoreZip)
 
 function createAdminUser(role: 'ADMIN' | 'USER' = 'ADMIN') {
   return {
@@ -114,6 +117,8 @@ function createRestoreHistoryItem(
     datasourceType: 'MYSQL',
     backupId: 9001,
     failureReason: '-',
+    executionCapability: 'EXECUTABLE' as const,
+    executionBlockedReason: null,
     ...overrides,
   }
 }
@@ -156,6 +161,30 @@ function createRestoreDetail(
       { itemType: 'SCALES', relativePaths: ['scales/test-scale.json'] },
       { itemType: 'METADATA', relativePaths: ['metadata/summary.json'] },
     ],
+    executionCapability: 'EXECUTABLE' as const,
+    executionBlockedReason: null,
+    ...overrides,
+  }
+}
+
+function createRestoreUploadResult(
+  overrides?: Partial<Awaited<ReturnType<typeof uploadRestoreZip>>>,
+) {
+  return {
+    restoreId: 71,
+    status: 'VALIDATED' as const,
+    fileName: 'restore-validated.zip',
+    validatedAt: '2026-04-04 09:05',
+    formatVersion: 'FULL_BACKUP_ZIP_V1',
+    datasourceType: 'MYSQL',
+    backupId: 9001,
+    detectedItems: [
+      { itemType: 'DATABASE', relativePaths: ['db/database.sql'] },
+      { itemType: 'CONFIG', relativePaths: ['config/application.yml'] },
+    ],
+    failureReason: '-',
+    executionCapability: 'EXECUTABLE' as const,
+    executionBlockedReason: null,
     ...overrides,
   }
 }
@@ -194,6 +223,14 @@ function renderAdminBackupsPage() {
   )
 }
 
+function getBackupFilterForm() {
+  return screen.getByRole('form', { name: '백업 이력 필터' })
+}
+
+function getRestoreFilterForm() {
+  return screen.getByRole('form', { name: '복원 검증 이력 필터' })
+}
+
 beforeEach(() => {
   mockUseAuth.mockReturnValue({
     user: createAdminUser(),
@@ -209,6 +246,7 @@ beforeEach(() => {
   mockedFetchRestoreDetail.mockReset()
   mockedFetchRestorePreparation.mockReset()
   mockedExecuteRestore.mockReset()
+  mockedUploadRestoreZip.mockReset()
   mockedFetchRestoreHistoryPage.mockResolvedValue(createRestoreHistoryPage([]))
 })
 
@@ -252,11 +290,13 @@ describe('admin backups', () => {
 
     await screen.findByText('backup-20260330-090500-db-dump.sql')
 
-    await user.selectOptions(screen.getByLabelText('백업 유형'), 'AUTO')
-    await user.selectOptions(screen.getByLabelText('상태'), 'FAILED')
-    fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2026-03-01' } })
-    fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2026-03-31' } })
-    await user.click(screen.getByRole('button', { name: '조회' }))
+    const backupFilterForm = getBackupFilterForm()
+
+    await user.selectOptions(within(backupFilterForm).getByLabelText('백업 유형'), 'AUTO')
+    await user.selectOptions(within(backupFilterForm).getByLabelText('상태'), 'FAILED')
+    fireEvent.change(within(backupFilterForm).getByLabelText('시작일'), { target: { value: '2026-03-01' } })
+    fireEvent.change(within(backupFilterForm).getByLabelText('종료일'), { target: { value: '2026-03-31' } })
+    await user.click(within(backupFilterForm).getByRole('button', { name: '조회' }))
 
     await waitFor(() => {
       expect(mockedFetchBackupHistoryPage).toHaveBeenLastCalledWith({
@@ -280,12 +320,77 @@ describe('admin backups', () => {
 
     await screen.findByText('backup-20260330-090500-db-dump.sql')
 
-    fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2026-04-01' } })
-    fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2026-03-01' } })
-    await user.click(screen.getByRole('button', { name: '조회' }))
+    const backupFilterForm = getBackupFilterForm()
+
+    fireEvent.change(within(backupFilterForm).getByLabelText('시작일'), { target: { value: '2026-04-01' } })
+    fireEvent.change(within(backupFilterForm).getByLabelText('종료일'), { target: { value: '2026-03-01' } })
+    await user.click(within(backupFilterForm).getByRole('button', { name: '조회' }))
 
     expect(await screen.findByText('조회 기간을 다시 확인해주세요. 시작일은 종료일보다 늦을 수 없습니다.')).toBeTruthy()
     expect(mockedFetchBackupHistoryPage).toHaveBeenCalledTimes(1)
+  })
+
+  it('applies restore status/date filters with the existing restore history API params and resets the page to 1', async () => {
+    const user = userEvent.setup()
+
+    mockedFetchBackupHistoryPage.mockResolvedValue(createBackupHistoryPage([createBackupHistoryItem()]))
+    mockedFetchLatestBackupHistory.mockResolvedValue(createBackupHistoryItem())
+    mockedFetchRestoreHistoryPage
+      .mockResolvedValueOnce(createRestoreHistoryPage([createRestoreHistoryItem()], { totalItems: 3, totalPages: 3 }))
+      .mockResolvedValueOnce(createRestoreHistoryPage([createRestoreHistoryItem({ id: 72 })], { page: 2, totalItems: 3, totalPages: 3 }))
+      .mockResolvedValueOnce(createRestoreHistoryPage([createRestoreHistoryItem({ id: 73, status: 'FAILED' as const })], { totalItems: 1, totalPages: 1 }))
+
+    renderAdminBackupsPage()
+
+    const restoreHistoryCard = (await screen.findByText('복원 검증 이력 3건')).closest('.card')
+    expect(restoreHistoryCard).toBeTruthy()
+
+    await user.click(within(restoreHistoryCard as HTMLElement).getByRole('button', { name: '다음' }))
+
+    await waitFor(() => {
+      expect(mockedFetchRestoreHistoryPage).toHaveBeenNthCalledWith(2, {
+        page: 2,
+        size: 20,
+      })
+    })
+
+    const restoreFilterForm = getRestoreFilterForm()
+
+    await user.selectOptions(within(restoreFilterForm).getByLabelText('상태'), 'FAILED')
+    fireEvent.change(within(restoreFilterForm).getByLabelText('시작일'), { target: { value: '2026-04-01' } })
+    fireEvent.change(within(restoreFilterForm).getByLabelText('종료일'), { target: { value: '2026-04-30' } })
+    await user.click(within(restoreFilterForm).getByRole('button', { name: '조회' }))
+
+    await waitFor(() => {
+      expect(mockedFetchRestoreHistoryPage).toHaveBeenLastCalledWith({
+        status: 'FAILED',
+        dateFrom: '2026-04-01',
+        dateTo: '2026-04-30',
+        page: 1,
+        size: 20,
+      })
+    })
+  })
+
+  it('blocks the restore history request and shows a validation message when the restore date range is invalid', async () => {
+    const user = userEvent.setup()
+
+    mockedFetchBackupHistoryPage.mockResolvedValue(createBackupHistoryPage([createBackupHistoryItem()]))
+    mockedFetchLatestBackupHistory.mockResolvedValue(createBackupHistoryItem())
+    mockedFetchRestoreHistoryPage.mockResolvedValue(createRestoreHistoryPage([createRestoreHistoryItem()]))
+
+    renderAdminBackupsPage()
+
+    await screen.findByText('restore-validated.zip')
+
+    const restoreFilterForm = getRestoreFilterForm()
+
+    fireEvent.change(within(restoreFilterForm).getByLabelText('시작일'), { target: { value: '2026-04-30' } })
+    fireEvent.change(within(restoreFilterForm).getByLabelText('종료일'), { target: { value: '2026-04-01' } })
+    await user.click(within(restoreFilterForm).getByRole('button', { name: '조회' }))
+
+    expect(await within(restoreFilterForm).findByText('조회 기간을 다시 확인해주세요. 시작일은 종료일보다 늦을 수 없습니다.')).toBeTruthy()
+    expect(mockedFetchRestoreHistoryPage).toHaveBeenCalledTimes(1)
   })
 
   it('opens the confirmation modal and refreshes the list after a manual backup run', async () => {
@@ -402,6 +507,8 @@ describe('admin backups', () => {
       fileName: 'backup-20260404-173219-snapshot-full-v1.zip',
       datasourceType: 'H2',
       backupId: 4,
+      executionCapability: 'BLOCKED',
+      executionBlockedReason: '업로드한 ZIP 에 db/database.sql 이 없어 DATABASE 복원 그룹을 만들 수 없습니다.\n업로드한 ZIP datasourceType=H2 는 현재 버전에서 지원하지 않습니다.',
       detectedItems: [
         { itemType: 'CONFIG', relativePaths: ['config/application.yml'] },
         { itemType: 'SCALES', relativePaths: ['scales/test-scale.json'] },
@@ -429,6 +536,16 @@ describe('admin backups', () => {
     await user.click(screen.getByText('backup-20260404-173219-snapshot-full-v1.zip'))
 
     expect(await screen.findByText('표시 전용 detectedItems')).toBeTruthy()
+
+    const restoreDetailCard = screen.getByText('선택한 복원 검증 상세').closest('.card')
+    expect(restoreDetailCard).toBeTruthy()
+
+    const restoreDetailScope = within(restoreDetailCard as HTMLElement)
+    expect(restoreDetailScope.getByText('실행 가능 여부')).toBeTruthy()
+    expect(restoreDetailScope.getByText('실행 불가 사유')).toBeTruthy()
+    expect(restoreDetailScope.getAllByText('VALIDATED').length).toBeGreaterThan(0)
+    expect(restoreDetailScope.getAllByText('실행 불가').length).toBeGreaterThan(0)
+
     expect(screen.getByText('CONFIG 1개')).toBeTruthy()
     expect(screen.getByText('SCALES 1개')).toBeTruthy()
     expect(screen.getByText('METADATA 1개')).toBeTruthy()
@@ -444,6 +561,92 @@ describe('admin backups', () => {
     expect(screen.queryByText('확인 문구가 정확히 일치하지 않습니다.')).toBeNull()
     expect(screen.getAllByText('선택된 그룹 없음').length).toBeGreaterThan(0)
     expect(screen.getByText('실행 준비 불가')).toBeTruthy()
+  })
+
+  it('shows validated status and blocked execution capability separately in the restore history list', async () => {
+    mockedFetchBackupHistoryPage.mockResolvedValue(createBackupHistoryPage([createBackupHistoryItem()]))
+    mockedFetchLatestBackupHistory.mockResolvedValue(createBackupHistoryItem())
+    mockedFetchRestoreHistoryPage.mockResolvedValue(createRestoreHistoryPage([createRestoreHistoryItem({
+      fileName: 'backup-20260404-173219-snapshot-full-v1.zip',
+      datasourceType: 'H2',
+      backupId: 4,
+      executionCapability: 'BLOCKED',
+      executionBlockedReason: '업로드한 ZIP 에 db/database.sql 이 없어 DATABASE 복원 그룹을 만들 수 없습니다.\n업로드한 ZIP datasourceType=H2 는 현재 버전에서 지원하지 않습니다.',
+    })]))
+
+    renderAdminBackupsPage()
+
+    const restoreRow = (await screen.findByText('backup-20260404-173219-snapshot-full-v1.zip')).closest('tr')
+    expect(screen.getByRole('columnheader', { name: '실행 가능 여부' })).toBeTruthy()
+    expect(restoreRow).toBeTruthy()
+
+    const restoreRowScope = within(restoreRow as HTMLElement)
+    expect(restoreRowScope.getByText('VALIDATED')).toBeTruthy()
+    expect(restoreRowScope.getByText('실행 불가')).toBeTruthy()
+    expect(restoreRowScope.getByText(/db\/database\.sql/)).toBeTruthy()
+    expect(restoreRowScope.getByText(/datasourceType=H2/)).toBeTruthy()
+  })
+
+  it('shows upload validation success together with blocked execution capability notice', async () => {
+    const user = userEvent.setup()
+
+    mockedFetchBackupHistoryPage.mockResolvedValue(createBackupHistoryPage([createBackupHistoryItem()]))
+    mockedFetchLatestBackupHistory.mockResolvedValue(createBackupHistoryItem())
+    mockedFetchRestoreHistoryPage
+      .mockResolvedValueOnce(createRestoreHistoryPage([]))
+      .mockResolvedValueOnce(createRestoreHistoryPage([createRestoreHistoryItem({
+        id: 72,
+        fileName: 'backup-20260404-173219-snapshot-full-v1.zip',
+        datasourceType: 'H2',
+        backupId: 4,
+      })]))
+    mockedUploadRestoreZip.mockResolvedValue(createRestoreUploadResult({
+      restoreId: 72,
+      fileName: 'backup-20260404-173219-snapshot-full-v1.zip',
+      datasourceType: 'H2',
+      backupId: 4,
+      executionCapability: 'BLOCKED',
+      executionBlockedReason: '업로드한 ZIP 에 db/database.sql 이 없어 DATABASE 복원 그룹을 만들 수 없습니다.',
+    }))
+    mockedFetchRestoreDetail.mockResolvedValue(createRestoreDetail({
+      id: 72,
+      fileName: 'backup-20260404-173219-snapshot-full-v1.zip',
+      datasourceType: 'H2',
+      backupId: 4,
+      executionCapability: 'BLOCKED',
+      executionBlockedReason: '업로드한 ZIP 에 db/database.sql 이 없어 DATABASE 복원 그룹을 만들 수 없습니다.',
+      detectedItems: [
+        { itemType: 'CONFIG', relativePaths: ['config/application.yml'] },
+        { itemType: 'SCALES', relativePaths: ['scales/test-scale.json'] },
+        { itemType: 'METADATA', relativePaths: ['metadata/summary.json'] },
+      ],
+    }))
+    mockedFetchRestorePreparation.mockResolvedValue(createRestorePreparation({
+      restoreId: 72,
+      confirmationTextStatus: 'NOT_APPLICABLE',
+      itemGroups: [
+        {
+          itemType: 'DATABASE',
+          relativePaths: [],
+          selectable: false,
+          selected: false,
+          blockedReason: '업로드한 ZIP 에 db/database.sql 이 없어 DATABASE 복원 그룹을 만들 수 없습니다.',
+        },
+      ],
+      blockedReason: '업로드한 ZIP 에 db/database.sql 이 없어 DATABASE 복원 그룹을 만들 수 없습니다.',
+    }))
+
+    const view = renderAdminBackupsPage()
+    await screen.findByText('backup-20260330-090500-db-dump.sql')
+
+    const fileInput = view.container.querySelector('input[type="file"]')
+    expect(fileInput).toBeTruthy()
+    await user.upload(fileInput as HTMLInputElement, new File(['zip'], 'backup-20260404-173219-snapshot-full-v1.zip', { type: 'application/zip' }))
+    await user.click(screen.getByRole('button', { name: '업로드' }))
+
+    expect(await screen.findByText(/업로드\/검증이 완료되었습니다\./)).toBeTruthy()
+    expect(screen.getByText(/현재 버전에서는 복원 실행이 불가합니다\./)).toBeTruthy()
+    expect(screen.getByText(/restoreId 72 상세를 확인하세요\./)).toBeTruthy()
   })
 
   it('shows confirmation mismatch separately when restore is otherwise selectable', async () => {

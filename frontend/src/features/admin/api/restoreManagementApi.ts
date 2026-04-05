@@ -13,10 +13,12 @@ export const RESTORE_STATUS_OPTIONS = [
 ] as const
 export const RESTORE_DETECTED_ITEM_TYPES = ['DATABASE', 'CONFIG', 'SCALES', 'METADATA'] as const
 export const RESTORE_EXECUTABLE_ITEM_TYPES = ['DATABASE'] as const
+export const RESTORE_EXECUTION_CAPABILITY_OPTIONS = ['EXECUTABLE', 'BLOCKED'] as const
 
 export type RestoreStatus = (typeof RESTORE_STATUS_OPTIONS)[number]
 export type RestoreDetectedItemType = (typeof RESTORE_DETECTED_ITEM_TYPES)[number]
 export type RestoreExecutableItemType = (typeof RESTORE_EXECUTABLE_ITEM_TYPES)[number]
+export type RestoreExecutionCapability = (typeof RESTORE_EXECUTION_CAPABILITY_OPTIONS)[number]
 export type RestoreConfirmationTextStatus = 'NOT_APPLICABLE' | 'WAITING_INPUT' | 'MATCHED' | 'MISMATCHED'
 
 interface RestoreHistoryListItemResponse {
@@ -31,6 +33,8 @@ interface RestoreHistoryListItemResponse {
   datasourceType: string | null
   backupId: number | null
   failureReason: string | null
+  executionCapability: RestoreExecutionCapability | string
+  executionBlockedReason: string | null
 }
 
 interface RestoreHistoryPageResponse {
@@ -62,6 +66,8 @@ interface RestoreDetailResponse {
   preBackupFileName: string | null
   failureReason: string | null
   detectedItems: RestoreDetectedItemResponse[]
+  executionCapability: RestoreExecutionCapability | string
+  executionBlockedReason: string | null
 }
 
 interface RestoreUploadResponse {
@@ -74,6 +80,8 @@ interface RestoreUploadResponse {
   backupId: number | null
   detectedItems: RestoreDetectedItemResponse[]
   failureReason: string | null
+  executionCapability: RestoreExecutionCapability | string
+  executionBlockedReason: string | null
 }
 
 interface RestoreExecuteResponse {
@@ -133,6 +141,8 @@ export interface RestoreHistoryItem {
   datasourceType: string
   backupId: number | null
   failureReason: string
+  executionCapability: RestoreExecutionCapability
+  executionBlockedReason: string | null
 }
 
 export interface RestoreHistoryPage {
@@ -144,6 +154,9 @@ export interface RestoreHistoryPage {
 }
 
 export interface RestoreHistoryQuery {
+  status?: RestoreStatus
+  dateFrom?: string
+  dateTo?: string
   page?: number
   size?: number
 }
@@ -164,6 +177,8 @@ export interface RestoreDetail {
   preBackupFileName: string
   failureReason: string
   detectedItems: RestoreDetectedItem[]
+  executionCapability: RestoreExecutionCapability
+  executionBlockedReason: string | null
 }
 
 export interface RestoreUploadResult {
@@ -176,6 +191,8 @@ export interface RestoreUploadResult {
   backupId: number | null
   detectedItems: RestoreDetectedItem[]
   failureReason: string
+  executionCapability: RestoreExecutionCapability
+  executionBlockedReason: string | null
 }
 
 export interface RestoreExecuteParams {
@@ -221,6 +238,12 @@ function normalizeArray(values: string[] | null | undefined) {
   return (values ?? []).map((value) => value.trim()).filter(Boolean)
 }
 
+function normalizeRestoreExecutionCapability(
+  value: RestoreExecutionCapability | string | null | undefined,
+): RestoreExecutionCapability {
+  return value === 'EXECUTABLE' ? 'EXECUTABLE' : 'BLOCKED'
+}
+
 function formatFileSize(fileSizeBytes: number | null) {
   if (fileSizeBytes == null) {
     return '-'
@@ -264,6 +287,8 @@ function mapRestoreHistoryItem(item: RestoreHistoryListItemResponse): RestoreHis
     datasourceType: normalizeText(item.datasourceType),
     backupId: item.backupId ?? null,
     failureReason: normalizeText(item.failureReason),
+    executionCapability: normalizeRestoreExecutionCapability(item.executionCapability),
+    executionBlockedReason: normalizeNullableText(item.executionBlockedReason),
   }
 }
 
@@ -294,6 +319,8 @@ function mapRestoreDetail(response: RestoreDetailResponse): RestoreDetail {
     preBackupFileName: normalizeText(response.preBackupFileName),
     failureReason: normalizeText(response.failureReason),
     detectedItems: response.detectedItems.map(mapDetectedItem),
+    executionCapability: normalizeRestoreExecutionCapability(response.executionCapability),
+    executionBlockedReason: normalizeNullableText(response.executionBlockedReason),
   }
 }
 
@@ -308,6 +335,8 @@ function mapRestoreUploadResult(response: RestoreUploadResponse): RestoreUploadR
     backupId: response.backupId ?? null,
     detectedItems: response.detectedItems.map(mapDetectedItem),
     failureReason: normalizeText(response.failureReason),
+    executionCapability: normalizeRestoreExecutionCapability(response.executionCapability),
+    executionBlockedReason: normalizeNullableText(response.executionBlockedReason),
   }
 }
 

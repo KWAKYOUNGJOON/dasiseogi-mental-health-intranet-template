@@ -245,6 +245,80 @@ class RestoreUploadIntegrationTest {
     }
 
     @Test
+    void returnsBlockedExecutionCapabilityForValidatedH2SnapshotUploadAndDetail() throws Exception {
+        MockHttpSession session = login("admina", "Test1234!");
+        Map<String, byte[]> payloadEntries = minimalPayloadEntries();
+        Map<String, Object> manifest = standardManifest(manifestEntries(payloadEntries), false, "H2", 41L);
+
+        withTempRestoreRoot(() -> {
+            MvcResult uploadResult = mockMvc.perform(multipart("/api/v1/admin/restores/upload")
+                            .file(new MockMultipartFile(
+                                    "file",
+                                    "backup-20260404-173219-snapshot-full-v1.zip",
+                                    "application/zip",
+                                    createStandardZip(manifest, payloadEntries)
+                            ))
+                            .session(session))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.status").value("VALIDATED"))
+                    .andExpect(jsonPath("$.data.executionCapability").value("BLOCKED"))
+                    .andExpect(jsonPath("$.data.executionBlockedReason").value(org.hamcrest.Matchers.allOf(
+                            org.hamcrest.Matchers.containsString("db/database.sql"),
+                            org.hamcrest.Matchers.containsString("datasourceType=H2")
+                    )))
+                    .andReturn();
+
+            long restoreId = body(uploadResult).path("data").path("restoreId").asLong();
+
+            mockMvc.perform(get("/api/v1/admin/restores/{restoreId}", restoreId)
+                            .session(session))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.restoreId").value(restoreId))
+                    .andExpect(jsonPath("$.data.status").value("VALIDATED"))
+                    .andExpect(jsonPath("$.data.executionCapability").value("BLOCKED"))
+                    .andExpect(jsonPath("$.data.executionBlockedReason").value(org.hamcrest.Matchers.allOf(
+                            org.hamcrest.Matchers.containsString("db/database.sql"),
+                            org.hamcrest.Matchers.containsString("datasourceType=H2")
+                    )));
+        });
+    }
+
+    @Test
+    void returnsExecutableExecutionCapabilityForValidatedMysqlDatabaseDumpUploadAndDetail() throws Exception {
+        MockHttpSession session = login("admina", "Test1234!");
+        Map<String, byte[]> payloadEntries = payloadEntriesWithDatabaseDump();
+        Map<String, Object> manifest = standardManifest(manifestEntries(payloadEntries), true, "MYSQL", 42L);
+
+        withTempRestoreRoot(() ->
+                withField(restoreService, "datasourceUrl", "jdbc:mysql://127.0.0.1:3306/mentalhealth", () -> {
+                    MvcResult uploadResult = mockMvc.perform(multipart("/api/v1/admin/restores/upload")
+                                    .file(new MockMultipartFile(
+                                            "file",
+                                            "backup-20260404-173219-db-dump-full-v1.zip",
+                                            "application/zip",
+                                            createStandardZip(manifest, payloadEntries)
+                                    ))
+                                    .session(session))
+                            .andExpect(status().isOk())
+                            .andExpect(jsonPath("$.data.status").value("VALIDATED"))
+                            .andExpect(jsonPath("$.data.executionCapability").value("EXECUTABLE"))
+                            .andExpect(jsonPath("$.data.executionBlockedReason").doesNotExist())
+                            .andReturn();
+
+                    long restoreId = body(uploadResult).path("data").path("restoreId").asLong();
+
+                    mockMvc.perform(get("/api/v1/admin/restores/{restoreId}", restoreId)
+                                    .session(session))
+                            .andExpect(status().isOk())
+                            .andExpect(jsonPath("$.data.restoreId").value(restoreId))
+                            .andExpect(jsonPath("$.data.status").value("VALIDATED"))
+                            .andExpect(jsonPath("$.data.executionCapability").value("EXECUTABLE"))
+                            .andExpect(jsonPath("$.data.executionBlockedReason").doesNotExist());
+                })
+        );
+    }
+
+    @Test
     void returnsFailedRestoreDetailWithFailureReasonAndEmptyDetectedItems() throws Exception {
         MockHttpSession session = login("admina", "Test1234!");
         byte[] zipBytes = createZip(Map.of(
@@ -343,6 +417,16 @@ class RestoreUploadIntegrationTest {
         }
     }
 
+    private void withField(Object target, String fieldName, Object value, ThrowingRunnable runnable) throws Exception {
+        Object originalValue = ReflectionTestUtils.getField(target, fieldName);
+        ReflectionTestUtils.setField(target, fieldName, value);
+        try {
+            runnable.run();
+        } finally {
+            ReflectionTestUtils.setField(target, fieldName, originalValue);
+        }
+    }
+
     private MockHttpSession login(String loginId, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(APPLICATION_JSON)
@@ -401,24 +485,39 @@ class RestoreUploadIntegrationTest {
         return entries;
     }
 
+    private Map<String, byte[]> payloadEntriesWithDatabaseDump() {
+        Map<String, byte[]> entries = new LinkedHashMap<>(minimalPayloadEntries());
+        entries.put("db/database.sql", "create table test (id bigint);\n".getBytes(StandardCharsets.UTF_8));
+        return entries;
+    }
+
     private Map<String, Object> standardManifest(List<Map<String, Object>> entries) {
         return standardManifest(entries, false);
     }
 
     private Map<String, Object> standardManifest(List<Map<String, Object>> entries, boolean includesDatabaseDump) {
+        return standardManifest(entries, includesDatabaseDump, "H2", 1L);
+    }
+
+    private Map<String, Object> standardManifest(
+            List<Map<String, Object>> entries,
+            boolean includesDatabaseDump,
+            String datasourceType,
+            long backupId
+    ) {
         Map<String, Object> manifest = new LinkedHashMap<>();
         manifest.put("formatVersion", "FULL_BACKUP_ZIP_V1");
         manifest.put("createdAt", "2026-04-04T12:00:00+09:00");
-        manifest.put("datasourceType", "H2");
+        manifest.put("datasourceType", datasourceType);
         manifest.put("appVersion", "unknown");
-        manifest.put("backupId", 1L);
+        manifest.put("backupId", backupId);
         manifest.put("executedBy", Map.of("loginId", "admina", "name", "관리자A"));
         manifest.put("profile", "test");
         manifest.put("environment", "test");
         manifest.put("summary", Map.of(
                 "backupType", "MANUAL",
                 "backupMethod", includesDatabaseDump ? "DB_DUMP" : "SNAPSHOT",
-                "datasourceType", "H2",
+                "datasourceType", datasourceType,
                 "includesDatabaseDump", includesDatabaseDump,
                 "userCount", 3,
                 "clientCount", 2,
