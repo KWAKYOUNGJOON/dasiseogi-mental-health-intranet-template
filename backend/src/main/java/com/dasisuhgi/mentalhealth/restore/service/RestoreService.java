@@ -128,7 +128,7 @@ public class RestoreService {
         this.dbImportCommand = dbImportCommand;
         this.dbImportTimeoutSeconds = dbImportTimeoutSeconds > 0 ? dbImportTimeoutSeconds : DEFAULT_IMPORT_TIMEOUT_SECONDS;
         this.writeTransactionTemplate = new TransactionTemplate(transactionManager);
-        this.writeTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.writeTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
     }
 
     @Transactional(readOnly = true)

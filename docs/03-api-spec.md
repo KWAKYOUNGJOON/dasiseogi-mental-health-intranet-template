@@ -157,6 +157,7 @@
 - `ISIK`
 - `AUDITK`
 - `IESR`
+- `CRI`
 
 ### 4.6 경고 유형
 - `HIGH_RISK`
@@ -291,6 +292,7 @@
 - 앱 기동 여부를 반환한다.
 - DB 연결 가능 여부를 함께 확인한다.
 - scale registry 로딩 여부를 함께 확인한다.
+- 현재 활성/구현 완료 척도 수를 `loadedScaleCount` 로 함께 반환한다.
 - 전체 상태가 `UP` 이 아니면 HTTP `503` 으로 응답한다.
 
 ### 성공 응답 예시
@@ -302,7 +304,7 @@
     "appStatus": "UP",
     "dbStatus": "UP",
     "scaleRegistryStatus": "UP",
-    "loadedScaleCount": 8
+    "loadedScaleCount": 9
   }
 }
 ```

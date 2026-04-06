@@ -262,7 +262,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:4173/api/v1/health | ConvertTo-Json -Dep
 기대값:
 - `backend` 가 `healthy`
 - `frontend` 가 `Up`
-- 두 health 응답 모두 `status=UP`, `dbStatus=UP`, `scaleRegistryStatus=UP`, `loadedScaleCount=8`
+- 두 health 응답 모두 `status=UP`, `dbStatus=UP`, `scaleRegistryStatus=UP`, `loadedScaleCount=9`
 
 ---
 

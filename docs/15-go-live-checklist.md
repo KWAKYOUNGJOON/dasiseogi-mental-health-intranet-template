@@ -4,7 +4,7 @@
 
 - 이 문서는 실제 운영 시작 직전 최종 점검 순서와 통과 여부를 확인하는 저장소 기준 체크리스트다.
 - 이 문서는 실제 운영 성공, 실제 운영 반영 완료, 실제 로그인 성공을 선언하는 결과 문서가 아니다.
-- 현재 저장소 기준으로 로컬 Docker Compose 검증, 로컬 MariaDB runtime 검증, custom admin 브라우저 검증, 전체 척도 8종 커버 검증, 운영 입력 시트/배포 절차/bootstrap 절차/prod config 체크리스트 정리는 끝났지만 실제 운영 시작은 아직 미실행이다.
+- 현재 저장소 기준으로 로컬 Docker Compose 검증, 로컬 MariaDB runtime 검증, custom admin 브라우저 검증, 전체 척도 9종(CRI 포함) 커버 검증, 운영 입력 시트/배포 절차/bootstrap 절차/prod config 체크리스트 정리는 끝났지만 실제 운영 시작은 아직 미실행이다.
 - 따라서 아직 실제 운영에서 실행하지 않은 항목은 성공처럼 쓰지 않고, 실제 운영값도 추측해서 채우지 않는다.
 - 실제 운영 입력값 작업본은 [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 복사본 또는 내부 운영 문서에서만 관리한다.
 - 실제 운영 시작 결과와 성공/실패 판정은 `docs/deploy-results/YYYY-MM-DD.md` 또는 내부 운영 결과 문서에만 기록한다.

@@ -21,7 +21,7 @@
 |---|---|---|---|
 | 로그인/권한 | [`AuthService`](../backend/src/main/java/com/dasisuhgi/mentalhealth/auth/service/AuthService.java), [`AccessPolicyService`](../backend/src/main/java/com/dasisuhgi/mentalhealth/common/security/AccessPolicyService.java), [`docs/03-api-spec.md`](./03-api-spec.md) | 로그인, 세션 기반 권한, 관리자 권한 차단은 코드로 구현됨 | 운영 계정/권한 매트릭스만 배포 전 실제 계정으로 한 번 점검 |
 | 대상자/세션 저장 정확성 | [`AssessmentService`](../backend/src/main/java/com/dasisuhgi/mentalhealth/assessment/service/AssessmentService.java), [`docs/09-test-scenarios.md`](./09-test-scenarios.md) | 세션 저장은 서버 재계산 + 단일 트랜잭션, 롤백 테스트도 존재 | 운영 DB 계열에서 동일 흐름 한 번 더 검증 |
-| 8종 척도 계산 및 통계 반영 | [`ScaleService`](../backend/src/main/java/com/dasisuhgi/mentalhealth/scale/service/ScaleService.java), `backend/src/main/resources/scales/**/*.json`, [`StatisticsExportService`](../backend/src/main/java/com/dasisuhgi/mentalhealth/statistics/service/StatisticsExportService.java) | 8종 정의 로딩과 통계/export 경로가 구현되어 있고 `2026-03-30` MariaDB 실검증까지 완료 | 실제 운영 데이터로 배포 직후 한 번 더 스모크 확인 |
+| 9종 척도 계산 및 통계 반영 | [`ScaleService`](../backend/src/main/java/com/dasisuhgi/mentalhealth/scale/service/ScaleService.java), `backend/src/main/resources/scales/**/*.json`, [`StatisticsExportService`](../backend/src/main/java/com/dasisuhgi/mentalhealth/statistics/service/StatisticsExportService.java) | 9종 정의 로딩과 통계/export 경로가 구현되어 있고 CRI 포함 범위 기준으로 `2026-03-30` MariaDB 실검증까지 완료 | 실제 운영 데이터로 배포 직후 한 번 더 스모크 확인 |
 | 오등록/오입력 숨김 정책 | [`AccessPolicyService`](../backend/src/main/java/com/dasisuhgi/mentalhealth/common/security/AccessPolicyService.java), [`AssessmentService`](../backend/src/main/java/com/dasisuhgi/mentalhealth/assessment/service/AssessmentService.java) | MISREGISTERED/MISENTERED 조회 제한과 상태값 처리가 코드에 반영됨 | 관리자/작성자 외 차단을 운영 계정으로 수동 확인 |
 | print/export | [`AssessmentService#getSessionPrintData`](../backend/src/main/java/com/dasisuhgi/mentalhealth/assessment/service/AssessmentService.java), [`StatisticsExportService`](../backend/src/main/java/com/dasisuhgi/mentalhealth/statistics/service/StatisticsExportService.java), [`docs/03-api-spec.md`](./03-api-spec.md) | print-data는 메모 제외, export는 관리자 전용 CSV로 동작 | 배포 직후 브라우저 인쇄와 CSV 다운로드 실기 확인 |
 | 관리자 기능 | [`AdminService`](../backend/src/main/java/com/dasisuhgi/mentalhealth/admin/service/AdminService.java), [`docs/03-api-spec.md`](./03-api-spec.md) | 승인/반려, 사용자 목록, 역할/상태 변경, requestId/userId 혼동 방지가 구현됨 | 운영자 계정으로 승인/반려 1회씩 확인 |
@@ -75,7 +75,7 @@
 - [ ] 운영 백업 경로 존재 및 writable 확인
 - [x] 수동 백업 1회 성공 확인
 - [ ] `/api/v1/health` 가 `UP` 응답 확인
-- [ ] 8종 scale registry 로딩 확인
+- [ ] 9종 scale registry 로딩 확인
 - [ ] 관리자/일반 사용자 테스트 계정 또는 운영 계정 점검
 - [ ] 내부망/프록시에서 `/api/v1/health` 접근 범위 점검
 - [ ] reverse proxy 사용 시 `APP_TRUST_PROXY_HEADERS` 값 최종 확인

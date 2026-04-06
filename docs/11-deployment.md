@@ -670,7 +670,7 @@ scripts\deploy-frontend.bat "<release-dist-path>"
 2. `scripts/health-check.bat` 또는 `GET /api/v1/health` 확인
 3. 대상자 목록 확인
 4. 대상자 상세 확인
-5. 8종 중 최소 2종 선택한 샘플 세션 저장 확인
+5. 9종 중 최소 2종 선택한 샘플 세션 저장 확인
 6. 세션 상세/print view/통계 확인
 7. CSV export 확인
 8. 관리자 승인/반려 및 사용자 상태/역할 변경 확인

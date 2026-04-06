@@ -12,7 +12,7 @@
 - `frontend/`: React + TypeScript + Vite 기반 최소 업무 UI
 - 세션 기반 로그인
 - 대상자 목록 / 등록 / 상세
-- 척도 레지스트리 + 8종 척도 JSON 리소스 로딩
+- 척도 레지스트리 + 9종 척도 JSON 리소스 로딩
 - 다중 척도 서버 재계산 기반 세션 저장
 - 세션 상세 조회
 - 세션 출력용 `print-data` API + 인쇄 화면
@@ -30,7 +30,7 @@
 ## 구조 원칙
 - 척도 정의 원본은 `backend/src/main/resources/scales` 기준입니다.
 - 프론트에는 척도 정의 복사본을 두지 않습니다.
-- 현재 실제 저장 가능한 척도는 `PHQ-9`, `GAD-7`, `mKPQ-16`, `K-MDQ`, `PSS-10`, `ISI-K`, `AUDIT-K`, `IES-R` 8종입니다.
+- 현재 실제 저장 가능한 척도는 `PHQ-9`, `GAD-7`, `mKPQ-16`, `K-MDQ`, `PSS-10`, `ISI-K`, `AUDIT-K`, `IES-R`, `정신과적 위기 분류 평정척도 (CRI)` 9종입니다.
 - 세션 저장은 단일 트랜잭션으로 처리합니다.
 - 삭제 API는 만들지 않고 상태값 방식으로 확장하도록 설계했습니다.
 - `clientNo`, `sessionNo` 는 `count()+1` 이 아니라 별도 식별번호 시퀀스 테이블 기반으로 생성합니다.
@@ -295,7 +295,7 @@ npm run build
 
 - 로그인 가능 확인
 - 대상자 등록 가능 확인
-- 8종 중 최소 2종 선택으로 멀티 척도 세션 저장 확인
+- 9종 중 최소 2종 선택으로 멀티 척도 세션 저장 확인
 - 세션 상세 조회 확인
 - print view 열기와 브라우저 인쇄 확인
 - `statistics/summary`, `statistics/scales`, `statistics/alerts` 조회 확인
