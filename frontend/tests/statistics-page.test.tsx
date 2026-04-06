@@ -438,4 +438,29 @@ describe('statistics page', () => {
     expect(await screen.findByText('2026-03-31 09:10:00')).toBeTruthy()
     expect(screen.queryByText('2026-03-31T00:10:00Z')).toBeNull()
   })
+
+  it('shows the CRI label only once in the alert scale dropdown while keeping the option value', async () => {
+    mockedFetchStatisticsAlerts.mockResolvedValue(createStatisticsAlertPage([createStatisticsAlertItem()]))
+    mockedFetchStatisticsScales.mockResolvedValue(
+      createStatisticsScales({
+        items: [
+          {
+            scaleCode: 'CRI',
+            scaleName: '정신과적 위기 분류 평정척도 (CRI)',
+            totalCount: 5,
+            alertCount: 2,
+            isActive: true,
+          },
+        ],
+      }),
+    )
+
+    renderStatisticsRoute()
+
+    const criOption = await screen.findByRole('option', { name: '정신과적 위기 분류 평정척도 (CRI)' })
+
+    expect(criOption).toBeTruthy()
+    expect((criOption as HTMLOptionElement).value).toBe('CRI')
+    expect(screen.queryByRole('option', { name: '정신과적 위기 분류 평정척도 (CRI) (CRI)' })).toBeNull()
+  })
 })

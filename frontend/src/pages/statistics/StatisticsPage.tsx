@@ -54,10 +54,21 @@ function formatStatisticsScaleLabel(scaleCode: string, scaleName?: string) {
   return resolvedScaleName ?? scaleCode
 }
 
+function formatStatisticsScaleNameWithCode(scaleCode: string, scaleName: string) {
+  const trimmedScaleName = scaleName.trimEnd()
+  const scaleCodeSuffix = `(${scaleCode})`
+
+  if (trimmedScaleName.endsWith(scaleCodeSuffix)) {
+    return trimmedScaleName
+  }
+
+  return `${trimmedScaleName} ${scaleCodeSuffix}`
+}
+
 function formatStatisticsScaleOptionLabel(item: StatisticsScaleResponse['items'][number]) {
   const displayLabel = STATISTICS_SCALE_DESCRIPTION_BY_CODE[item.scaleCode]
     ? formatStatisticsScaleLabel(item.scaleCode, item.scaleName)
-    : `${item.scaleName} (${item.scaleCode})`
+    : formatStatisticsScaleNameWithCode(item.scaleCode, item.scaleName)
 
   return `${displayLabel}${item.isActive ? '' : ' - 비활성'}`
 }

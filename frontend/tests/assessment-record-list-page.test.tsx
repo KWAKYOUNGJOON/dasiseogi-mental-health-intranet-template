@@ -315,6 +315,29 @@ describe('assessment record list page', () => {
     expect(screen.queryByText('2026-03-31T09:20:00')).toBeNull()
   })
 
+  it('renders CRI as a short code in the scale column even when the API returns the long name', async () => {
+    mockedFetchAssessmentRecords.mockResolvedValueOnce(
+      createAssessmentRecordPage([
+        createRecord({
+          scaleCode: 'CRI',
+          scaleName: '정신과적 위기 분류 평정척도 (CRI)',
+        }),
+        createRecord({
+          sessionId: 502,
+          sessionScaleId: 9002,
+          scaleCode: 'PHQ9',
+          scaleName: 'PHQ-9',
+        }),
+      ]),
+    )
+
+    renderAssessmentRecordFlow()
+
+    expect(await screen.findByRole('cell', { name: 'CRI' })).toBeTruthy()
+    expect(screen.getByRole('cell', { name: 'PHQ-9' })).toBeTruthy()
+    expect(screen.queryByRole('cell', { name: '정신과적 위기 분류 평정척도 (CRI)' })).toBeNull()
+  })
+
   it('shows friendly scale labels in the dropdown while keeping the filter value as the scale code', async () => {
     const user = userEvent.setup()
 

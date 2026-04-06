@@ -11,6 +11,17 @@ import { PageHeader } from '../../shared/components/PageHeader'
 import { formatAssessmentLocalDateTimeText, toValidDateText } from '../../shared/utils/dateText'
 
 const DEFAULT_SIZE = 20
+const ASSESSMENT_RECORD_SCALE_NAME_BY_CODE: Record<string, string> = {
+  PHQ9: 'PHQ-9',
+  GAD7: 'GAD-7',
+  MKPQ16: 'mKPQ-16',
+  KMDQ: 'K-MDQ',
+  PSS10: 'PSS-10',
+  ISIK: 'ISI-K',
+  AUDITK: 'AUDIT-K',
+  IESR: 'IES-R',
+  CRI: 'CRI',
+}
 const ASSESSMENT_RECORD_SCALE_DESCRIPTION_BY_CODE: Record<string, string> = {
   PHQ9: '우울',
   GAD7: '불안',
@@ -102,6 +113,20 @@ function formatAssessmentRecordScaleOptionLabel(item: ScaleListItem) {
   }
 
   return `${item.scaleName} (${item.scaleCode})`
+}
+
+function formatAssessmentRecordScaleCellLabel(record: AssessmentRecordPage['items'][number]) {
+  const scaleCode = record.scaleCode?.trim()
+
+  if (scaleCode) {
+    const shortLabel = ASSESSMENT_RECORD_SCALE_NAME_BY_CODE[scaleCode]
+
+    if (shortLabel) {
+      return shortLabel
+    }
+  }
+
+  return record.scaleName || scaleCode || ''
 }
 
 export function AssessmentRecordListPage() {
@@ -303,7 +328,7 @@ export function AssessmentRecordListPage() {
                     <td>{formatAssessmentLocalDateTimeText(record.sessionCompletedAt)}</td>
                     <td>{record.clientName}</td>
                     <td>{record.performedByName}</td>
-                    <td>{record.scaleName}</td>
+                    <td>{formatAssessmentRecordScaleCellLabel(record)}</td>
                     <td>{record.totalScore}</td>
                     <td>{record.resultLevel}</td>
                     <td>{record.hasAlert ? '있음' : '없음'}</td>
