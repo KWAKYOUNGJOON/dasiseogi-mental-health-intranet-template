@@ -102,6 +102,14 @@ function formatStatisticsScaleListLabel(item: StatisticsScaleResponse['items'][n
   return formatStatisticsScaleLabel(item.scaleCode, item.scaleName)
 }
 
+function formatStatisticsAlertScaleLabel(scaleCode: string) {
+  if (scaleCode === CRI_SCALE_CODE) {
+    return `CRI (${DEFAULT_CRI_SCALE_NAME})`
+  }
+
+  return formatStatisticsScaleLabel(scaleCode)
+}
+
 function formatStatisticsScaleOptionLabel(item: StatisticsScaleResponse['items'][number]) {
   const displayLabel = formatStatisticsScaleDropdownLabel(item)
 
@@ -351,7 +359,7 @@ export function StatisticsPage() {
                           <td>{alert.sessionCompletedAt}</td>
                           <td>{alert.clientName}</td>
                           <td>{alert.performedByName}</td>
-                          <td>{formatStatisticsScaleLabel(alert.scaleCode)}</td>
+                          <td>{formatStatisticsAlertScaleLabel(alert.scaleCode)}</td>
                           <td>{formatAlertTypeLabel(alert.alertType)}</td>
                           <td>{alert.alertMessage}</td>
                         </tr>
