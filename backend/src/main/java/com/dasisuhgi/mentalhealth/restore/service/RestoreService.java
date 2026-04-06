@@ -53,7 +53,11 @@ import java.util.zip.ZipFile;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -82,6 +86,7 @@ public class RestoreService {
     private final ActivityLogService activityLogService;
     private final BackupService backupService;
     private final ObjectMapper objectMapper;
+    private final JdbcTemplate jdbcTemplate;
     private final String restoreRootPath;
     private final long maxUploadSizeBytes;
     private final String datasourceUrl;
@@ -89,6 +94,7 @@ public class RestoreService {
     private final String datasourcePassword;
     private final String dbImportCommand;
     private final long dbImportTimeoutSeconds;
+    private final TransactionTemplate writeTransactionTemplate;
 
     public RestoreService(
             RestoreHistoryRepository restoreHistoryRepository,
@@ -97,6 +103,8 @@ public class RestoreService {
             ActivityLogService activityLogService,
             BackupService backupService,
             ObjectMapper objectMapper,
+            JdbcTemplate jdbcTemplate,
+            PlatformTransactionManager transactionManager,
             @Value("${app.restore.root-path:./tmp/restores}") String restoreRootPath,
             @Value("${app.restore.max-upload-size-bytes:524288000}") long maxUploadSizeBytes,
             @Value("${spring.datasource.url}") String datasourceUrl,
@@ -111,6 +119,7 @@ public class RestoreService {
         this.activityLogService = activityLogService;
         this.backupService = backupService;
         this.objectMapper = objectMapper;
+        this.jdbcTemplate = jdbcTemplate;
         this.restoreRootPath = restoreRootPath;
         this.maxUploadSizeBytes = maxUploadSizeBytes > 0 ? maxUploadSizeBytes : MAX_UPLOAD_SIZE_BYTES;
         this.datasourceUrl = datasourceUrl;
@@ -118,6 +127,8 @@ public class RestoreService {
         this.datasourcePassword = datasourcePassword;
         this.dbImportCommand = dbImportCommand;
         this.dbImportTimeoutSeconds = dbImportTimeoutSeconds > 0 ? dbImportTimeoutSeconds : DEFAULT_IMPORT_TIMEOUT_SECONDS;
+        this.writeTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.writeTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Transactional(readOnly = true)
@@ -278,39 +289,15 @@ public class RestoreService {
         }
     }
 
-    @Transactional(noRollbackFor = Exception.class)
     public RestoreExecuteResponse executeRestore(Long restoreId, RestoreExecuteRequest request, SessionUser sessionUser) {
         User currentUser = accessPolicyService.getCurrentUser(sessionUser);
         if (!accessPolicyService.isAdmin(currentUser)) {
             throw new AppException(HttpStatus.FORBIDDEN, "RESTORE_EXECUTE_FORBIDDEN", "복원 실행 권한이 없습니다.");
         }
 
-        RestoreHistory history = restoreHistoryRepository.findLockedById(restoreId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "RESTORE_HISTORY_NOT_FOUND", "복원 검증 이력을 찾을 수 없습니다."));
-
-        if (history.getStatus() != RestoreStatus.VALIDATED) {
-            throw new AppException(HttpStatus.CONFLICT, "RESTORE_EXECUTE_INVALID_STATUS", "VALIDATED 상태의 복원 검증 이력만 실행할 수 있습니다.");
-        }
-
-        ValidationResult validationResult = resolveStoredValidationResult(history);
-        List<String> selectedItemTypes = normalizeSelectedItemTypes(request == null ? null : request.selectedItemTypes());
-        assertExecutableSelection(selectedItemTypes, validationResult.detectedItems());
-        assertConfirmationText(request == null ? null : request.confirmationText());
-
-        String archiveDatasourceType = normalizeDatasourceType(validationResult.datasourceType());
-        String runtimeDatasourceType = determineDatasourceType(datasourceUrl);
-        if (!isSupportedImportDatasource(archiveDatasourceType) || !isSupportedImportDatasource(runtimeDatasourceType)) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_UNSUPPORTED_DATASOURCE",
-                    "현재 버전에서는 MariaDB/MySQL datasource 의 DATABASE 복원만 지원합니다.");
-        }
-
-        history.setExecutedAt(SeoulDateTimeSupport.now());
-        history.setSelectedItemTypes(String.join(",", selectedItemTypes));
-        history.setPreBackupId(null);
-        history.setPreBackupFileName(null);
-        history.setFailureReason(null);
-        history.setStatus(RestoreStatus.PRE_BACKUP_RUNNING);
-        restoreHistoryRepository.saveAndFlush(history);
+        RestoreExecutionContext executionContext = prepareRestoreExecution(restoreId, request);
+        RestoreHistory history = executionContext.history();
+        List<String> selectedItemTypes = executionContext.selectedItemTypes();
 
         activityLogService.logBestEffort(
                 currentUser,
@@ -331,7 +318,7 @@ public class RestoreService {
             String failureReason = buildFailureReason(exception);
             history.setStatus(RestoreStatus.PRE_BACKUP_FAILED);
             history.setFailureReason(failureReason);
-            restoreHistoryRepository.saveAndFlush(history);
+            history = saveRestoreHistory(history);
 
             activityLogService.logBestEffort(
                     currentUser,
@@ -348,13 +335,13 @@ public class RestoreService {
         history.setPreBackupId(preBackupResult.backupId());
         history.setPreBackupFileName(preBackupResult.fileName());
         history.setStatus(RestoreStatus.RESTORING);
-        restoreHistoryRepository.saveAndFlush(history);
+        history = saveRestoreHistory(history);
 
         try {
-            executeDatabaseRestore(Path.of(history.getFilePath()), archiveDatasourceType);
+            executeDatabaseRestore(Path.of(history.getFilePath()), executionContext.archiveDatasourceType());
             history.setStatus(RestoreStatus.SUCCESS);
             history.setFailureReason(null);
-            restoreHistoryRepository.saveAndFlush(history);
+            history = saveRestoreHistory(history);
 
             activityLogService.logBestEffort(
                     currentUser,
@@ -372,7 +359,7 @@ public class RestoreService {
             String failureReason = buildFailureReason(exception);
             history.setStatus(RestoreStatus.FAILED);
             history.setFailureReason(failureReason);
-            restoreHistoryRepository.saveAndFlush(history);
+            history = saveRestoreHistory(history);
 
             activityLogService.logBestEffort(
                     currentUser,
@@ -385,6 +372,101 @@ public class RestoreService {
 
             return buildExecuteResponse(history, "DATABASE 복원 실행에 실패했습니다.");
         }
+    }
+
+    private RestoreExecutionContext prepareRestoreExecution(Long restoreId, RestoreExecuteRequest request) {
+        return executeInWriteTransaction(() -> {
+            RestoreHistory history = restoreHistoryRepository.findLockedById(restoreId)
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "RESTORE_HISTORY_NOT_FOUND", "복원 검증 이력을 찾을 수 없습니다."));
+
+            if (history.getStatus() != RestoreStatus.VALIDATED) {
+                throw new AppException(HttpStatus.CONFLICT, "RESTORE_EXECUTE_INVALID_STATUS", "VALIDATED 상태의 복원 검증 이력만 실행할 수 있습니다.");
+            }
+
+            ValidationResult validationResult = resolveStoredValidationResult(history);
+            List<String> selectedItemTypes = normalizeSelectedItemTypes(request == null ? null : request.selectedItemTypes());
+            assertExecutableSelection(selectedItemTypes, validationResult.detectedItems());
+            assertConfirmationText(request == null ? null : request.confirmationText());
+
+            String archiveDatasourceType = normalizeDatasourceType(validationResult.datasourceType());
+            String runtimeDatasourceType = determineDatasourceType(datasourceUrl);
+            if (!isSupportedImportDatasource(archiveDatasourceType) || !isSupportedImportDatasource(runtimeDatasourceType)) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "RESTORE_UNSUPPORTED_DATASOURCE",
+                        "현재 버전에서는 MariaDB/MySQL datasource 의 DATABASE 복원만 지원합니다.");
+            }
+
+            history.setExecutedAt(SeoulDateTimeSupport.now());
+            history.setSelectedItemTypes(String.join(",", selectedItemTypes));
+            history.setPreBackupId(null);
+            history.setPreBackupFileName(null);
+            history.setFailureReason(null);
+            history.setStatus(RestoreStatus.PRE_BACKUP_RUNNING);
+            RestoreHistory savedHistory = restoreHistoryRepository.saveAndFlush(history);
+
+            return new RestoreExecutionContext(savedHistory, archiveDatasourceType, selectedItemTypes);
+        });
+    }
+
+    private RestoreHistory saveRestoreHistory(RestoreHistory history) {
+        return executeInWriteTransaction(() -> {
+            if (history.getId() != null && restoreHistoryRepository.existsById(history.getId())) {
+                return restoreHistoryRepository.saveAndFlush(history);
+            }
+            insertRestoreHistory(history);
+            return history;
+        });
+    }
+
+    private <T> T executeInWriteTransaction(java.util.function.Supplier<T> action) {
+        T result = writeTransactionTemplate.execute(status -> action.get());
+        if (result == null) {
+            throw new IllegalStateException("Transaction callback returned null.");
+        }
+        return result;
+    }
+
+    private void insertRestoreHistory(RestoreHistory history) {
+        jdbcTemplate.update("""
+                        INSERT INTO restore_histories (
+                            id,
+                            status,
+                            file_name,
+                            file_path,
+                            file_size_bytes,
+                            uploaded_at,
+                            validated_at,
+                            uploaded_by_id,
+                            uploaded_by_name_snapshot,
+                            format_version,
+                            datasource_type,
+                            backup_id,
+                            executed_at,
+                            selected_item_types,
+                            pre_backup_id,
+                            pre_backup_file_name,
+                            failure_reason,
+                            created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                history.getId(),
+                history.getStatus().name(),
+                history.getFileName(),
+                history.getFilePath(),
+                history.getFileSizeBytes(),
+                history.getUploadedAt(),
+                history.getValidatedAt(),
+                history.getUploadedById(),
+                history.getUploadedByNameSnapshot(),
+                history.getFormatVersion(),
+                history.getDatasourceType(),
+                history.getBackupId(),
+                history.getExecutedAt(),
+                history.getSelectedItemTypes(),
+                history.getPreBackupId(),
+                history.getPreBackupFileName(),
+                history.getFailureReason(),
+                history.getCreatedAt()
+        );
     }
 
     private void validateMultipartFile(MultipartFile file) {
@@ -1193,6 +1275,13 @@ public class RestoreService {
             String datasourceType,
             Long backupId,
             List<RestoreDetectedItemResponse> detectedItems
+    ) {
+    }
+
+    private record RestoreExecutionContext(
+            RestoreHistory history,
+            String archiveDatasourceType,
+            List<String> selectedItemTypes
     ) {
     }
 
