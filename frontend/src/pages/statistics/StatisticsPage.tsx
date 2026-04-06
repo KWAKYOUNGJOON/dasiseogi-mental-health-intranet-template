@@ -42,6 +42,9 @@ const STATISTICS_SCALE_DESCRIPTION_BY_CODE: Record<string, string> = {
   AUDITK: '알코올 사용',
   IESR: '외상 후 스트레스(PTSD)',
 }
+const CRI_SCALE_CODE = 'CRI'
+const CRI_SCALE_NAME_SUFFIX = '(CRI)'
+const DEFAULT_CRI_SCALE_NAME = '정신과적 위기 분류 평정척도'
 
 function formatStatisticsScaleLabel(scaleCode: string, scaleName?: string) {
   const resolvedScaleName = scaleName ?? STATISTICS_SCALE_NAME_BY_CODE[scaleCode]
@@ -65,10 +68,42 @@ function formatStatisticsScaleNameWithCode(scaleCode: string, scaleName: string)
   return `${trimmedScaleName} ${scaleCodeSuffix}`
 }
 
-function formatStatisticsScaleOptionLabel(item: StatisticsScaleResponse['items'][number]) {
+function formatStatisticsCriBaseName(scaleName?: string) {
+  const trimmedScaleName = scaleName?.trim()
+
+  if (!trimmedScaleName) {
+    return DEFAULT_CRI_SCALE_NAME
+  }
+
+  if (!trimmedScaleName.endsWith(CRI_SCALE_NAME_SUFFIX)) {
+    return trimmedScaleName
+  }
+
+  return trimmedScaleName.slice(0, -CRI_SCALE_NAME_SUFFIX.length).trimEnd()
+}
+
+function formatStatisticsScaleDropdownLabel(item: StatisticsScaleResponse['items'][number]) {
+  if (item.scaleCode === CRI_SCALE_CODE) {
+    return `CRI(${formatStatisticsCriBaseName(item.scaleName)})`
+  }
+
   const displayLabel = STATISTICS_SCALE_DESCRIPTION_BY_CODE[item.scaleCode]
     ? formatStatisticsScaleLabel(item.scaleCode, item.scaleName)
     : formatStatisticsScaleNameWithCode(item.scaleCode, item.scaleName)
+
+  return displayLabel
+}
+
+function formatStatisticsScaleListLabel(item: StatisticsScaleResponse['items'][number]) {
+  if (item.scaleCode === CRI_SCALE_CODE) {
+    return `CRI (${formatStatisticsCriBaseName(item.scaleName)})`
+  }
+
+  return formatStatisticsScaleLabel(item.scaleCode, item.scaleName)
+}
+
+function formatStatisticsScaleOptionLabel(item: StatisticsScaleResponse['items'][number]) {
+  const displayLabel = formatStatisticsScaleDropdownLabel(item)
 
   return `${displayLabel}${item.isActive ? '' : ' - 비활성'}`
 }
@@ -252,7 +287,7 @@ export function StatisticsPage() {
                 <tbody>
                   {currentScaleItems.map((item) => (
                     <tr key={item.scaleCode}>
-                      <td>{formatStatisticsScaleLabel(item.scaleCode, item.scaleName)}</td>
+                      <td>{formatStatisticsScaleListLabel(item)}</td>
                       <td>{item.totalCount}</td>
                       <td>{item.alertCount}</td>
                     </tr>
@@ -274,7 +309,7 @@ export function StatisticsPage() {
                       {legacyScaleItems.map((item) => (
                         <tr key={item.scaleCode}>
                           <td>
-                            {formatStatisticsScaleLabel(item.scaleCode, item.scaleName)} <span className="muted">(비활성)</span>
+                            {formatStatisticsScaleListLabel(item)} <span className="muted">(비활성)</span>
                           </td>
                           <td>{item.totalCount}</td>
                           <td>{item.alertCount}</td>

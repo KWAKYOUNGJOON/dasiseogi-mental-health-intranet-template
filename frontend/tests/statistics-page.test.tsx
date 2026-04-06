@@ -439,7 +439,7 @@ describe('statistics page', () => {
     expect(screen.queryByText('2026-03-31T00:10:00Z')).toBeNull()
   })
 
-  it('shows the CRI label only once in the alert scale dropdown while keeping the option value', async () => {
+  it('shows the dropdown-specific CRI label while keeping the option value', async () => {
     mockedFetchStatisticsAlerts.mockResolvedValue(createStatisticsAlertPage([createStatisticsAlertItem()]))
     mockedFetchStatisticsScales.mockResolvedValue(
       createStatisticsScales({
@@ -457,10 +457,36 @@ describe('statistics page', () => {
 
     renderStatisticsRoute()
 
-    const criOption = await screen.findByRole('option', { name: '정신과적 위기 분류 평정척도 (CRI)' })
+    const criOption = await screen.findByRole('option', { name: 'CRI(정신과적 위기 분류 평정척도)' })
 
     expect(criOption).toBeTruthy()
     expect((criOption as HTMLOptionElement).value).toBe('CRI')
+    expect(screen.queryByRole('option', { name: '정신과적 위기 분류 평정척도 (CRI)' })).toBeNull()
     expect(screen.queryByRole('option', { name: '정신과적 위기 분류 평정척도 (CRI) (CRI)' })).toBeNull()
+  })
+
+  it('shows the list-specific CRI label in the current active scales table', async () => {
+    mockedFetchStatisticsAlerts.mockResolvedValue(createStatisticsAlertPage([createStatisticsAlertItem()]))
+    mockedFetchStatisticsScales.mockResolvedValue(
+      createStatisticsScales({
+        items: [
+          {
+            scaleCode: 'CRI',
+            scaleName: '정신과적 위기 분류 평정척도 (CRI)',
+            totalCount: 5,
+            alertCount: 2,
+            isActive: true,
+          },
+        ],
+      }),
+    )
+
+    renderStatisticsRoute()
+
+    const currentScaleCard = (await screen.findByRole('heading', { level: 3, name: '현재 운영 척도' })).closest('.card')
+
+    expect(currentScaleCard).toBeTruthy()
+    expect(within(currentScaleCard as HTMLDivElement).getByRole('cell', { name: 'CRI (정신과적 위기 분류 평정척도)' })).toBeTruthy()
+    expect(within(currentScaleCard as HTMLDivElement).queryByRole('cell', { name: '정신과적 위기 분류 평정척도 (CRI)' })).toBeNull()
   })
 })
