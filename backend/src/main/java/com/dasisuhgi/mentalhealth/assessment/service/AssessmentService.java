@@ -535,16 +535,18 @@ public class AssessmentService {
         }
 
         int risk8PlusMental = scoreByQuestionNo.getOrDefault(CRI_SELF_OTHER_RISK_EIGHT_QUESTION_NO, 0) + mentalTotal;
-        String resultLevel = resolveCriResultLevel(
+        String resultLevelCode = resolveCriResultLevelCode(
                 scoreByQuestionNo.getOrDefault(CRI_SELF_OTHER_RISK_PRESENT_QUESTION_NO, 0),
                 scoreByQuestionNo.getOrDefault(CRI_SELF_OTHER_RISK_EIGHT_QUESTION_NO, 0),
                 selfOtherTotal,
                 mentalTotal
         );
+        String resultLevel = formatCriResultLevel(resultLevelCode);
 
         return buildScaleEvaluation(
                 definition,
                 totalScore,
+                resultLevelCode,
                 resultLevel,
                 evaluatedAnswers,
                 List.of(
@@ -575,31 +577,28 @@ public class AssessmentService {
     }
 
     private ScaleEvaluation buildScaleEvaluation(ScaleDefinition definition, int totalScore, List<EvaluatedAnswer> evaluatedAnswers) {
-        final int calculatedTotalScore = totalScore;
-        String resultLevel = definition.interpretationRules().stream()
-                .filter(rule -> matches(rule, calculatedTotalScore))
-                .map(InterpretationRule::label)
-                .findFirst()
-                .orElse("미분류");
-
-        return buildScaleEvaluation(definition, totalScore, resultLevel, evaluatedAnswers, List.of());
+        ResolvedResultLevel resultLevel = resolveInterpretationResultLevel(definition, totalScore);
+        return buildScaleEvaluation(definition, totalScore, resultLevel.code(), resultLevel.label(), evaluatedAnswers, List.of());
     }
 
     private ScaleEvaluation buildScaleEvaluation(
             ScaleDefinition definition,
             int totalScore,
+            String resultLevelCode,
             String resultLevel,
             List<EvaluatedAnswer> evaluatedAnswers,
             List<ResultDetail> resultDetails
     ) {
-        List<SessionAlertData> alerts = buildAlertData(definition, totalScore, evaluatedAnswers);
+        List<SessionAlertData> alerts = buildAlertData(definition, totalScore, resultLevelCode, resultLevel, evaluatedAnswers);
 
-        return new ScaleEvaluation(definition, totalScore, resultLevel, !alerts.isEmpty(), evaluatedAnswers, alerts, resultDetails);
+        return new ScaleEvaluation(definition, totalScore, resultLevelCode, resultLevel, !alerts.isEmpty(), evaluatedAnswers, alerts, resultDetails);
     }
 
     private List<SessionAlertData> buildAlertData(
             ScaleDefinition definition,
             int totalScore,
+            String resultLevelCode,
+            String resultLevel,
             List<EvaluatedAnswer> evaluatedAnswers
     ) {
         List<SessionAlertData> alerts = new ArrayList<>();
@@ -625,6 +624,14 @@ public class AssessmentService {
                         null,
                         Integer.toString(totalScore)
                 ));
+            } else if (matchesResultLevel(rule, resultLevelCode)) {
+                alerts.add(new SessionAlertData(
+                        AlertType.valueOf(rule.type()),
+                        rule.code(),
+                        rule.message(),
+                        null,
+                        resultLevel
+                ));
             }
         }
 
@@ -647,6 +654,26 @@ public class AssessmentService {
         return List.of();
     }
 
+    private boolean matchesResultLevel(ScaleAlertRule rule, String resultLevelCode) {
+        String normalizedResultLevelCode = blankToNull(resultLevelCode);
+        if (normalizedResultLevelCode == null || rule.resultLevelCodes() == null || rule.resultLevelCodes().isEmpty()) {
+            return false;
+        }
+        return rule.resultLevelCodes().stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(code -> !code.isEmpty())
+                .anyMatch(code -> code.equalsIgnoreCase(normalizedResultLevelCode));
+    }
+
+    private ResolvedResultLevel resolveInterpretationResultLevel(ScaleDefinition definition, int totalScore) {
+        return definition.interpretationRules().stream()
+                .filter(rule -> matches(rule, totalScore))
+                .findFirst()
+                .map(rule -> new ResolvedResultLevel(blankToNull(rule.code()), rule.label()))
+                .orElse(new ResolvedResultLevel(null, "미분류"));
+    }
+
     private boolean matches(InterpretationRule rule, int totalScore) {
         return totalScore >= rule.min() && totalScore <= rule.max();
     }
@@ -657,6 +684,7 @@ public class AssessmentService {
         snapshot.put("scaleName", evaluation.definition().scaleName());
         snapshot.put("scaleVersion", evaluation.definition().version());
         snapshot.put("totalScore", evaluation.totalScore());
+        snapshot.put("resultLevelCode", evaluation.resultLevelCode());
         snapshot.put("resultLevel", evaluation.resultLevel());
         snapshot.put("screenPositive",
                 evaluation.definition().screeningThreshold() != null && evaluation.totalScore() >= evaluation.definition().screeningThreshold());
@@ -707,7 +735,7 @@ public class AssessmentService {
         return value.trim();
     }
 
-    private String resolveCriResultLevel(
+    private String resolveCriResultLevelCode(
             int selfOtherQuestionOneScore,
             int selfOtherQuestionEightScore,
             int selfOtherTotal,
@@ -716,12 +744,27 @@ public class AssessmentService {
         int risk8PlusMental = selfOtherQuestionEightScore + mentalTotal;
 
         if (selfOtherQuestionOneScore == 1 && selfOtherTotal >= 2) {
-            return risk8PlusMental >= 1 ? "A - 극도의 위기" : "B - 위기";
+            return risk8PlusMental >= 1 ? "A" : "B";
         }
         if (selfOtherTotal >= 1) {
-            return risk8PlusMental >= 1 ? "C - 고위험" : "D - 주의";
+            return risk8PlusMental >= 1 ? "C" : "D";
         }
-        return "E - 위기상황 아님";
+        return "E";
+    }
+
+    private String formatCriResultLevel(String resultLevelCode) {
+        return switch (resultLevelCode) {
+            case "A" -> "A - 극도의 위기";
+            case "B" -> "B - 위기";
+            case "C" -> "C - 고위험";
+            case "D" -> "D - 주의";
+            case "E" -> "E - 위기상황 아님";
+            default -> throw new AppException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "CRI_RESULT_LEVEL_INVALID",
+                    "CRI 결과 레벨 계산에 실패했습니다."
+            );
+        };
     }
 
     private List<SessionScaleResultDetailResponse> readResultDetails(SessionScale scale) {
@@ -771,11 +814,18 @@ public class AssessmentService {
     private record ScaleEvaluation(
             ScaleDefinition definition,
             int totalScore,
+            String resultLevelCode,
             String resultLevel,
             boolean hasAlert,
             List<EvaluatedAnswer> answers,
             List<SessionAlertData> alerts,
             List<ResultDetail> resultDetails
+    ) {
+    }
+
+    private record ResolvedResultLevel(
+            String code,
+            String label
     ) {
     }
 

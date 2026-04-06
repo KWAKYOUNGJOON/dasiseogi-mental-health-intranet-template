@@ -955,10 +955,23 @@ class CoreWorkflowIntegrationTest {
                         )))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.scaleCount").value(1))
-                .andExpect(jsonPath("$.data.hasAlert").value(false))
+                .andExpect(jsonPath("$.data.hasAlert").value(true))
                 .andReturn();
 
         long sessionId = body(saveResult).path("data").path("sessionId").asLong();
+        List<SessionAlert> savedAlerts = sessionAlertRepository.findBySessionIdOrderByIdAsc(sessionId);
+        SessionScale savedScale = sessionScaleRepository.findBySessionIdOrderByDisplayOrderAsc(sessionId).get(0);
+        JsonNode rawSnapshot = objectMapper.readTree(savedScale.getRawResultSnapshot());
+
+        assertThat(savedAlerts).hasSize(1);
+        assertThat(savedAlerts.get(0).getScaleCode()).isEqualTo("CRI");
+        assertThat(savedAlerts.get(0).getAlertType()).isEqualTo(AlertType.HIGH_RISK);
+        assertThat(savedAlerts.get(0).getAlertCode()).isEqualTo("CRI_RESULT_A");
+        assertThat(savedAlerts.get(0).getAlertMessage()).isEqualTo("CRI 결과 A: 극도의 위기");
+        assertThat(savedAlerts.get(0).getQuestionNo()).isNull();
+        assertThat(savedAlerts.get(0).getTriggerValue()).isEqualTo("A - 극도의 위기");
+        assertThat(rawSnapshot.path("resultLevelCode").asText()).isEqualTo("A");
+        assertThat(rawSnapshot.path("resultLevel").asText()).isEqualTo("A - 극도의 위기");
 
         mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}", sessionId).session(session))
                 .andExpect(status().isOk())
@@ -966,40 +979,76 @@ class CoreWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.scales[0].scaleName").value("정신과적 위기 분류 평정척도 (CRI)"))
                 .andExpect(jsonPath("$.data.scales[0].totalScore").value(2))
                 .andExpect(jsonPath("$.data.scales[0].resultLevel").value("A - 극도의 위기"))
+                .andExpect(jsonPath("$.data.scales[0].hasAlert").value(true))
+                .andExpect(jsonPath("$.data.scales[0].alerts.length()").value(1))
+                .andExpect(jsonPath("$.data.scales[0].alerts[0].alertCode").value("CRI_RESULT_A"))
+                .andExpect(jsonPath("$.data.scales[0].alerts[0].alertType").value("HIGH_RISK"))
+                .andExpect(jsonPath("$.data.scales[0].alerts[0].alertMessage").value("CRI 결과 A: 극도의 위기"))
+                .andExpect(jsonPath("$.data.scales[0].alerts[0].triggerValue").value("A - 극도의 위기"))
                 .andExpect(jsonPath("$.data.scales[0].resultDetails[0].key").value("selfOtherTotal"))
                 .andExpect(jsonPath("$.data.scales[0].resultDetails[0].value").value("2"))
                 .andExpect(jsonPath("$.data.scales[0].resultDetails[1].value").value("0"))
                 .andExpect(jsonPath("$.data.scales[0].resultDetails[2].value").value("0"))
                 .andExpect(jsonPath("$.data.scales[0].resultDetails[3].value").value("0"))
                 .andExpect(jsonPath("$.data.scales[0].resultDetails[4].value").value("1"))
-                .andExpect(jsonPath("$.data.scales[0].answers.length()").value(23));
+                .andExpect(jsonPath("$.data.scales[0].answers.length()").value(23))
+                .andExpect(jsonPath("$.data.alerts[0].alertCode").value("CRI_RESULT_A"));
 
         mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}/print-data", sessionId).session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.scales[0].scaleCode").value("CRI"))
                 .andExpect(jsonPath("$.data.scales[0].resultLevel").value("A - 극도의 위기"))
+                .andExpect(jsonPath("$.data.scales[0].alertMessages[0]").value("CRI 결과 A: 극도의 위기"))
                 .andExpect(jsonPath("$.data.scales[0].resultDetails[0].label").value("자타해 위험 합계"))
-                .andExpect(jsonPath("$.data.scales[0].resultDetails[4].value").value("1"));
+                .andExpect(jsonPath("$.data.scales[0].resultDetails[4].value").value("1"))
+                .andExpect(jsonPath("$.data.alertCount").value(1));
     }
 
     @Test
     void saveCriSessionClassifiesCrisisCaseAsB() throws Exception {
-        assertCriResultLevel("CRI B 판정", criAnswersForCrisis(), "B - 위기", 2);
+        assertCriResultLevel(
+                "CRI B 판정",
+                criAnswersForCrisis(),
+                "B",
+                "B - 위기",
+                2,
+                AlertType.HIGH_RISK,
+                "CRI_RESULT_B",
+                "CRI 결과 B: 위기"
+        );
     }
 
     @Test
     void saveCriSessionClassifiesHighRiskCaseAsC() throws Exception {
-        assertCriResultLevel("CRI C 판정", criAnswersForHighRisk(), "C - 고위험", 2);
+        assertCriResultLevel(
+                "CRI C 판정",
+                criAnswersForHighRisk(),
+                "C",
+                "C - 고위험",
+                2,
+                AlertType.CAUTION,
+                "CRI_RESULT_C",
+                "CRI 결과 C: 고위험"
+        );
     }
 
     @Test
     void saveCriSessionClassifiesCautionCaseAsD() throws Exception {
-        assertCriResultLevel("CRI D 판정", criAnswersForCaution(), "D - 주의", 1);
+        assertCriResultLevel(
+                "CRI D 판정",
+                criAnswersForCaution(),
+                "D",
+                "D - 주의",
+                1,
+                AlertType.CAUTION,
+                "CRI_RESULT_D",
+                "CRI 결과 D: 주의"
+        );
     }
 
     @Test
     void saveCriSessionClassifiesNonCrisisCaseAsE() throws Exception {
-        assertCriResultLevel("CRI E 판정", criAnswersForNoCrisis(), "E - 위기상황 아님", 0);
+        assertCriResultLevel("CRI E 판정", criAnswersForNoCrisis(), "E", "E - 위기상황 아님", 0, null, null, null);
     }
 
     @Test
@@ -1022,12 +1071,14 @@ class CoreWorkflowIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.scales[0].totalScore").value(1))
                 .andExpect(jsonPath("$.data.scales[0].resultLevel").value("E - 위기상황 아님"))
+                .andExpect(jsonPath("$.data.scales[0].hasAlert").value(false))
                 .andExpect(jsonPath("$.data.scales[0].resultDetails[3].key").value("supportTotal"))
                 .andExpect(jsonPath("$.data.scales[0].resultDetails[3].value").value("1"))
                 .andExpect(jsonPath("$.data.scales[0].answers[21].answerLabel").value("없다"))
                 .andExpect(jsonPath("$.data.scales[0].answers[21].scoreValue").value(1))
                 .andExpect(jsonPath("$.data.scales[0].answers[22].answerLabel").value("있다"))
-                .andExpect(jsonPath("$.data.scales[0].answers[22].scoreValue").value(0));
+                .andExpect(jsonPath("$.data.scales[0].answers[22].scoreValue").value(0))
+                .andExpect(jsonPath("$.data.scales[0].alerts.length()").value(0));
     }
 
     @Test
@@ -1479,6 +1530,52 @@ class CoreWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.totalItems").value(1))
                 .andExpect(jsonPath("$.data.items[0].sessionId").value(matchingSession.getId()))
                 .andExpect(jsonPath("$.data.items[0].alertMessage").value("일치"));
+    }
+
+    @Test
+    void savedCriAlertIsExposedInStatisticsEndpoints() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+        Client client = findClient("김대상", LocalDate.of(1982, 7, 13));
+
+        JsonNode summaryBefore = dataObject("/api/v1/statistics/summary?dateFrom=2026-03-24&dateTo=2026-03-29", session);
+        JsonNode scalesBefore = dataObject("/api/v1/statistics/scales?dateFrom=2026-03-24&dateTo=2026-03-29", session).path("items");
+        JsonNode criBefore = findByField(scalesBefore, "scaleCode", "CRI");
+
+        MvcResult saveResult = mockMvc.perform(post("/api/v1/assessment-sessions")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(sessionSaveRequest(client.getId(), "CRI 통계 경고 반영", List.of(
+                                scaleRequest("CRI", criAnswersForHighRisk())
+                        )))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.hasAlert").value(true))
+                .andReturn();
+
+        long sessionId = body(saveResult).path("data").path("sessionId").asLong();
+
+        JsonNode alerts = dataObject(
+                "/api/v1/statistics/alerts?dateFrom=2026-03-24&dateTo=2026-03-29&scaleCode=CRI&alertType=CAUTION&page=1&size=20",
+                session
+        ).path("items");
+        JsonNode savedAlert = findByField(alerts, "sessionId", Long.toString(sessionId));
+
+        assertThat(savedAlert).isNotNull();
+        assertThat(savedAlert.path("scaleCode").asText()).isEqualTo("CRI");
+        assertThat(savedAlert.path("alertType").asText()).isEqualTo("CAUTION");
+        assertThat(savedAlert.path("alertMessage").asText()).isEqualTo("CRI 결과 C: 고위험");
+
+        JsonNode scalesAfter = dataObject("/api/v1/statistics/scales?dateFrom=2026-03-24&dateTo=2026-03-29", session).path("items");
+        JsonNode criAfter = findByField(scalesAfter, "scaleCode", "CRI");
+
+        assertThat(criBefore).isNotNull();
+        assertThat(criAfter).isNotNull();
+        assertThat(criAfter.path("totalCount").asLong()).isEqualTo(criBefore.path("totalCount").asLong() + 1L);
+        assertThat(criAfter.path("alertCount").asLong()).isEqualTo(criBefore.path("alertCount").asLong() + 1L);
+
+        JsonNode summaryAfter = dataObject("/api/v1/statistics/summary?dateFrom=2026-03-24&dateTo=2026-03-29", session);
+
+        assertThat(summaryAfter.path("alertSessionCount").asLong()).isEqualTo(summaryBefore.path("alertSessionCount").asLong() + 1L);
+        assertThat(summaryAfter.path("alertScaleCount").asLong()).isEqualTo(summaryBefore.path("alertScaleCount").asLong() + 1L);
     }
 
     @Test
@@ -2109,7 +2206,16 @@ class CoreWorkflowIntegrationTest {
         return sessionSaveRequest(clientId, memo, List.of(scaleRequest("PHQ9", 0, 0, 0, 0, 0, 0, 0, 0, 1)));
     }
 
-    private void assertCriResultLevel(String memo, int[] answers, String expectedResultLevel, int expectedTotalScore) throws Exception {
+    private void assertCriResultLevel(
+            String memo,
+            int[] answers,
+            String expectedResultLevelCode,
+            String expectedResultLevel,
+            int expectedTotalScore,
+            AlertType expectedAlertType,
+            String expectedAlertCode,
+            String expectedAlertMessage
+    ) throws Exception {
         MockHttpSession session = login("usera", "Test1234!");
         Client client = findClient("김대상", LocalDate.of(1982, 7, 13));
 
@@ -2122,13 +2228,41 @@ class CoreWorkflowIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
 
+        JsonNode saveBody = body(saveResult);
         long sessionId = body(saveResult).path("data").path("sessionId").asLong();
-
-        mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}", sessionId).session(session))
+        JsonNode detailBody = body(mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}", sessionId).session(session))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.scales[0].scaleCode").value("CRI"))
-                .andExpect(jsonPath("$.data.scales[0].totalScore").value(expectedTotalScore))
-                .andExpect(jsonPath("$.data.scales[0].resultLevel").value(expectedResultLevel));
+                .andReturn());
+        JsonNode scale = detailBody.path("data").path("scales").get(0);
+        List<SessionAlert> savedAlerts = sessionAlertRepository.findBySessionIdOrderByIdAsc(sessionId);
+        SessionScale savedScale = sessionScaleRepository.findBySessionIdOrderByDisplayOrderAsc(sessionId).get(0);
+        JsonNode rawSnapshot = objectMapper.readTree(savedScale.getRawResultSnapshot());
+
+        assertThat(saveBody.path("data").path("hasAlert").asBoolean()).isEqualTo(expectedAlertType != null);
+        assertThat(scale.path("scaleCode").asText()).isEqualTo("CRI");
+        assertThat(scale.path("totalScore").asInt()).isEqualTo(expectedTotalScore);
+        assertThat(scale.path("resultLevel").asText()).isEqualTo(expectedResultLevel);
+        assertThat(scale.path("hasAlert").asBoolean()).isEqualTo(expectedAlertType != null);
+        assertThat(rawSnapshot.path("resultLevelCode").asText()).isEqualTo(expectedResultLevelCode);
+        assertThat(rawSnapshot.path("resultLevel").asText()).isEqualTo(expectedResultLevel);
+
+        if (expectedAlertType == null) {
+            assertThat(savedAlerts).isEmpty();
+            assertThat(scale.path("alerts").size()).isZero();
+            return;
+        }
+
+        assertThat(savedAlerts).hasSize(1);
+        assertThat(savedAlerts.get(0).getAlertType()).isEqualTo(expectedAlertType);
+        assertThat(savedAlerts.get(0).getAlertCode()).isEqualTo(expectedAlertCode);
+        assertThat(savedAlerts.get(0).getAlertMessage()).isEqualTo(expectedAlertMessage);
+        assertThat(savedAlerts.get(0).getQuestionNo()).isNull();
+        assertThat(savedAlerts.get(0).getTriggerValue()).isEqualTo(expectedResultLevel);
+        assertThat(scale.path("alerts").size()).isEqualTo(1);
+        assertThat(scale.path("alerts").get(0).path("alertType").asText()).isEqualTo(expectedAlertType.name());
+        assertThat(scale.path("alerts").get(0).path("alertCode").asText()).isEqualTo(expectedAlertCode);
+        assertThat(scale.path("alerts").get(0).path("alertMessage").asText()).isEqualTo(expectedAlertMessage);
+        assertThat(scale.path("alerts").get(0).path("triggerValue").asText()).isEqualTo(expectedResultLevel);
     }
 
     private Map<String, Object> sessionSaveRequest(Long clientId, String memo, List<Map<String, Object>> selectedScales) {

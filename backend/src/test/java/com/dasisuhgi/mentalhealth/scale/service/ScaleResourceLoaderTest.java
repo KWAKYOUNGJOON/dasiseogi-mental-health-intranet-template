@@ -131,6 +131,28 @@ class ScaleResourceLoaderTest {
         assertThat(cri.items().subList(21, 23))
                 .flatExtracting(item -> item.options().stream().map(option -> option.label()).toList())
                 .containsExactly("없다", "있다", "없다", "있다");
+        assertThat(cri.alertRules())
+                .extracting(rule -> rule.code())
+                .containsExactly("CRI_RESULT_A", "CRI_RESULT_B", "CRI_RESULT_C", "CRI_RESULT_D");
+        assertThat(cri.alertRules())
+                .extracting(rule -> rule.type())
+                .containsExactly("HIGH_RISK", "HIGH_RISK", "CAUTION", "CAUTION");
+        assertThat(cri.alertRules())
+                .extracting(rule -> rule.message())
+                .containsExactly(
+                        "CRI 결과 A: 극도의 위기",
+                        "CRI 결과 B: 위기",
+                        "CRI 결과 C: 고위험",
+                        "CRI 결과 D: 주의"
+                );
+        assertThat(cri.alertRules())
+                .extracting(rule -> rule.resultLevelCodes())
+                .containsExactly(
+                        java.util.List.of("A"),
+                        java.util.List.of("B"),
+                        java.util.List.of("C"),
+                        java.util.List.of("D")
+                );
     }
 
     private String readClasspathResource(String location) throws IOException {

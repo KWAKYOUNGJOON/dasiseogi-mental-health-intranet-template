@@ -240,5 +240,30 @@
     }
   ],
   "interpretationRules": [],
-  "alertRules": []
+  "alertRules": [
+    {
+      "code": "CRI_RESULT_A",
+      "type": "HIGH_RISK",
+      "message": "CRI 결과 A: 극도의 위기",
+      "resultLevelCodes": ["A"]
+    },
+    {
+      "code": "CRI_RESULT_B",
+      "type": "HIGH_RISK",
+      "message": "CRI 결과 B: 위기",
+      "resultLevelCodes": ["B"]
+    },
+    {
+      "code": "CRI_RESULT_C",
+      "type": "CAUTION",
+      "message": "CRI 결과 C: 고위험",
+      "resultLevelCodes": ["C"]
+    },
+    {
+      "code": "CRI_RESULT_D",
+      "type": "CAUTION",
+      "message": "CRI 결과 D: 주의",
+      "resultLevelCodes": ["D"]
+    }
+  ]
 }

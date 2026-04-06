@@ -176,13 +176,18 @@ class AssessmentSaveMariaDbSchemaIntegrationTest {
                 .andExpect(jsonPath("$.data.scales[0].scaleCode").value("PHQ9"))
                 .andExpect(jsonPath("$.data.scales[1].scaleCode").value("CRI"))
                 .andExpect(jsonPath("$.data.scales[1].resultLevel").value("A - 극도의 위기"))
+                .andExpect(jsonPath("$.data.scales[1].hasAlert").value(true))
+                .andExpect(jsonPath("$.data.scales[1].alerts[0].alertCode").value("CRI_RESULT_A"))
+                .andExpect(jsonPath("$.data.scales[1].alerts[0].alertType").value("HIGH_RISK"))
+                .andExpect(jsonPath("$.data.scales[1].alerts[0].alertMessage").value("CRI 결과 A: 극도의 위기"))
                 .andExpect(jsonPath("$.data.scales[1].resultDetails[0].key").value("selfOtherTotal"));
 
         mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}/print-data", sessionId).session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.scales[0].scaleCode").value("PHQ9"))
                 .andExpect(jsonPath("$.data.scales[1].scaleCode").value("CRI"))
-                .andExpect(jsonPath("$.data.scales[1].resultLevel").value("A - 극도의 위기"));
+                .andExpect(jsonPath("$.data.scales[1].resultLevel").value("A - 극도의 위기"))
+                .andExpect(jsonPath("$.data.scales[1].alertMessages[0]").value("CRI 결과 A: 극도의 위기"));
 
         mockMvc.perform(get("/api/v1/assessment-records")
                         .session(session)

@@ -7,6 +7,7 @@ public record ScaleAlertRule(
         String questionKey,
         java.util.List<String> questionKeys,
         Integer minAnswerValue,
-        Integer minTotalScore
+        Integer minTotalScore,
+        java.util.List<String> resultLevelCodes
 ) {
 }
