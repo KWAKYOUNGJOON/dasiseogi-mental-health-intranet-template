@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS session_scales (
     PRIMARY KEY (id),
     CONSTRAINT uk_session_scales_session_id_scale_code UNIQUE (session_id, scale_code),
     CONSTRAINT chk_session_scales_scale_code
-        CHECK (scale_code IN ('PHQ9', 'GAD7', 'MKPQ16', 'KMDQ', 'PSS10', 'ISIK', 'AUDITK', 'IESR')),
+        CHECK (scale_code IN ('PHQ9', 'GAD7', 'MKPQ16', 'KMDQ', 'PSS10', 'ISIK', 'AUDITK', 'IESR', 'CRI')),
     CONSTRAINT chk_session_scales_raw_result_snapshot
         CHECK (JSON_VALID(raw_result_snapshot)),
     CONSTRAINT fk_session_scales_session
@@ -192,7 +192,7 @@ CREATE TABLE IF NOT EXISTS session_answers (
     PRIMARY KEY (id),
     CONSTRAINT uk_session_answers_scale_question UNIQUE (session_scale_id, question_no),
     CONSTRAINT chk_session_answers_scale_code
-        CHECK (scale_code IN ('PHQ9', 'GAD7', 'MKPQ16', 'KMDQ', 'PSS10', 'ISIK', 'AUDITK', 'IESR')),
+        CHECK (scale_code IN ('PHQ9', 'GAD7', 'MKPQ16', 'KMDQ', 'PSS10', 'ISIK', 'AUDITK', 'IESR', 'CRI')),
     CONSTRAINT fk_session_answers_session_scale
         FOREIGN KEY (session_scale_id) REFERENCES session_scales (id),
     CONSTRAINT fk_session_answers_session
@@ -215,7 +215,7 @@ CREATE TABLE IF NOT EXISTS session_alerts (
     created_at DATETIME NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT chk_session_alerts_scale_code
-        CHECK (scale_code IN ('PHQ9', 'GAD7', 'MKPQ16', 'KMDQ', 'PSS10', 'ISIK', 'AUDITK', 'IESR')),
+        CHECK (scale_code IN ('PHQ9', 'GAD7', 'MKPQ16', 'KMDQ', 'PSS10', 'ISIK', 'AUDITK', 'IESR', 'CRI')),
     CONSTRAINT chk_session_alerts_alert_type
         CHECK (alert_type IN ('HIGH_RISK', 'CAUTION', 'CRITICAL_ITEM', 'COMPOSITE_RULE')),
     CONSTRAINT fk_session_alerts_session

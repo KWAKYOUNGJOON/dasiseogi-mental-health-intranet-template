@@ -148,6 +148,38 @@ class SchemaValidationMariaDbTest {
     }
 
     @Test
+    void schemaSqlAllowsAllNineOfficialScaleCodesInSessionTablesOnMariaDb() throws Exception {
+        applySchemaSql();
+
+        Set<String> expectedScaleCodes = new LinkedHashSet<>(Arrays.asList(
+                "PHQ9",
+                "GAD7",
+                "MKPQ16",
+                "KMDQ",
+                "PSS10",
+                "ISIK",
+                "AUDITK",
+                "IESR",
+                "CRI"
+        ));
+
+        Optional<String> sessionScalesClause = checkConstraintClause("session_scales", "chk_session_scales_scale_code");
+        assertThat(sessionScalesClause).isPresent();
+        assertThat(extractQuotedUppercaseTokens(sessionScalesClause.orElseThrow()))
+                .containsExactlyInAnyOrderElementsOf(expectedScaleCodes);
+
+        Optional<String> sessionAnswersClause = checkConstraintClause("session_answers", "chk_session_answers_scale_code");
+        assertThat(sessionAnswersClause).isPresent();
+        assertThat(extractQuotedUppercaseTokens(sessionAnswersClause.orElseThrow()))
+                .containsExactlyInAnyOrderElementsOf(expectedScaleCodes);
+
+        Optional<String> sessionAlertsClause = checkConstraintClause("session_alerts", "chk_session_alerts_scale_code");
+        assertThat(sessionAlertsClause).isPresent();
+        assertThat(extractQuotedUppercaseTokens(sessionAlertsClause.orElseThrow()))
+                .containsExactlyInAnyOrderElementsOf(expectedScaleCodes);
+    }
+
+    @Test
     void schemaSqlKeepsActivityLogActionTypeCheckConstraintInSyncWithEnum() throws Exception {
         applySchemaSql();
 
@@ -283,7 +315,7 @@ class SchemaValidationMariaDbTest {
 
     private Set<String> extractQuotedUppercaseTokens(String clause) {
         Set<String> tokens = new LinkedHashSet<>();
-        Matcher matcher = Pattern.compile("'([A-Z_]+)'").matcher(clause == null ? "" : clause);
+        Matcher matcher = Pattern.compile("'([A-Z0-9_]+)'").matcher(clause == null ? "" : clause);
         while (matcher.find()) {
             tokens.add(matcher.group(1));
         }

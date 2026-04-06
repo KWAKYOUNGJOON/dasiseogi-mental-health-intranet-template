@@ -138,6 +138,75 @@ class AssessmentSaveMariaDbSchemaIntegrationTest {
     }
 
     @Test
+    void savePhq9AndCriSessionAgainstSchemaSqlOnMariaDb() throws Exception {
+        MockHttpSession session = login("usera", "Test1234!");
+
+        MvcResult createResult = mockMvc.perform(post("/api/v1/clients")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "name", "마리아CRI대상",
+                                "gender", "FEMALE",
+                                "birthDate", "1993-08-21",
+                                "phone", "010-3333-4444",
+                                "primaryWorkerId", 2L
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").isNumber())
+                .andReturn();
+
+        long clientId = body(createResult).path("data").path("id").asLong();
+
+        MvcResult saveResult = mockMvc.perform(post("/api/v1/assessment-sessions")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(json(sessionSaveRequest(clientId, "MariaDB schema PHQ9 + CRI", List.of(
+                                scaleRequest("PHQ9", 0, 0, 0, 0, 0, 0, 0, 0, 1),
+                                scaleRequest("CRI", criAnswersForExtremeCrisis())
+                        )))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.scaleCount").value(2))
+                .andExpect(jsonPath("$.data.hasAlert").value(true))
+                .andReturn();
+
+        long sessionId = body(saveResult).path("data").path("sessionId").asLong();
+
+        mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}", sessionId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scales[0].scaleCode").value("PHQ9"))
+                .andExpect(jsonPath("$.data.scales[1].scaleCode").value("CRI"))
+                .andExpect(jsonPath("$.data.scales[1].resultLevel").value("A - 극도의 위기"))
+                .andExpect(jsonPath("$.data.scales[1].resultDetails[0].key").value("selfOtherTotal"));
+
+        mockMvc.perform(get("/api/v1/assessment-sessions/{sessionId}/print-data", sessionId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scales[0].scaleCode").value("PHQ9"))
+                .andExpect(jsonPath("$.data.scales[1].scaleCode").value("CRI"))
+                .andExpect(jsonPath("$.data.scales[1].resultLevel").value("A - 극도의 위기"));
+
+        mockMvc.perform(get("/api/v1/assessment-records")
+                        .session(session)
+                        .param("dateFrom", "2026-03-24")
+                        .param("dateTo", "2026-03-29")
+                        .param("clientName", "마리아CRI대상")
+                        .param("scaleCode", "CRI")
+                        .param("page", "1")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalItems").value(1))
+                .andExpect(jsonPath("$.data.items[0].sessionId").value(sessionId))
+                .andExpect(jsonPath("$.data.items[0].clientId").value(clientId))
+                .andExpect(jsonPath("$.data.items[0].scaleCode").value("CRI"))
+                .andExpect(jsonPath("$.data.items[0].resultLevel").value("A - 극도의 위기"));
+
+        mockMvc.perform(get("/api/v1/clients/{clientId}", clientId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.recentSessions[0].id").value(sessionId))
+                .andExpect(jsonPath("$.data.recentSessions[0].scaleCount").value(2))
+                .andExpect(jsonPath("$.data.recentSessions[0].status").value("COMPLETED"));
+    }
+
+    @Test
     void createClientAndFetchDetailAgainstSchemaSqlOnMariaDb() throws Exception {
         MockHttpSession session = login("usera", "Test1234!");
 
@@ -228,5 +297,12 @@ class AssessmentSaveMariaDbSchemaIntegrationTest {
         answer.put("questionNo", questionNo);
         answer.put("answerValue", answerValue);
         return answer;
+    }
+
+    private int[] criAnswersForExtremeCrisis() {
+        int[] answers = new int[23];
+        answers[0] = 1;
+        answers[7] = 1;
+        return answers;
     }
 }
