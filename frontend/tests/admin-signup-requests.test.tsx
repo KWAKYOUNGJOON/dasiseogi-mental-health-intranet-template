@@ -131,7 +131,9 @@ describe('admin signup requests', () => {
     expect(screen.getByText('김지원')).toBeTruthy()
     expect(screen.getByText('jwkim')).toBeTruthy()
     expect(screen.getByText('신규 입사자 계정 요청')).toBeTruthy()
-    expect(screen.getByText('승인 대기')).toBeTruthy()
+    const signupRequestRow = screen.getByText('jwkim').closest('tr')
+    expect(signupRequestRow).toBeTruthy()
+    expect(within(signupRequestRow as HTMLElement).getByText('승인 대기')).toBeTruthy()
 
     const statusSelect = screen.getByLabelText('상태') as HTMLSelectElement
     expect(

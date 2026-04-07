@@ -99,7 +99,7 @@ afterEach(() => {
 })
 
 describe('statistics alert table scale labels', () => {
-  it('shows the long CRI label only in the alert records table while keeping other scale labels unchanged', async () => {
+  it('keeps the default CRI label in the alert records table while leaving other scale labels unchanged', async () => {
     mockedFetchStatisticsAlerts.mockResolvedValue({
       items: [
         {
@@ -136,8 +136,8 @@ describe('statistics alert table scale labels', () => {
     const alertCard = (await screen.findByRole('heading', { level: 3, name: '경고 기록' })).closest('.card')
 
     expect(alertCard).toBeTruthy()
-    expect(within(alertCard as HTMLDivElement).getByRole('cell', { name: 'CRI (정신과적 위기 분류 평정척도)' })).toBeTruthy()
-    expect(within(alertCard as HTMLDivElement).queryByRole('cell', { name: 'CRI' })).toBeNull()
+    expect(within(alertCard as HTMLDivElement).getByRole('cell', { name: 'CRI' })).toBeTruthy()
+    expect(within(alertCard as HTMLDivElement).queryByRole('cell', { name: 'CRI (정신과적 위기 분류 평정척도)' })).toBeNull()
     expect(within(alertCard as HTMLDivElement).getByRole('cell', { name: 'GAD-7 (불안)' })).toBeTruthy()
   })
 })

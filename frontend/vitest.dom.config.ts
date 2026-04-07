@@ -3,7 +3,7 @@ import sharedConfig from './vitest.shared.config'
 
 export default mergeConfig(sharedConfig, {
   test: {
-    environment: 'happy-dom',
+    environment: 'node',
     globalSetup: ['./tests/vitest.global-setup.ts'],
     include: ['**/*.{test,spec}.tsx'],
     maxWorkers: 1,

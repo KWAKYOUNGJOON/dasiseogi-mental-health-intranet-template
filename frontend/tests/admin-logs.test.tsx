@@ -125,7 +125,7 @@ describe('admin logs', () => {
 
     expect(screen.getByRole('heading', { name: '로그 확인' })).toBeTruthy()
     expect(screen.getByText(/관리자/)).toBeTruthy()
-    expect(screen.getByRole('cell', { name: 'USER_ROLE_CHANGE' })).toBeTruthy()
+    expect(screen.getByRole('cell', { name: /USER_ROLE_CHANGE/ })).toBeTruthy()
     expect(screen.getByText('사용자 역할 변경: ADMIN')).toBeTruthy()
   })
 

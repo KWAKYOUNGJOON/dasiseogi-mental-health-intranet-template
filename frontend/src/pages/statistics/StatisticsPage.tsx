@@ -84,7 +84,7 @@ function formatStatisticsCriBaseName(scaleName?: string) {
 
 function formatStatisticsScaleDropdownLabel(item: StatisticsScaleResponse['items'][number]) {
   if (item.scaleCode === CRI_SCALE_CODE) {
-    return `CRI(${formatStatisticsCriBaseName(item.scaleName)})`
+    return `CRI (${formatStatisticsCriBaseName(item.scaleName)})`
   }
 
   const displayLabel = STATISTICS_SCALE_DESCRIPTION_BY_CODE[item.scaleCode]
@@ -95,18 +95,10 @@ function formatStatisticsScaleDropdownLabel(item: StatisticsScaleResponse['items
 }
 
 function formatStatisticsScaleListLabel(item: StatisticsScaleResponse['items'][number]) {
-  if (item.scaleCode === CRI_SCALE_CODE) {
-    return `CRI (${formatStatisticsCriBaseName(item.scaleName)})`
-  }
-
   return formatStatisticsScaleLabel(item.scaleCode, item.scaleName)
 }
 
 function formatStatisticsAlertScaleLabel(scaleCode: string) {
-  if (scaleCode === CRI_SCALE_CODE) {
-    return `CRI (${DEFAULT_CRI_SCALE_NAME})`
-  }
-
   return formatStatisticsScaleLabel(scaleCode)
 }
 

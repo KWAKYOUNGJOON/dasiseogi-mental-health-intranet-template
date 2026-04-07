@@ -1,5 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthUser } from '../src/features/auth/api/authApi'
@@ -20,6 +19,7 @@ const mockUseAuth = vi.fn<() => MockAuthValue>()
 const mockLogin = vi.fn<(loginId: string, password: string) => Promise<void>>()
 const mockLogout = vi.fn<() => Promise<void>>()
 const mockRefresh = vi.fn<() => Promise<void>>()
+const mockDateTextInput = vi.fn<(props: any) => void>()
 
 vi.mock('../src/app/providers/AuthProvider', () => ({
   useAuth: () => mockUseAuth(),
@@ -44,6 +44,14 @@ vi.mock('../src/features/statistics/api/statisticsApi', () => ({
   fetchStatisticsAlerts: vi.fn(),
   fetchStatisticsScales: vi.fn(),
   fetchStatisticsSummary: vi.fn(),
+}))
+
+vi.mock('../src/shared/components/DateTextInput', () => ({
+  DateTextInput: (props: any) => {
+    mockDateTextInput(props)
+
+    return <input {...props} onChange={(event) => props.onChange((event.target as HTMLInputElement).value)} type="text" value={props.value} />
+  },
 }))
 
 import { AppRouter } from '../src/app/router/AppRouter'
@@ -175,11 +183,39 @@ function renderStatisticsRoute() {
   )
 }
 
+function setFormControlValue(element: HTMLInputElement | HTMLSelectElement, value: string) {
+  Object.defineProperty(element, 'value', {
+    configurable: true,
+    value,
+    writable: true,
+  })
+}
+
+function setTextInputValue(input: HTMLInputElement, value: string) {
+  fireEvent.change(input, { target: { value } })
+}
+
+function setSelectValue(select: HTMLSelectElement, value: string) {
+  setFormControlValue(select, value)
+  fireEvent.change(select)
+}
+
+function getDateTextInputOnChange(label: string) {
+  const props = mockDateTextInput.mock.calls
+    .map(([currentProps]) => currentProps)
+    .find((currentProps) => currentProps['aria-label'] === label)
+
+  expect(props).toBeTruthy()
+
+  return props.onChange as (value: string) => void
+}
+
 beforeEach(() => {
   mockUseAuth.mockReset()
   mockLogin.mockReset()
   mockLogout.mockReset()
   mockRefresh.mockReset()
+  mockDateTextInput.mockReset()
   mockGetDefaultStatisticsSeoulDateRange.mockClear()
   mockedDownloadStatisticsExport.mockReset()
   mockedFetchStatisticsSummary.mockReset()
@@ -206,8 +242,6 @@ afterEach(() => {
 
 describe('statistics page', () => {
   it('keeps the admin summary csv export button stable with the current date range payload', async () => {
-    const user = userEvent.setup()
-
     mockedFetchStatisticsAlerts.mockResolvedValue(createStatisticsAlertPage([createStatisticsAlertItem()]))
     mockUseAuth.mockReturnValue(
       createAuthValue({
@@ -249,10 +283,12 @@ describe('statistics page', () => {
     expect(dateFromInput.value).toBe(initialDateRange?.dateFrom)
     expect(dateToInput.value).toBe(initialDateRange?.dateTo)
 
-    fireEvent.change(dateFromInput, { target: { value: '2026-03-01' } })
-    fireEvent.change(dateToInput, { target: { value: '2026-03-31' } })
+    act(() => {
+      getDateTextInputOnChange('시작일')('2026-03-01')
+      getDateTextInputOnChange('종료일')('2026-03-31')
+    })
 
-    await user.click(summaryCsvButton)
+    fireEvent.click(summaryCsvButton)
 
     await waitFor(() => {
       expect(mockedDownloadStatisticsExport).toHaveBeenCalledTimes(1)
@@ -266,8 +302,6 @@ describe('statistics page', () => {
   })
 
   it('keeps the user statistics flow stable through initial load, filter search, and page reset to 1', async () => {
-    const user = userEvent.setup()
-
     mockedFetchStatisticsAlerts
       .mockResolvedValueOnce(
         createStatisticsAlertPage([createStatisticsAlertItem()], {
@@ -373,7 +407,7 @@ describe('statistics page', () => {
     expect(screen.queryByText('경고 기록이 없습니다.')).toBeNull()
     expect(screen.queryByText('통계 정보를 불러오지 못했습니다.')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: '다음' }))
+    fireEvent.click(screen.getByRole('button', { name: '다음' }))
 
     await waitFor(() => {
       expect(mockedFetchStatisticsAlerts).toHaveBeenLastCalledWith({
@@ -393,9 +427,9 @@ describe('statistics page', () => {
     expect(within(secondPageAlertRow as HTMLTableRowElement).getByText('GAD-7 (불안)')).toBeTruthy()
     expect(screen.getByText('2건 / 2페이지')).toBeTruthy()
 
-    await user.selectOptions(screen.getByLabelText('경고 척도'), 'PHQ9')
-    await user.selectOptions(screen.getByLabelText('경고 유형'), 'HIGH_RISK')
-    await user.click(screen.getByRole('button', { name: '조회' }))
+    setSelectValue(screen.getByLabelText('경고 척도') as HTMLSelectElement, 'PHQ9')
+    setSelectValue(screen.getByLabelText('경고 유형') as HTMLSelectElement, 'HIGH_RISK')
+    fireEvent.click(screen.getByRole('button', { name: '조회' }))
 
     await waitFor(() => {
       expect(mockedFetchStatisticsSummary).toHaveBeenCalledTimes(3)
@@ -457,7 +491,7 @@ describe('statistics page', () => {
 
     renderStatisticsRoute()
 
-    const criOption = await screen.findByRole('option', { name: 'CRI(정신과적 위기 분류 평정척도)' })
+    const criOption = await screen.findByRole('option', { name: 'CRI (정신과적 위기 분류 평정척도)' })
 
     expect(criOption).toBeTruthy()
     expect((criOption as HTMLOptionElement).value).toBe('CRI')
@@ -465,7 +499,7 @@ describe('statistics page', () => {
     expect(screen.queryByRole('option', { name: '정신과적 위기 분류 평정척도 (CRI) (CRI)' })).toBeNull()
   })
 
-  it('shows the list-specific CRI label in the current active scales table', async () => {
+  it('keeps the original CRI label in the current active scales table', async () => {
     mockedFetchStatisticsAlerts.mockResolvedValue(createStatisticsAlertPage([createStatisticsAlertItem()]))
     mockedFetchStatisticsScales.mockResolvedValue(
       createStatisticsScales({
@@ -486,7 +520,7 @@ describe('statistics page', () => {
     const currentScaleCard = (await screen.findByRole('heading', { level: 3, name: '현재 운영 척도' })).closest('.card')
 
     expect(currentScaleCard).toBeTruthy()
-    expect(within(currentScaleCard as HTMLDivElement).getByRole('cell', { name: 'CRI (정신과적 위기 분류 평정척도)' })).toBeTruthy()
-    expect(within(currentScaleCard as HTMLDivElement).queryByRole('cell', { name: '정신과적 위기 분류 평정척도 (CRI)' })).toBeNull()
+    expect(within(currentScaleCard as HTMLDivElement).getByRole('cell', { name: '정신과적 위기 분류 평정척도 (CRI)' })).toBeTruthy()
+    expect(within(currentScaleCard as HTMLDivElement).queryByRole('cell', { name: 'CRI (정신과적 위기 분류 평정척도)' })).toBeNull()
   })
 })
