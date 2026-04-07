@@ -351,7 +351,7 @@ describe('assessment record list page', () => {
     expect(screen.getByRole('option', { name: 'ISI-K (불면)' })).toBeTruthy()
     expect(screen.getByRole('option', { name: 'AUDIT-K (알코올 사용)' })).toBeTruthy()
     expect(screen.getByRole('option', { name: 'IES-R (외상 후 스트레스(PTSD))' })).toBeTruthy()
-    expect(screen.getByRole('option', { name: '정신과적 위기 분류 평정척도 (CRI) (정신과적 위기 분류)' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'CRI (정신과적 위기 분류 평정척도)' })).toBeTruthy()
 
     const scaleSelect = screen.getByRole('combobox')
     await user.selectOptions(scaleSelect, 'PHQ9')

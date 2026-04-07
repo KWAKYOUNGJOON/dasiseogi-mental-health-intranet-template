@@ -33,6 +33,9 @@ const ASSESSMENT_RECORD_SCALE_DESCRIPTION_BY_CODE: Record<string, string> = {
   IESR: '외상 후 스트레스(PTSD)',
   CRI: '정신과적 위기 분류',
 }
+const ASSESSMENT_RECORD_SCALE_OPTION_LABEL_BY_CODE: Record<string, string> = {
+  CRI: 'CRI (정신과적 위기 분류 평정척도)',
+}
 
 interface RecordFilters {
   dateFrom: string
@@ -106,6 +109,12 @@ function buildSessionDetailPath(
 }
 
 function formatAssessmentRecordScaleOptionLabel(item: ScaleListItem) {
+  const optionLabel = ASSESSMENT_RECORD_SCALE_OPTION_LABEL_BY_CODE[item.scaleCode]
+
+  if (optionLabel) {
+    return optionLabel
+  }
+
   const description = ASSESSMENT_RECORD_SCALE_DESCRIPTION_BY_CODE[item.scaleCode]
 
   if (description) {
