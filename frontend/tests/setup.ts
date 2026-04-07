@@ -816,9 +816,13 @@ window.document.addEventListener('click', (event) => {
 window.requestAnimationFrame = (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0)
 window.cancelAnimationFrame = (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle)
 window.open = typeof window.open === 'function' ? window.open.bind(window) : (() => null)
+const originalMatchMedia =
+  typeof window.matchMedia === 'function' ? window.matchMedia.bind(window) : null
+const originalGetComputedStyle =
+  typeof window.getComputedStyle === 'function' ? window.getComputedStyle.bind(window) : null
 window.matchMedia =
-  typeof window.matchMedia === 'function'
-    ? (query: string) => window.matchMedia(query)
+  originalMatchMedia
+    ? (query: string) => originalMatchMedia(query)
     : ((query: string) => ({
         addEventListener: () => undefined,
         addListener: () => undefined,
@@ -830,8 +834,8 @@ window.matchMedia =
         removeListener: () => undefined,
       }))
 window.getComputedStyle =
-  typeof window.getComputedStyle === 'function'
-    ? (element: Element) => window.getComputedStyle(element)
+  originalGetComputedStyle
+    ? (element: Element, pseudoElement?: string) => originalGetComputedStyle(element, pseudoElement)
     : (() => ({
         getPropertyPriority: () => '',
         getPropertyValue: () => '',
