@@ -5,19 +5,20 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../app/providers/AuthProvider'
 import { fetchAdminUsers } from '../../features/admin/api/adminApi'
 import {
-  CLIENT_CREATE_FIELDS,
   CLIENT_CREATE_VALIDATION_MESSAGE,
   getClientCreateApiResponse,
-  hasClientCreateErrors,
   mapClientCreateFieldErrors,
-  validateClientCreateField,
-  validateClientCreateForm,
   type ClientCreateFieldErrors,
   type ClientCreateFieldName,
   type ClientCreateFormValues,
   type ClientCreateTouched,
 } from '../../features/clients/api/clientCreateApi'
 import { fetchClientDetail, updateClient, type ClientDetail } from '../../features/clients/api/clientApi'
+import {
+  getClientFormBlurValidationState,
+  getClientFormChangeValidationState,
+  getClientFormSubmitValidationState,
+} from '../../features/clients/clientFormValidationState'
 import {
   CLIENT_FORM_FIELD_DEFINITIONS,
   getClientFormFieldDescribedBy,
@@ -112,38 +113,6 @@ export function ClientEditPage() {
     void load(Number(clientId))
   }, [clientId, load])
 
-  function getNextFieldErrors(
-    currentFieldErrors: ClientCreateFieldErrors,
-    field: ClientCreateFieldName,
-    nextForm: ClientCreateFormValues,
-  ) {
-    const nextErrors = { ...currentFieldErrors }
-    const message = validateClientCreateField(field, nextForm)
-
-    if (message) {
-      nextErrors[field] = message
-    } else {
-      delete nextErrors[field]
-    }
-
-    return nextErrors
-  }
-
-  function syncFieldError(field: ClientCreateFieldName, nextForm: ClientCreateFormValues) {
-    const nextErrors = getNextFieldErrors(fieldErrors, field, nextForm)
-
-    setFieldErrors(nextErrors)
-
-    if (formMessage === CLIENT_CREATE_VALIDATION_MESSAGE) {
-      setFormMessage(hasClientCreateErrors(nextErrors) ? CLIENT_CREATE_VALIDATION_MESSAGE : null)
-      return
-    }
-
-    if (formMessage && !hasClientCreateErrors(nextErrors)) {
-      setFormMessage(null)
-    }
-  }
-
   function handleFieldChange(field: ClientCreateFieldName) {
     return (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       const value =
@@ -152,14 +121,17 @@ export function ClientEditPage() {
 
       setForm(nextForm)
 
-      if (fieldErrors[field] || touched[field]) {
-        syncFieldError(field, nextForm)
-        return
-      }
+      const nextValidationState = getClientFormChangeValidationState({
+        currentFieldErrors: fieldErrors,
+        field,
+        formMessage,
+        mode: 'edit',
+        nextForm,
+        touched,
+      })
 
-      if (formMessage && !hasClientCreateErrors(fieldErrors)) {
-        setFormMessage(null)
-      }
+      setFieldErrors(nextValidationState.fieldErrors)
+      setFormMessage(nextValidationState.formMessage)
     }
   }
 
@@ -169,21 +141,31 @@ export function ClientEditPage() {
 
       setForm(nextForm)
 
-      if (fieldErrors[field] || touched[field]) {
-        syncFieldError(field, nextForm)
-        return
-      }
+      const nextValidationState = getClientFormChangeValidationState({
+        currentFieldErrors: fieldErrors,
+        field,
+        formMessage,
+        mode: 'edit',
+        nextForm,
+        touched,
+      })
 
-      if (formMessage && !hasClientCreateErrors(fieldErrors)) {
-        setFormMessage(null)
-      }
+      setFieldErrors(nextValidationState.fieldErrors)
+      setFormMessage(nextValidationState.formMessage)
     }
   }
 
   function handleBlur(field: ClientCreateFieldName) {
     return () => {
-      setTouched((current) => ({ ...current, [field]: true }))
-      syncFieldError(field, form)
+      const nextValidationState = getClientFormBlurValidationState({
+        currentFieldErrors: fieldErrors,
+        currentTouched: touched,
+        field,
+        form,
+      })
+
+      setTouched(nextValidationState.touched)
+      setFieldErrors(nextValidationState.fieldErrors)
     }
   }
 
@@ -193,16 +175,12 @@ export function ClientEditPage() {
       return
     }
 
-    const nextTouched = CLIENT_CREATE_FIELDS.reduce<ClientCreateTouched>((current, field) => {
-      current[field] = true
-      return current
-    }, {})
-    const nextErrors = validateClientCreateForm(form)
+    const nextValidationState = getClientFormSubmitValidationState(form)
 
-    setTouched(nextTouched)
-    setFieldErrors(nextErrors)
+    setTouched(nextValidationState.touched)
+    setFieldErrors(nextValidationState.fieldErrors)
 
-    if (hasClientCreateErrors(nextErrors)) {
+    if (nextValidationState.hasErrors) {
       setFormMessage(CLIENT_CREATE_VALIDATION_MESSAGE)
       return
     }

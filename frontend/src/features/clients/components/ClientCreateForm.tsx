@@ -11,23 +11,24 @@ import {
   getClientFormFieldInputId,
 } from '../clientFormMetadata'
 import {
-  CLIENT_CREATE_FIELDS,
   CLIENT_CREATE_VALIDATION_MESSAGE,
   getClientCreateApiResponse,
   getDefaultClientCreateFormValues,
   getDuplicateCheckMessage,
-  hasClientCreateErrors,
   mapClientCreateFieldErrors,
   requestClientDuplicateCheck,
   resolveClientCreateRepresentativeMessage,
   submitClientCreate,
-  validateClientCreateField,
-  validateClientCreateForm,
   type ClientCreateFieldErrors,
   type ClientCreateFieldName,
   type ClientCreateFormValues,
   type ClientCreateTouched,
 } from '../api/clientCreateApi'
+import {
+  getClientFormBlurValidationState,
+  getClientFormChangeValidationState,
+  getClientFormSubmitValidationState,
+} from '../clientFormValidationState'
 
 type DuplicateCandidate = Awaited<ReturnType<typeof requestClientDuplicateCheck>>['candidates'][number]
 const CLIENT_CREATE_FORM_VARIANT = 'create' as const
@@ -57,21 +58,6 @@ export function ClientCreateForm() {
     })
   }, [user?.id])
 
-  function updateFieldError(field: ClientCreateFieldName, nextForm: ClientCreateFormValues) {
-    setFieldErrors((current) => {
-      const nextErrors = { ...current }
-      const message = validateClientCreateField(field, nextForm)
-
-      if (message) {
-        nextErrors[field] = message
-      } else {
-        delete nextErrors[field]
-      }
-
-      return nextErrors
-    })
-  }
-
   function resetDuplicateCheckResult() {
     setDuplicateMessage(null)
     setDuplicateCandidates([])
@@ -89,21 +75,17 @@ export function ClientCreateForm() {
         resetDuplicateCheckResult()
       }
 
-      if (touched[field]) {
-        updateFieldError(field, nextForm)
-      }
+      const nextValidationState = getClientFormChangeValidationState({
+        currentFieldErrors: fieldErrors,
+        field,
+        formMessage,
+        mode: 'create',
+        nextForm,
+        touched,
+      })
 
-      if (formMessage === CLIENT_CREATE_VALIDATION_MESSAGE) {
-        const nextErrors = validateClientCreateForm(nextForm)
-
-        setFieldErrors(nextErrors)
-        setFormMessage(hasClientCreateErrors(nextErrors) ? CLIENT_CREATE_VALIDATION_MESSAGE : null)
-        return
-      }
-
-      if (formMessage) {
-        setFormMessage(null)
-      }
+      setFieldErrors(nextValidationState.fieldErrors)
+      setFormMessage(nextValidationState.formMessage)
     }
   }
 
@@ -114,28 +96,31 @@ export function ClientCreateForm() {
       setForm(nextForm)
       resetDuplicateCheckResult()
 
-      if (touched[field]) {
-        updateFieldError(field, nextForm)
-      }
+      const nextValidationState = getClientFormChangeValidationState({
+        currentFieldErrors: fieldErrors,
+        field,
+        formMessage,
+        mode: 'create',
+        nextForm,
+        touched,
+      })
 
-      if (formMessage === CLIENT_CREATE_VALIDATION_MESSAGE) {
-        const nextErrors = validateClientCreateForm(nextForm)
-
-        setFieldErrors(nextErrors)
-        setFormMessage(hasClientCreateErrors(nextErrors) ? CLIENT_CREATE_VALIDATION_MESSAGE : null)
-        return
-      }
-
-      if (formMessage) {
-        setFormMessage(null)
-      }
+      setFieldErrors(nextValidationState.fieldErrors)
+      setFormMessage(nextValidationState.formMessage)
     }
   }
 
   function handleBlur(field: ClientCreateFieldName) {
     return () => {
-      setTouched((current) => ({ ...current, [field]: true }))
-      updateFieldError(field, form)
+      const nextValidationState = getClientFormBlurValidationState({
+        currentFieldErrors: fieldErrors,
+        currentTouched: touched,
+        field,
+        form,
+      })
+
+      setTouched(nextValidationState.touched)
+      setFieldErrors(nextValidationState.fieldErrors)
     }
   }
 
@@ -173,16 +158,12 @@ export function ClientCreateForm() {
       return
     }
 
-    const nextTouched = CLIENT_CREATE_FIELDS.reduce<ClientCreateTouched>((current, field) => {
-      current[field] = true
-      return current
-    }, {})
-    const nextErrors = validateClientCreateForm(form)
+    const nextValidationState = getClientFormSubmitValidationState(form)
 
-    setTouched(nextTouched)
-    setFieldErrors(nextErrors)
+    setTouched(nextValidationState.touched)
+    setFieldErrors(nextValidationState.fieldErrors)
 
-    if (hasClientCreateErrors(nextErrors)) {
+    if (nextValidationState.hasErrors) {
       setFormMessage(CLIENT_CREATE_VALIDATION_MESSAGE)
       return
     }
