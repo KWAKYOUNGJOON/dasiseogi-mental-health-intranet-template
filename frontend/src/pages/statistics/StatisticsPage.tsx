@@ -14,6 +14,7 @@ import {
 import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
 import type { ApiResponse } from '../../shared/types/api'
+import { hasAdminAccess } from '../../shared/user/userMetadata'
 import { getDefaultStatisticsSeoulDateRange, toValidDateText } from '../../shared/utils/dateText'
 import {
   DEFAULT_STATISTICS_ALERT_PAGE_SIZE,
@@ -89,12 +90,13 @@ export function StatisticsPage() {
   const exportDateFrom = toValidDateText(dateFrom) || undefined
   const exportDateTo = toValidDateText(dateTo) || undefined
   const selectedAlertScaleLabel = alertScaleCode ? formatStatisticsScaleLabel(alertScaleCode) : '전체 척도'
+  const canExportStatistics = hasAdminAccess(user)
 
   return (
     <div className="stack">
       <PageHeader
         actions={
-          user?.role === 'ADMIN' ? (
+          canExportStatistics ? (
             <div className="actions">
               <button
                 className="secondary-button"

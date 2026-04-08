@@ -6,6 +6,7 @@ import { useAuth } from '../../app/providers/AuthProvider'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { PageHeader } from '../../shared/components/PageHeader'
 import type { ApiResponse } from '../../shared/types/api'
+import { hasAdminAccess } from '../../shared/user/userMetadata'
 
 function getErrorMessage(error: unknown, fallbackMessage: string) {
   if (!isAxiosError<ApiResponse<unknown>>(error)) {
@@ -65,8 +66,9 @@ export function ClientDetailPage() {
     return <div>대상자 정보를 불러오는 중...</div>
   }
 
-  const canMarkMisregistered = user?.role === 'ADMIN' || user?.id === client.createdById
-  const canEditClient = user?.role === 'ADMIN' || user?.id === client.createdById
+  const hasAdminPrivileges = hasAdminAccess(user)
+  const canMarkMisregistered = hasAdminPrivileges || user?.id === client.createdById
+  const canEditClient = hasAdminPrivileges || user?.id === client.createdById
 
   return (
     <div className="stack">

@@ -9,6 +9,7 @@ import {
 } from '../../features/assessment/api/assessmentApi'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { PageHeader } from '../../shared/components/PageHeader'
+import { hasAdminAccess } from '../../shared/user/userMetadata'
 import { formatAssessmentLocalDateTimeText } from '../../shared/utils/dateText'
 import type { ApiResponse } from '../../shared/types/api'
 
@@ -374,7 +375,7 @@ export function AssessmentSessionDetailPage() {
     window.open(`/assessments/sessions/${session.id}/print`, '_blank', 'noopener,noreferrer')
   }
 
-  const canMarkMisentered = user?.role === 'ADMIN' || user?.id === session?.performedById
+  const canMarkMisentered = hasAdminAccess(user) || user?.id === session?.performedById
   const highlightedScaleCode =
     requestedHighlightScaleCode && session?.scales.some((scale) => scale.scaleCode === requestedHighlightScaleCode)
       ? requestedHighlightScaleCode

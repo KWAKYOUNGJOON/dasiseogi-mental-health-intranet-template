@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -19,6 +20,8 @@ import {
 import { fetchClientDetail, updateClient, type ClientDetail } from '../../features/clients/api/clientApi'
 import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
+import type { ApiResponse } from '../../shared/types/api'
+import { hasAdminAccess } from '../../shared/user/userMetadata'
 
 const DEFAULT_CLIENT_EDIT_ERROR_MESSAGE = '대상자 수정에 실패했습니다.'
 
@@ -46,6 +49,14 @@ function resolveClientEditRepresentativeMessage(response: ReturnType<typeof getC
   return response?.message?.trim() || DEFAULT_CLIENT_EDIT_ERROR_MESSAGE
 }
 
+function getClientEditLoadErrorMessage(error: unknown) {
+  if (!isAxiosError<ApiResponse<unknown>>(error)) {
+    return '대상자 정보를 불러오지 못했습니다.'
+  }
+
+  return error.response?.data?.message ?? '대상자 정보를 불러오지 못했습니다.'
+}
+
 export function ClientEditPage() {
   const { clientId } = useParams()
   const navigate = useNavigate()
@@ -65,13 +76,14 @@ export function ClientEditPage() {
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [formMessage, setFormMessage] = useState<string | null>(null)
+  const hasAdminPrivileges = hasAdminAccess(user)
 
   useEffect(() => {
     if (!clientId) {
       return
     }
     void load(Number(clientId))
-  }, [clientId, user?.role])
+  }, [clientId, hasAdminPrivileges])
 
   async function load(id: number) {
     setLoading(true)
@@ -90,7 +102,7 @@ export function ClientEditPage() {
       setFieldErrors({})
       setFormMessage(null)
 
-      if (user?.role === 'ADMIN') {
+      if (hasAdminPrivileges) {
         const workers = await fetchAdminUsers({ status: 'ACTIVE', size: 100 })
         const nextOptions = workers.items.map((item) => ({ userId: item.userId, name: item.name }))
         if (!nextOptions.some((item) => item.userId === clientData.primaryWorkerId)) {
@@ -100,8 +112,8 @@ export function ClientEditPage() {
       } else {
         setWorkerOptions([{ userId: clientData.primaryWorkerId, name: clientData.primaryWorkerName }])
       }
-    } catch (requestError: any) {
-      setLoadError(requestError?.response?.data?.message ?? '대상자 정보를 불러오지 못했습니다.')
+    } catch (requestError: unknown) {
+      setLoadError(getClientEditLoadErrorMessage(requestError))
     } finally {
       setLoading(false)
     }
@@ -235,7 +247,7 @@ export function ClientEditPage() {
     return <div className="error-text">대상자 정보를 찾을 수 없습니다.</div>
   }
 
-  const canEdit = user?.role === 'ADMIN' || user?.id === client.createdById
+  const canEdit = hasAdminPrivileges || user?.id === client.createdById
 
   if (!canEdit) {
     return <div className="error-text">해당 대상자를 수정할 권한이 없습니다.</div>
@@ -336,7 +348,7 @@ export function ClientEditPage() {
 
           <label className="field" htmlFor={getFieldInputId('primaryWorkerId')} style={{ gridColumn: '1 / -1' }}>
             <span>담당자</span>
-            {user?.role === 'ADMIN' ? (
+            {hasAdminPrivileges ? (
               <select
                 aria-describedby={getFieldDescribedBy('primaryWorkerId', Boolean(fieldErrors.primaryWorkerId))}
                 aria-invalid={fieldErrors.primaryWorkerId ? 'true' : undefined}
