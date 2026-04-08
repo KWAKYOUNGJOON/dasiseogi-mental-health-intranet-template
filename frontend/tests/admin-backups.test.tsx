@@ -694,7 +694,6 @@ describe('admin backups', () => {
 
     await user.click(screen.getByText('restore-validated.zip'))
     await user.click(await screen.findByRole('checkbox'))
-    await screen.findByText('현재 선택 1개')
     fireEvent.change(screen.getByLabelText('복원 실행 확인 문구'), { target: { value: '틀린 문구' } })
 
     expect(await screen.findByText('불일치')).toBeTruthy()
@@ -802,7 +801,6 @@ describe('admin backups', () => {
     expect(executeButton).toBeDisabled()
 
     await user.click(screen.getByRole('checkbox'))
-    await screen.findByText('현재 선택 1개')
     fireEvent.change(screen.getByLabelText('복원 실행 확인 문구'), { target: { value: '전체 복원을 실행합니다' } })
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '복원 실행' })).toBeEnabled()

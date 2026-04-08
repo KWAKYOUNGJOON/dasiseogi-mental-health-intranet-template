@@ -7,6 +7,12 @@ public record ScaleQuestion(
         String questionKey,
         String text,
         boolean reverseScored,
-        List<ScaleOption> options
+        List<ScaleOption> options,
+        ConditionalRequired conditionalRequired
 ) {
+    public record ConditionalRequired(
+            List<Integer> sourceQuestionNos,
+            Integer minScoreSum
+    ) {
+    }
 }

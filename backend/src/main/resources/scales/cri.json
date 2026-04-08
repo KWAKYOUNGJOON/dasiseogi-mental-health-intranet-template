@@ -239,6 +239,15 @@
       ]
     }
   ],
+  "metadata": {
+    "resultLevelLabels": {
+      "A": "극도의 위기",
+      "B": "위기",
+      "C": "고위험",
+      "D": "주의",
+      "E": "위기상황 아님"
+    }
+  },
   "interpretationRules": [],
   "alertRules": [
     {

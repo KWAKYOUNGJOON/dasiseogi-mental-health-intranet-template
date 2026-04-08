@@ -72,8 +72,6 @@ public class AssessmentService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final String KMDQ_SCALE_CODE = "KMDQ";
     private static final String CRI_SCALE_CODE = "CRI";
-    private static final int KMDQ_SYMPTOM_QUESTION_END_NO = 13;
-    private static final int KMDQ_SAME_PERIOD_QUESTION_NO = 14;
     private static final int CRI_SELF_OTHER_END_NO = 8;
     private static final int CRI_MENTAL_END_NO = 14;
     private static final int CRI_FUNCTION_END_NO = 21;
@@ -461,10 +459,10 @@ public class AssessmentService {
 
     private ScaleEvaluation evaluateKmdqScale(ScaleDefinition definition, Map<Integer, AnswerRequest> answerMap) {
         List<EvaluatedAnswer> evaluatedAnswers = new ArrayList<>();
-        int symptomYesCount = 0;
+        Map<Integer, Integer> scoreByQuestionNo = new LinkedHashMap<>();
 
         for (ScaleQuestion question : definition.items()) {
-            if (question.questionNo() > KMDQ_SYMPTOM_QUESTION_END_NO) {
+            if (!isKmdqBaseRequiredQuestion(question)) {
                 continue;
             }
             AnswerRequest answerRequest = answerMap.get(question.questionNo());
@@ -474,16 +472,16 @@ public class AssessmentService {
 
             EvaluatedAnswer evaluatedAnswer = evaluateAnswer(question, answerRequest);
             evaluatedAnswers.add(evaluatedAnswer);
-            symptomYesCount += evaluatedAnswer.appliedScore();
+            scoreByQuestionNo.put(question.questionNo(), evaluatedAnswer.appliedScore());
         }
 
         for (ScaleQuestion question : definition.items()) {
-            if (question.questionNo() <= KMDQ_SYMPTOM_QUESTION_END_NO) {
+            if (isKmdqBaseRequiredQuestion(question)) {
                 continue;
             }
 
             AnswerRequest answerRequest = answerMap.get(question.questionNo());
-            boolean required = question.questionNo() == KMDQ_SAME_PERIOD_QUESTION_NO && symptomYesCount >= 2;
+            boolean required = isConditionallyRequired(question, scoreByQuestionNo);
             if (answerRequest == null) {
                 if (required) {
                     throw answerIncomplete();
@@ -491,10 +489,44 @@ public class AssessmentService {
                 continue;
             }
 
-            evaluatedAnswers.add(evaluateAnswer(question, answerRequest));
+            EvaluatedAnswer evaluatedAnswer = evaluateAnswer(question, answerRequest);
+            evaluatedAnswers.add(evaluatedAnswer);
+            scoreByQuestionNo.put(question.questionNo(), evaluatedAnswer.appliedScore());
         }
 
-        return buildScaleEvaluation(definition, symptomYesCount, evaluatedAnswers);
+        int totalScore = evaluatedAnswers.stream()
+                .mapToInt(EvaluatedAnswer::appliedScore)
+                .sum();
+        return buildScaleEvaluation(definition, totalScore, evaluatedAnswers);
+    }
+
+    // In the current K-MDQ JSON, symptom items are the only score-bearing base-required questions.
+    private boolean isKmdqBaseRequiredQuestion(ScaleQuestion question) {
+        return question.options().stream()
+                .anyMatch(option -> option.score() != 0);
+    }
+
+    private boolean isConditionallyRequired(ScaleQuestion question, Map<Integer, Integer> scoreByQuestionNo) {
+        ScaleQuestion.ConditionalRequired conditionalRequired = question.conditionalRequired();
+        if (conditionalRequired == null) {
+            return false;
+        }
+        if (conditionalRequired.sourceQuestionNos() == null
+                || conditionalRequired.sourceQuestionNos().isEmpty()
+                || conditionalRequired.sourceQuestionNos().stream().anyMatch(Objects::isNull)
+                || conditionalRequired.minScoreSum() == null) {
+            throw invalidConditionalRequired();
+        }
+
+        int scoreSum = 0;
+        for (Integer sourceQuestionNo : conditionalRequired.sourceQuestionNos()) {
+            Integer score = scoreByQuestionNo.get(sourceQuestionNo);
+            if (score == null) {
+                throw invalidConditionalRequired();
+            }
+            scoreSum += score;
+        }
+        return scoreSum >= conditionalRequired.minScoreSum();
     }
 
     private ScaleEvaluation evaluateCriScale(ScaleDefinition definition, Map<Integer, AnswerRequest> answerMap) {
@@ -541,7 +573,7 @@ public class AssessmentService {
                 selfOtherTotal,
                 mentalTotal
         );
-        String resultLevel = formatCriResultLevel(resultLevelCode);
+        String resultLevel = formatCriResultLevel(definition, resultLevelCode);
 
         return buildScaleEvaluation(
                 definition,
@@ -640,6 +672,14 @@ public class AssessmentService {
 
     private AppException answerIncomplete() {
         return new AppException(HttpStatus.BAD_REQUEST, "ANSWER_INCOMPLETE", "모든 문항에 응답해야 저장할 수 있습니다.");
+    }
+
+    private AppException invalidConditionalRequired() {
+        return new AppException(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "SCALE_CONDITIONAL_REQUIRED_INVALID",
+                "척도 조건부 필수 규칙 구성이 올바르지 않습니다."
+        );
     }
 
     private List<String> resolveTargetQuestionKeys(ScaleAlertRule rule) {
@@ -752,19 +792,57 @@ public class AssessmentService {
         return "E";
     }
 
-    private String formatCriResultLevel(String resultLevelCode) {
-        return switch (resultLevelCode) {
-            case "A" -> "A - 극도의 위기";
-            case "B" -> "B - 위기";
-            case "C" -> "C - 고위험";
-            case "D" -> "D - 주의";
-            case "E" -> "E - 위기상황 아님";
-            default -> throw new AppException(
+    private String formatCriResultLevel(ScaleDefinition definition, String resultLevelCode) {
+        String normalizedResultLevelCode = blankToNull(resultLevelCode);
+        if (normalizedResultLevelCode == null) {
+            throw new AppException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "CRI_RESULT_LEVEL_INVALID",
                     "CRI 결과 레벨 계산에 실패했습니다."
             );
-        };
+        }
+
+        String normalizedCodeKey = normalizedResultLevelCode.toUpperCase(Locale.ROOT);
+        String label = resolveCriResultLevelLabels(definition).get(normalizedCodeKey);
+        if (label == null) {
+            throw new AppException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "CRI_RESULT_LEVEL_LABEL_MISSING",
+                    "CRI 결과 레벨 표시 문구를 찾을 수 없습니다."
+            );
+        }
+        return normalizedCodeKey + " - " + label;
+    }
+
+    private Map<String, String> resolveCriResultLevelLabels(ScaleDefinition definition) {
+        if (definition.metadata() == null
+                || definition.metadata().resultLevelLabels() == null
+                || definition.metadata().resultLevelLabels().isEmpty()) {
+            throw new AppException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "CRI_RESULT_LEVEL_METADATA_MISSING",
+                    "CRI 결과 레벨 표시 문구 metadata 구성이 올바르지 않습니다."
+            );
+        }
+
+        Map<String, String> resultLevelLabels = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : definition.metadata().resultLevelLabels().entrySet()) {
+            String code = blankToNull(entry.getKey());
+            String label = blankToNull(entry.getValue());
+            if (code == null || label == null) {
+                continue;
+            }
+            resultLevelLabels.put(code.toUpperCase(Locale.ROOT), label);
+        }
+
+        if (resultLevelLabels.isEmpty()) {
+            throw new AppException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "CRI_RESULT_LEVEL_METADATA_MISSING",
+                    "CRI 결과 레벨 표시 문구 metadata 구성이 올바르지 않습니다."
+            );
+        }
+        return resultLevelLabels;
     }
 
     private List<SessionScaleResultDetailResponse> readResultDetails(SessionScale scale) {

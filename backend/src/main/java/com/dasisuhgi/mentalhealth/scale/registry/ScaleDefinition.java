@@ -1,6 +1,7 @@
 package com.dasisuhgi.mentalhealth.scale.registry;
 
 import java.util.List;
+import java.util.Map;
 
 public record ScaleDefinition(
         String scaleCode,
@@ -13,6 +14,11 @@ public record ScaleDefinition(
         String screeningLabel,
         List<ScaleQuestion> items,
         List<InterpretationRule> interpretationRules,
-        List<ScaleAlertRule> alertRules
+        List<ScaleAlertRule> alertRules,
+        Metadata metadata
 ) {
+    public record Metadata(
+            Map<String, String> resultLevelLabels
+    ) {
+    }
 }
