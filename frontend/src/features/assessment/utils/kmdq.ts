@@ -2,7 +2,6 @@ import type { ScaleDetail } from '../api/assessmentApi'
 
 const KMDQ_SCALE_CODE = 'KMDQ'
 const KMDQ_SYMPTOM_QUESTION_END_NO = 13
-const KMDQ_SAME_PERIOD_QUESTION_NO = 14
 const KMDQ_IMPAIRMENT_QUESTION_NO = 15
 const IESR_NORMAL_MAX_SCORE = 24
 const IESR_MILD_IMPACT_MAX_SCORE = 39
@@ -16,17 +15,41 @@ function hasAnsweredValue(value: string | undefined) {
   return typeof value === 'string' && value.length > 0
 }
 
+function calculateQuestionAnswerScore(question: ScaleDetail['questions'][number], answers: Record<number, string>) {
+  const selectedValue = answers[question.questionNo]
+  const selectedOption = question.options.find((option) => option.value === selectedValue)
+
+  return selectedOption?.score ?? 0
+}
+
 function calculateKmdqSymptomYesCount(scale: ScaleDetail, answers: Record<number, string>) {
   return scale.questions.reduce((count, question) => {
     if (question.questionNo > KMDQ_SYMPTOM_QUESTION_END_NO) {
       return count
     }
 
-    const selectedValue = answers[question.questionNo]
-    const selectedOption = question.options.find((option) => option.value === selectedValue)
-
-    return count + (selectedOption?.score ?? 0)
+    return count + calculateQuestionAnswerScore(question, answers)
   }, 0)
+}
+
+function isConditionalQuestionActive(scale: ScaleDetail, question: ScaleDetail['questions'][number], answers: Record<number, string>) {
+  const conditionalRequired = question.conditionalRequired
+
+  if (!conditionalRequired) {
+    return true
+  }
+
+  const scoreSum = conditionalRequired.sourceQuestionNos.reduce((total, sourceQuestionNo) => {
+    const sourceQuestion = scale.questions.find((candidate) => candidate.questionNo === sourceQuestionNo)
+
+    if (!sourceQuestion) {
+      return total
+    }
+
+    return total + calculateQuestionAnswerScore(sourceQuestion, answers)
+  }, 0)
+
+  return scoreSum >= conditionalRequired.minScoreSum
 }
 
 export function getRenderableQuestions(scale: ScaleDetail, answers: Record<number, string>) {
@@ -41,8 +64,8 @@ export function getRenderableQuestions(scale: ScaleDetail, answers: Record<numbe
       return true
     }
 
-    if (question.questionNo === KMDQ_SAME_PERIOD_QUESTION_NO) {
-      return symptomYesCount >= 2
+    if (question.conditionalRequired) {
+      return isConditionalQuestionActive(scale, question, answers)
     }
 
     if (question.questionNo === KMDQ_IMPAIRMENT_QUESTION_NO) {
@@ -58,15 +81,13 @@ export function getRequiredQuestions(scale: ScaleDetail, answers: Record<number,
     return scale.questions
   }
 
-  const symptomYesCount = calculateKmdqSymptomYesCount(scale, answers)
-
   return scale.questions.filter((question) => {
     if (question.questionNo <= KMDQ_SYMPTOM_QUESTION_END_NO) {
       return true
     }
 
-    if (question.questionNo === KMDQ_SAME_PERIOD_QUESTION_NO) {
-      return symptomYesCount >= 2
+    if (question.conditionalRequired) {
+      return isConditionalQuestionActive(scale, question, answers)
     }
 
     return false

@@ -186,6 +186,26 @@ class ScaleResourceLoaderTest {
                 );
     }
 
+    @Test
+    void getScaleDetailExposesKmdqQuestionLevelConditionalRequiredMetadata() {
+        ScaleProperties scaleProperties = new ScaleProperties();
+        scaleProperties.setResourcePath(null);
+        ScaleResourceLoader loader = new ScaleResourceLoader(objectMapper, resourceLoader, scaleProperties);
+        ScaleService scaleService = new ScaleService(loader);
+
+        scaleService.load();
+
+        var question14 = scaleService.getScaleDetail("KMDQ").questions().stream()
+                .filter(question -> question.questionNo() == 14)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(question14.conditionalRequired()).isNotNull();
+        assertThat(question14.conditionalRequired().sourceQuestionNos())
+                .containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
+        assertThat(question14.conditionalRequired().minScoreSum()).isEqualTo(2);
+    }
+
     private String readClasspathResource(String location) throws IOException {
         return new String(
                 resourceLoader.getResource(Objects.requireNonNull(location, "location")).getInputStream().readAllBytes(),

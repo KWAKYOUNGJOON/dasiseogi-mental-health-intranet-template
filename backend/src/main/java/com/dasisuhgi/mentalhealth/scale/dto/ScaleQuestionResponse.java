@@ -7,6 +7,12 @@ public record ScaleQuestionResponse(
         String questionKey,
         String questionText,
         boolean reverseScored,
-        List<ScaleOptionResponse> options
+        List<ScaleOptionResponse> options,
+        ConditionalRequiredResponse conditionalRequired
 ) {
+    public record ConditionalRequiredResponse(
+            List<Integer> sourceQuestionNos,
+            Integer minScoreSum
+    ) {
+    }
 }

@@ -24,6 +24,10 @@ export interface ScaleDetail {
     questionText: string
     reverseScored: boolean
     options: Array<{ value: string; label: string; score: number }>
+    conditionalRequired?: {
+      sourceQuestionNos: number[]
+      minScoreSum: number
+    }
   }>
 }
 

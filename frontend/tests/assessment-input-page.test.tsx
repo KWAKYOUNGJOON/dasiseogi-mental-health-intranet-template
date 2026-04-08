@@ -74,6 +74,10 @@ function createKmdqScaleDetail(): ScaleDetail {
         questionKey: 'kmdq_same_period',
         questionText: '같은 시기에 벌어진 적이 있었습니까?',
         reverseScored: false,
+        conditionalRequired: {
+          sourceQuestionNos: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+          minScoreSum: 2,
+        },
         options: [
           { value: 'N', label: '아니오', score: 0 },
           { value: 'Y', label: '예', score: 0 },

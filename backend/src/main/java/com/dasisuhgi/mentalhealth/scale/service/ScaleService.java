@@ -77,7 +77,13 @@ public class ScaleService {
                                 item.reverseScored(),
                                 item.options().stream()
                                         .map(option -> new ScaleOptionResponse(option.value(), option.label(), option.score()))
-                                        .toList()
+                                        .toList(),
+                                item.conditionalRequired() == null
+                                        ? null
+                                        : new ScaleQuestionResponse.ConditionalRequiredResponse(
+                                                item.conditionalRequired().sourceQuestionNos(),
+                                                item.conditionalRequired().minScoreSum()
+                                        )
                         ))
                         .toList()
         );
