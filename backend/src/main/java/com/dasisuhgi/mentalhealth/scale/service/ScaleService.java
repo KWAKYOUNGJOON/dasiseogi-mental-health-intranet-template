@@ -85,6 +85,19 @@ public class ScaleService {
                                                 item.conditionalRequired().minScoreSum()
                                         )
                         ))
+                        .toList(),
+                definition.interpretationRules().stream()
+                        .map(rule -> new ScaleDefinitionResponse.InterpretationRuleResponse(
+                                rule.min(),
+                                rule.max(),
+                                rule.label()
+                        ))
+                        .toList(),
+                definition.alertRules().stream()
+                        .map(rule -> new ScaleDefinitionResponse.AlertRuleResponse(
+                                rule.minTotalScore(),
+                                rule.message()
+                        ))
                         .toList()
         );
     }

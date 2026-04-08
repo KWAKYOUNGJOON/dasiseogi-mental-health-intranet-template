@@ -206,6 +206,49 @@ class ScaleResourceLoaderTest {
         assertThat(question14.conditionalRequired().minScoreSum()).isEqualTo(2);
     }
 
+    @Test
+    void getScaleDetailExposesIesrInterpretationRulesForPreview() {
+        ScaleProperties scaleProperties = new ScaleProperties();
+        scaleProperties.setResourcePath(null);
+        ScaleResourceLoader loader = new ScaleResourceLoader(objectMapper, resourceLoader, scaleProperties);
+        ScaleService scaleService = new ScaleService(loader);
+
+        scaleService.load();
+
+        assertThat(scaleService.getScaleDetail("IESR").interpretationRules())
+                .extracting(
+                        rule -> rule.min(),
+                        rule -> rule.max(),
+                        rule -> rule.label()
+                )
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(0, 24, "정상"),
+                        org.assertj.core.groups.Tuple.tuple(25, 39, "약간 충격"),
+                        org.assertj.core.groups.Tuple.tuple(40, 59, "심한 충격"),
+                        org.assertj.core.groups.Tuple.tuple(60, 88, "매우 심한 충격")
+                );
+    }
+
+    @Test
+    void getScaleDetailExposesIesrAlertRulesForPreview() {
+        ScaleProperties scaleProperties = new ScaleProperties();
+        scaleProperties.setResourcePath(null);
+        ScaleResourceLoader loader = new ScaleResourceLoader(objectMapper, resourceLoader, scaleProperties);
+        ScaleService scaleService = new ScaleService(loader);
+
+        scaleService.load();
+
+        assertThat(scaleService.getScaleDetail("IESR").alertRules())
+                .extracting(
+                        rule -> rule.minTotalScore(),
+                        rule -> rule.message()
+                )
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(18, "주의 필요"),
+                        org.assertj.core.groups.Tuple.tuple(25, "상담 권고 또는 고위험 경고")
+                );
+    }
+
     private String readClasspathResource(String location) throws IOException {
         return new String(
                 resourceLoader.getResource(Objects.requireNonNull(location, "location")).getInputStream().readAllBytes(),

@@ -1,7 +1,11 @@
 import { isAxiosError } from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
-import { createAssessmentSession, fetchScaleDetail, type ScaleDetail } from '../../features/assessment/api/assessmentApi'
+import {
+  createAssessmentSession,
+  fetchScaleDetail,
+  type ScaleDetail,
+} from '../../features/assessment/api/assessmentApi'
 import { useAssessmentDraftStore } from '../../features/assessment/store/assessmentDraftStore'
 import {
   calculateScalePreviewTotalScore,
@@ -27,9 +31,18 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
 
 export function AssessmentSummaryPage() {
   const { clientId } = useParams()
-  const { clientId: draftClientId, selectedScaleCodes, answersByScale, memo, startedAt, setMemo, reset } =
-    useAssessmentDraftStore()
-  const [definitions, setDefinitions] = useState<Record<string, ScaleDetail>>({})
+  const {
+    clientId: draftClientId,
+    selectedScaleCodes,
+    answersByScale,
+    memo,
+    startedAt,
+    setMemo,
+    reset,
+  } = useAssessmentDraftStore()
+  const [definitions, setDefinitions] = useState<Record<string, ScaleDetail>>(
+    {},
+  )
   const [loadingDefinitions, setLoadingDefinitions] = useState(false)
   const [definitionError, setDefinitionError] = useState<string | null>(null)
   const [definitionRequestKey, setDefinitionRequestKey] = useState(0)
@@ -37,12 +50,19 @@ export function AssessmentSummaryPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [savedSessionId, setSavedSessionId] = useState<number | null>(null)
   const parsedClientId = Number(clientId)
-  const hasValidClientId = Number.isInteger(parsedClientId) && parsedClientId > 0
-  const hasValidDraft = hasValidClientId && draftClientId === parsedClientId && selectedScaleCodes.length > 0 && Boolean(startedAt)
+  const hasValidClientId =
+    Number.isInteger(parsedClientId) && parsedClientId > 0
+  const hasValidDraft =
+    hasValidClientId &&
+    draftClientId === parsedClientId &&
+    selectedScaleCodes.length > 0 &&
+    Boolean(startedAt)
   const memoLength = memo.length
   const memoLimitExceeded = memoLength > SESSION_MEMO_MAX_LENGTH
   const memoLengthLabel = `${memoLength}/${SESSION_MEMO_MAX_LENGTH}`
-  const memoError = memoLimitExceeded ? `세션 메모는 ${SESSION_MEMO_MAX_LENGTH}자 이내로 입력해주세요.` : null
+  const memoError = memoLimitExceeded
+    ? `세션 메모는 ${SESSION_MEMO_MAX_LENGTH}자 이내로 입력해주세요.`
+    : null
 
   useEffect(() => {
     if (!hasValidDraft) {
@@ -59,7 +79,11 @@ export function AssessmentSummaryPage() {
       setDefinitionError(null)
 
       try {
-        const entries = await Promise.all(selectedScaleCodes.map(async (code) => [code, await fetchScaleDetail(code)] as const))
+        const entries = await Promise.all(
+          selectedScaleCodes.map(
+            async (code) => [code, await fetchScaleDetail(code)] as const,
+          ),
+        )
 
         if (cancelled) {
           return
@@ -72,7 +96,9 @@ export function AssessmentSummaryPage() {
         }
 
         setDefinitions({})
-        setDefinitionError(getErrorMessage(requestError, '척도 정의를 불러오지 못했습니다.'))
+        setDefinitionError(
+          getErrorMessage(requestError, '척도 정의를 불러오지 못했습니다.'),
+        )
       } finally {
         if (!cancelled) {
           setLoadingDefinitions(false)
@@ -92,12 +118,23 @@ export function AssessmentSummaryPage() {
       selectedScaleCodes.map((code) => {
         const definition = definitions[code]
         const answers = answersByScale[code] ?? {}
-        const requiredQuestions = definition ? getRequiredQuestions(definition, answers) : []
+        const requiredQuestions = definition
+          ? getRequiredQuestions(definition, answers)
+          : []
         const answeredCount = countAnsweredQuestions(requiredQuestions, answers)
         const questionCount = requiredQuestions.length
-        const totalScorePreview = calculateScalePreviewTotalScore(definition, answers)
-        const canPreviewIesrResult = code === IESR_SCALE_CODE && Boolean(definition)
-        const iesrAlertMessages = canPreviewIesrResult ? getIesrPreviewAlertMessages(totalScorePreview) : []
+        const totalScorePreview = calculateScalePreviewTotalScore(
+          definition,
+          answers,
+        )
+        const canPreviewIesrResult =
+          code === IESR_SCALE_CODE && Boolean(definition)
+        const iesrResultLevel = canPreviewIesrResult
+          ? getIesrPreviewResultLevel(totalScorePreview, definition)
+          : null
+        const iesrAlertMessages = canPreviewIesrResult
+          ? getIesrPreviewAlertMessages(totalScorePreview, definition)
+          : null
 
         return {
           scaleCode: code,
@@ -105,20 +142,35 @@ export function AssessmentSummaryPage() {
           answeredCount,
           questionCount,
           totalScorePreview,
-          resultLevelPreview: canPreviewIesrResult ? getIesrPreviewResultLevel(totalScorePreview) : null,
-          alertPreview: canPreviewIesrResult ? (iesrAlertMessages.length > 0 ? iesrAlertMessages.join(' / ') : '-') : null,
+          resultLevelPreview: canPreviewIesrResult ? iesrResultLevel : null,
+          alertPreview: canPreviewIesrResult
+            ? iesrAlertMessages
+              ? iesrAlertMessages.length > 0
+                ? iesrAlertMessages.join(' / ')
+                : '-'
+              : null
+            : null,
         }
       }),
     [answersByScale, definitions, selectedScaleCodes],
   )
-  const definitionsReady = hasValidDraft && selectedScaleCodes.every((code) => Boolean(definitions[code]))
+  const definitionsReady =
+    hasValidDraft &&
+    selectedScaleCodes.every((code) => Boolean(definitions[code]))
 
   if (savedSessionId !== null) {
-    return <Navigate replace to={`/assessments/sessions/${savedSessionId}?notice=saved`} />
+    return (
+      <Navigate
+        replace
+        to={`/assessments/sessions/${savedSessionId}?notice=saved`}
+      />
+    )
   }
 
   if (!clientId || !hasValidDraft) {
-    return <Navigate replace to={`/assessments/start/${clientId ?? ''}/scales`} />
+    return (
+      <Navigate replace to={`/assessments/start/${clientId ?? ''}/scales`} />
+    )
   }
 
   const startedAtValue = startedAt ?? ''
@@ -160,10 +212,12 @@ export function AssessmentSummaryPage() {
       }
 
       const answers = answersByScale[code] ?? {}
-      const hasMissingAnswer = getRequiredQuestions(definition, answers).some((question) => {
-        const answerValue = answers[question.questionNo]
-        return typeof answerValue !== 'string' || answerValue.length === 0
-      })
+      const hasMissingAnswer = getRequiredQuestions(definition, answers).some(
+        (question) => {
+          const answerValue = answers[question.questionNo]
+          return typeof answerValue !== 'string' || answerValue.length === 0
+        },
+      )
 
       return hasMissingAnswer ? [definition.scaleName] : []
     })
@@ -213,10 +267,12 @@ export function AssessmentSummaryPage() {
         memo,
         selectedScales: selectedScaleCodes.map((code) => ({
           scaleCode: code,
-          answers: Object.entries(answersByScale[code] ?? {}).map(([questionNo, answerValue]) => ({
-            questionNo: Number(questionNo),
-            answerValue,
-          })),
+          answers: Object.entries(answersByScale[code] ?? {}).map(
+            ([questionNo, answerValue]) => ({
+              questionNo: Number(questionNo),
+              answerValue,
+            }),
+          ),
         })),
       })
       reset()
@@ -230,11 +286,15 @@ export function AssessmentSummaryPage() {
 
   return (
     <div className="stack">
-      <PageHeader description="저장 전 최종 확인 단계입니다." title="세션 요약" />
+      <PageHeader
+        description="저장 전 최종 확인 단계입니다."
+        title="세션 요약"
+      />
       <div className="card stack">
         <strong>저장 전 안내</strong>
         <p className="muted" style={{ margin: 0 }}>
-          현재 표시는 저장 전 UX용 미리보기입니다. 최종 점수, 판정, 경고는 저장 시 서버가 다시 계산합니다.
+          현재 표시는 저장 전 UX용 미리보기입니다. 최종 점수, 판정, 경고는 저장
+          시 서버가 다시 계산합니다.
         </p>
       </div>
       {saveError ? (
@@ -250,7 +310,11 @@ export function AssessmentSummaryPage() {
             {definitionError}
           </div>
           <div className="actions">
-            <button className="secondary-button" onClick={handleRetryDefinitions} type="button">
+            <button
+              className="secondary-button"
+              onClick={handleRetryDefinitions}
+              type="button"
+            >
               다시 시도
             </button>
           </div>
@@ -275,7 +339,9 @@ export function AssessmentSummaryPage() {
                   {summary.answeredCount} / {summary.questionCount || '-'}
                 </td>
                 <td>{summary.totalScorePreview}</td>
-                <td>{summary.resultLevelPreview ?? '저장 후 서버 최종 계산'}</td>
+                <td>
+                  {summary.resultLevelPreview ?? '저장 후 서버 최종 계산'}
+                </td>
                 <td>{summary.alertPreview ?? '저장 후 서버 최종 계산'}</td>
               </tr>
             ))}

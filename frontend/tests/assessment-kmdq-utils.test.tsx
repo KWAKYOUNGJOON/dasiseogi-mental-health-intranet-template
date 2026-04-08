@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { type ScaleDetail } from '../src/features/assessment/api/assessmentApi'
-import { getRenderableQuestions, getRequiredQuestions } from '../src/features/assessment/utils/kmdq'
+import {
+  getIesrPreviewAlertMessages,
+  getIesrPreviewResultLevel,
+  getRenderableQuestions,
+  getRequiredQuestions,
+} from '../src/features/assessment/utils/kmdq'
 
 function createKmdqScaleDetail(): ScaleDetail {
   return {
@@ -50,6 +55,41 @@ function createKmdqScaleDetail(): ScaleDetail {
   }
 }
 
+function createIesrScaleDetail(): ScaleDetail {
+  const options = [
+    { value: '0', label: '전혀 아니다', score: 0 },
+    { value: '1', label: '약간 그렇다', score: 1 },
+    { value: '2', label: '그런 편이다', score: 2 },
+    { value: '3', label: '꽤 그렇다', score: 3 },
+    { value: '4', label: '매우 그렇다', score: 4 },
+  ]
+
+  return {
+    scaleCode: 'IESR',
+    scaleName: 'IES-R',
+    displayOrder: 8,
+    questionCount: 22,
+    screeningThreshold: 18,
+    interpretationRules: [
+      { min: 0, max: 24, label: '정상' },
+      { min: 25, max: 39, label: '약간 충격' },
+      { min: 40, max: 59, label: '심한 충격' },
+      { min: 60, max: 88, label: '매우 심한 충격' },
+    ],
+    alertRules: [
+      { minTotalScore: 18, message: '주의 필요' },
+      { minTotalScore: 25, message: '상담 권고 또는 고위험 경고' },
+    ],
+    questions: Array.from({ length: 22 }, (_, index) => ({
+      questionNo: index + 1,
+      questionKey: `iesr_q${index + 1}`,
+      questionText: `IES-R 문항 ${index + 1}`,
+      reverseScored: false,
+      options,
+    })),
+  }
+}
+
 describe('kmdq metadata-driven conditional question handling', () => {
   it('renders question 14 when the conditionalRequired score threshold is met', () => {
     const scale = createKmdqScaleDetail()
@@ -70,7 +110,9 @@ describe('kmdq metadata-driven conditional question handling', () => {
       13: 'N',
     })
 
-    expect(renderableQuestions.map((question) => question.questionNo)).toContain(14)
+    expect(
+      renderableQuestions.map((question) => question.questionNo),
+    ).toContain(14)
   })
 
   it('hides question 14 when the conditionalRequired score threshold is not met', () => {
@@ -92,7 +134,9 @@ describe('kmdq metadata-driven conditional question handling', () => {
       13: 'N',
     })
 
-    expect(renderableQuestions.map((question) => question.questionNo)).not.toContain(14)
+    expect(
+      renderableQuestions.map((question) => question.questionNo),
+    ).not.toContain(14)
   })
 
   it('marks question 14 as required only while the same metadata condition is active', () => {
@@ -129,8 +173,33 @@ describe('kmdq metadata-driven conditional question handling', () => {
       13: 'N',
     })
 
-    expect(requiredBeforeThreshold.map((question) => question.questionNo)).not.toContain(14)
-    expect(requiredAtThreshold.map((question) => question.questionNo)).toContain(14)
-    expect(requiredAtThreshold.map((question) => question.questionNo)).not.toContain(15)
+    expect(
+      requiredBeforeThreshold.map((question) => question.questionNo),
+    ).not.toContain(14)
+    expect(
+      requiredAtThreshold.map((question) => question.questionNo),
+    ).toContain(14)
+    expect(
+      requiredAtThreshold.map((question) => question.questionNo),
+    ).not.toContain(15)
+  })
+})
+
+describe('IES-R preview metadata handling', () => {
+  it('shows the metadata-based result level and caution message at total score 18', () => {
+    const scale = createIesrScaleDetail()
+
+    expect(getIesrPreviewResultLevel(18, scale)).toBe('정상')
+    expect(getIesrPreviewAlertMessages(18, scale)).toEqual(['주의 필요'])
+  })
+
+  it('adds the second alert message when the total score is 25 or higher', () => {
+    const scale = createIesrScaleDetail()
+
+    expect(getIesrPreviewResultLevel(25, scale)).toBe('약간 충격')
+    expect(getIesrPreviewAlertMessages(25, scale)).toEqual([
+      '주의 필요',
+      '상담 권고 또는 고위험 경고',
+    ])
   })
 })

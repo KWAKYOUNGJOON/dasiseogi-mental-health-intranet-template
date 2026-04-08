@@ -18,6 +18,15 @@ export interface ScaleDetail {
   displayOrder: number
   questionCount: number
   screeningThreshold: number | null
+  interpretationRules?: Array<{
+    min: number
+    max: number
+    label: string
+  }>
+  alertRules?: Array<{
+    minTotalScore: number | null
+    message: string
+  }>
   questions: Array<{
     questionNo: number
     questionKey: string
@@ -153,7 +162,9 @@ export async function fetchScales() {
 }
 
 export async function fetchScaleDetail(scaleCode: string) {
-  const response = await http.get<ApiResponse<ScaleDetail>>(`/scales/${scaleCode}`)
+  const response = await http.get<ApiResponse<ScaleDetail>>(
+    `/scales/${scaleCode}`,
+  )
   return response.data.data
 }
 
@@ -180,22 +191,34 @@ export async function createAssessmentSession(payload: {
   return response.data.data
 }
 
-export async function fetchSessionDetail(sessionId: number, options?: { highlightScaleCode?: string }) {
-  const response = await http.get<ApiResponse<SessionDetail>>(`/assessment-sessions/${sessionId}`, {
-    params: options?.highlightScaleCode ? { highlightScaleCode: options.highlightScaleCode } : undefined,
-  })
+export async function fetchSessionDetail(
+  sessionId: number,
+  options?: { highlightScaleCode?: string },
+) {
+  const response = await http.get<ApiResponse<SessionDetail>>(
+    `/assessment-sessions/${sessionId}`,
+    {
+      params: options?.highlightScaleCode
+        ? { highlightScaleCode: options.highlightScaleCode }
+        : undefined,
+    },
+  )
   const session = response.data.data
 
   return {
     ...session,
     sessionStartedAt: formatSeoulDateTimeText(session.sessionStartedAt),
     sessionCompletedAt: formatSeoulDateTimeText(session.sessionCompletedAt),
-    misenteredAt: session.misenteredAt ? formatSeoulDateTimeText(session.misenteredAt) : null,
+    misenteredAt: session.misenteredAt
+      ? formatSeoulDateTimeText(session.misenteredAt)
+      : null,
   }
 }
 
 export async function fetchSessionPrintData(sessionId: number) {
-  const response = await http.get<ApiResponse<SessionPrintData>>(`/assessment-sessions/${sessionId}/print-data`)
+  const response = await http.get<ApiResponse<SessionPrintData>>(
+    `/assessment-sessions/${sessionId}/print-data`,
+  )
   const data = response.data.data
 
   return {
@@ -225,7 +248,10 @@ export async function fetchAssessmentRecords(params: {
   page?: number
   size?: number
 }) {
-  const response = await http.get<ApiResponse<AssessmentRecordPage>>('/assessment-records', { params })
+  const response = await http.get<ApiResponse<AssessmentRecordPage>>(
+    '/assessment-records',
+    { params },
+  )
   const page = response.data.data
 
   return {

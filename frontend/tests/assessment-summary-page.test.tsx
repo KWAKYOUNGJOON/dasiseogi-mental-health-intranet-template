@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -119,6 +126,16 @@ function createIesrScaleDetail(): ScaleDetail {
     displayOrder: 8,
     questionCount: 22,
     screeningThreshold: 18,
+    interpretationRules: [
+      { min: 0, max: 24, label: '정상' },
+      { min: 25, max: 39, label: '약간 충격' },
+      { min: 40, max: 59, label: '심한 충격' },
+      { min: 60, max: 88, label: '매우 심한 충격' },
+    ],
+    alertRules: [
+      { minTotalScore: 18, message: '주의 필요' },
+      { minTotalScore: 25, message: '상담 권고 또는 고위험 경고' },
+    ],
     questions: Array.from({ length: 22 }, (_, index) => ({
       questionNo: index + 1,
       questionKey: `iesr_q${index + 1}`,
@@ -150,14 +167,25 @@ function LocationDisplay() {
   return <div data-testid="location-display">{location.pathname}</div>
 }
 
-function renderAssessmentSummaryPage(initialEntry = '/assessments/start/42/summary') {
+function renderAssessmentSummaryPage(
+  initialEntry = '/assessments/start/42/summary',
+) {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <LocationDisplay />
       <Routes>
-        <Route path="/assessments/start/:clientId/summary" element={<AssessmentSummaryPage />} />
-        <Route path="/assessments/start/:clientId/scales" element={<div>척도 선택 화면</div>} />
-        <Route path="/assessments/sessions/:sessionId" element={<div>세션 상세 화면</div>} />
+        <Route
+          path="/assessments/start/:clientId/summary"
+          element={<AssessmentSummaryPage />}
+        />
+        <Route
+          path="/assessments/start/:clientId/scales"
+          element={<div>척도 선택 화면</div>}
+        />
+        <Route
+          path="/assessments/sessions/:sessionId"
+          element={<div>세션 상세 화면</div>}
+        />
       </Routes>
     </MemoryRouter>,
   )
@@ -171,7 +199,9 @@ function initializeDraft(options?: {
 }) {
   const clientId = options?.clientId ?? 42
   const scaleCodes = options?.scaleCodes ?? ['PHQ9']
-  const answersByScale = options?.answersByScale ?? { PHQ9: { 1: '1', 2: '0' } }
+  const answersByScale = options?.answersByScale ?? {
+    PHQ9: { 1: '1', 2: '0' },
+  }
   const memo = options?.memo ?? ''
   const store = useAssessmentDraftStore.getState()
 
@@ -216,8 +246,14 @@ describe('assessment summary page', () => {
 
     renderAssessmentSummaryPage()
 
-    expect(await screen.findByRole('heading', { name: '세션 요약' })).toBeTruthy()
-    expect(screen.getByText('현재 표시는 저장 전 UX용 미리보기입니다. 최종 점수, 판정, 경고는 저장 시 서버가 다시 계산합니다.')).toBeTruthy()
+    expect(
+      await screen.findByRole('heading', { name: '세션 요약' }),
+    ).toBeTruthy()
+    expect(
+      screen.getByText(
+        '현재 표시는 저장 전 UX용 미리보기입니다. 최종 점수, 판정, 경고는 저장 시 서버가 다시 계산합니다.',
+      ),
+    ).toBeTruthy()
     expect(await screen.findByText('PHQ-9')).toBeTruthy()
     expect(screen.getByText('2 / 2')).toBeTruthy()
     expect(screen.getByText('1')).toBeTruthy()
@@ -230,7 +266,10 @@ describe('assessment summary page', () => {
       scaleCodes: ['IESR'],
       answersByScale: {
         IESR: Object.fromEntries(
-          Array.from({ length: 22 }, (_, index) => [index + 1, index < 9 ? '2' : '0']),
+          Array.from({ length: 22 }, (_, index) => [
+            index + 1,
+            index < 9 ? '2' : '0',
+          ]),
         ) as Record<number, string>,
       },
     })
@@ -241,8 +280,12 @@ describe('assessment summary page', () => {
 
     expect(iesrRow).toBeTruthy()
     expect(within(iesrRow as HTMLTableRowElement).getByText('18')).toBeTruthy()
-    expect(within(iesrRow as HTMLTableRowElement).getByText('정상')).toBeTruthy()
-    expect(within(iesrRow as HTMLTableRowElement).getByText('주의 필요')).toBeTruthy()
+    expect(
+      within(iesrRow as HTMLTableRowElement).getByText('정상'),
+    ).toBeTruthy()
+    expect(
+      within(iesrRow as HTMLTableRowElement).getByText('주의 필요'),
+    ).toBeTruthy()
   })
 
   it('shows an error and retry action when scale definitions fail to load', async () => {
@@ -251,19 +294,25 @@ describe('assessment summary page', () => {
 
     renderAssessmentSummaryPage()
 
-    expect((await screen.findByRole('alert')).textContent).toContain('척도 정의를 불러오지 못했습니다.')
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      '척도 정의를 불러오지 못했습니다.',
+    )
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy()
   })
 
   it('recovers after retrying scale definition loading', async () => {
     const user = userEvent.setup()
 
-    mockedFetchScaleDetail.mockRejectedValueOnce(new Error('load failed')).mockResolvedValueOnce(createScaleDetail())
+    mockedFetchScaleDetail
+      .mockRejectedValueOnce(new Error('load failed'))
+      .mockResolvedValueOnce(createScaleDetail())
     initializeDraft()
 
     renderAssessmentSummaryPage()
 
-    expect((await screen.findByRole('alert')).textContent).toContain('척도 정의를 불러오지 못했습니다.')
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      '척도 정의를 불러오지 못했습니다.',
+    )
 
     await user.click(screen.getByRole('button', { name: '다시 시도' }))
 
@@ -288,7 +337,9 @@ describe('assessment summary page', () => {
     await user.click(screen.getByRole('button', { name: '세션 저장' }))
 
     expect(mockedCreateAssessmentSession).not.toHaveBeenCalled()
-    expect((await screen.findByRole('alert')).textContent).toContain('PHQ-9 응답이 완료되지 않았습니다.')
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'PHQ-9 응답이 완료되지 않았습니다.',
+    )
   })
 
   it('blocks save when the memo length exceeds the limit', async () => {
@@ -304,12 +355,16 @@ describe('assessment summary page', () => {
     fireEvent.change(memoField, { target: { value: '가'.repeat(1001) } })
 
     expect(screen.getByText('1001/1000')).toBeTruthy()
-    expect(screen.getByText('세션 메모는 1000자 이내로 입력해주세요.')).toBeTruthy()
+    expect(
+      screen.getByText('세션 메모는 1000자 이내로 입력해주세요.'),
+    ).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: '세션 저장' }))
 
     expect(mockedCreateAssessmentSession).not.toHaveBeenCalled()
-    expect((await screen.findByRole('alert')).textContent).toContain('세션 메모는 1000자 이내로 입력해주세요.')
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      '세션 메모는 1000자 이내로 입력해주세요.',
+    )
   })
 
   it('prevents duplicate save requests while saving is in progress', async () => {
@@ -335,7 +390,11 @@ describe('assessment summary page', () => {
     await user.click(saveButton)
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '저장 중...' }).hasAttribute('disabled')).toBe(true)
+      expect(
+        screen
+          .getByRole('button', { name: '저장 중...' })
+          .hasAttribute('disabled'),
+      ).toBe(true)
     })
 
     await user.click(screen.getByRole('button', { name: '저장 중...' }))
@@ -373,7 +432,9 @@ describe('assessment summary page', () => {
     await user.click(screen.getByRole('button', { name: '세션 저장' }))
 
     expect(await screen.findByText('세션 상세 화면')).toBeTruthy()
-    expect(screen.getByTestId('location-display').textContent).toBe('/assessments/sessions/777')
+    expect(screen.getByTestId('location-display').textContent).toBe(
+      '/assessments/sessions/777',
+    )
     expect(useAssessmentDraftStore.getState().clientId).toBeNull()
     expect(useAssessmentDraftStore.getState().selectedScaleCodes).toEqual([])
   })
@@ -381,7 +442,9 @@ describe('assessment summary page', () => {
   it('keeps the draft state when save fails so the user can retry', async () => {
     const user = userEvent.setup()
 
-    mockedCreateAssessmentSession.mockRejectedValueOnce(new Error('save failed'))
+    mockedCreateAssessmentSession.mockRejectedValueOnce(
+      new Error('save failed'),
+    )
     initializeDraft({ memo: '재시도 메모' })
 
     renderAssessmentSummaryPage()
@@ -389,10 +452,16 @@ describe('assessment summary page', () => {
     await screen.findByText('PHQ-9')
     await user.click(screen.getByRole('button', { name: '세션 저장' }))
 
-    expect((await screen.findByRole('alert')).textContent).toContain('세션 저장에 실패했습니다.')
-    expect(screen.getByTestId('location-display').textContent).toBe('/assessments/start/42/summary')
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      '세션 저장에 실패했습니다.',
+    )
+    expect(screen.getByTestId('location-display').textContent).toBe(
+      '/assessments/start/42/summary',
+    )
     expect(useAssessmentDraftStore.getState().clientId).toBe(42)
-    expect(useAssessmentDraftStore.getState().selectedScaleCodes).toEqual(['PHQ9'])
+    expect(useAssessmentDraftStore.getState().selectedScaleCodes).toEqual([
+      'PHQ9',
+    ])
     expect(useAssessmentDraftStore.getState().memo).toBe('재시도 메모')
   })
 
@@ -428,7 +497,9 @@ describe('assessment summary page', () => {
     await user.click(screen.getByRole('button', { name: '세션 저장' }))
 
     expect(mockedCreateAssessmentSession).not.toHaveBeenCalled()
-    expect((await screen.findByRole('alert')).textContent).toContain('K-MDQ 응답이 완료되지 않았습니다.')
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'K-MDQ 응답이 완료되지 않았습니다.',
+    )
   })
 
   it('allows K-MDQ save without impairment answer and keeps preview aligned to symptom count only', async () => {

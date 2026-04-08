@@ -8,6 +8,20 @@ public record ScaleDefinitionResponse(
         int displayOrder,
         int questionCount,
         Integer screeningThreshold,
-        List<ScaleQuestionResponse> questions
+        List<ScaleQuestionResponse> questions,
+        List<InterpretationRuleResponse> interpretationRules,
+        List<AlertRuleResponse> alertRules
 ) {
+    public record InterpretationRuleResponse(
+            int min,
+            int max,
+            String label
+    ) {
+    }
+
+    public record AlertRuleResponse(
+            Integer minTotalScore,
+            String message
+    ) {
+    }
 }
