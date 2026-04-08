@@ -14,6 +14,7 @@ import com.dasisuhgi.mentalhealth.statistics.dto.StatisticsSummaryResponse;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -43,37 +44,29 @@ public class StatisticsService {
     public StatisticsScaleResponse getScaleStatistics(LocalDate dateFrom, LocalDate dateTo, SessionUser sessionUser) {
         validateAuthenticated(sessionUser);
         DateRange dateRange = resolveDateRange(dateFrom, dateTo);
+        Map<String, ScaleListItemResponse> scaleMetadataByCode = getScaleMetadataByCode();
 
         Map<String, StatisticsScaleItemResponse> countedByCode = new LinkedHashMap<>();
         for (StatisticsScaleItemResponse item : assessmentQueryRepository.findScaleStatistics(dateRange.dateFrom(), dateRange.dateTo())) {
             countedByCode.put(item.scaleCode(), item);
         }
 
-        List<StatisticsScaleItemResponse> orderedItems = new java.util.ArrayList<>(scaleService.getScales().stream()
+        List<StatisticsScaleItemResponse> orderedItems = new ArrayList<>(scaleService.getScales().stream()
                 .filter(ScaleListItemResponse::isActive)
                 .filter(ScaleListItemResponse::implemented)
-                .map(scale -> countedByCode.getOrDefault(
-                        scale.scaleCode(),
-                        new StatisticsScaleItemResponse(scale.scaleCode(), scale.scaleName(), 0, 0, true)
-                ))
-                .map(item -> new StatisticsScaleItemResponse(
-                        item.scaleCode(),
-                        item.scaleName(),
-                        item.totalCount(),
-                        item.alertCount(),
+                .map(scale -> enrichScaleItem(
+                        countedByCode.getOrDefault(
+                                scale.scaleCode(),
+                                new StatisticsScaleItemResponse(scale.scaleCode(), scale.scaleName(), null, null, 0, 0, true)
+                        ),
+                        scale,
                         true
                 ))
                 .toList());
         countedByCode.forEach((scaleCode, item) -> {
             boolean alreadyIncluded = orderedItems.stream().anyMatch(candidate -> candidate.scaleCode().equals(scaleCode));
             if (!alreadyIncluded && item.totalCount() > 0) {
-                orderedItems.add(new StatisticsScaleItemResponse(
-                        item.scaleCode(),
-                        item.scaleName(),
-                        item.totalCount(),
-                        item.alertCount(),
-                        false
-                ));
+                orderedItems.add(enrichScaleItem(item, scaleMetadataByCode.get(scaleCode), false));
             }
         });
 
@@ -97,7 +90,8 @@ public class StatisticsService {
 
         DateRange dateRange = resolveDateRange(dateFrom, dateTo);
         AlertType parsedAlertType = parseAlertType(alertType);
-        return assessmentQueryRepository.findStatisticsAlerts(
+        Map<String, ScaleListItemResponse> scaleMetadataByCode = getScaleMetadataByCode();
+        PageResponse<StatisticsAlertItemResponse> alertPage = assessmentQueryRepository.findStatisticsAlerts(
                 dateRange.dateFrom(),
                 dateRange.dateTo(),
                 scaleCode,
@@ -105,6 +99,10 @@ public class StatisticsService {
                 page,
                 size
         );
+        List<StatisticsAlertItemResponse> items = alertPage.items().stream()
+                .map(item -> enrichAlertItem(item, scaleMetadataByCode.get(item.scaleCode())))
+                .toList();
+        return new PageResponse<>(items, alertPage.page(), alertPage.size(), alertPage.totalItems(), alertPage.totalPages());
     }
 
     private void validateAuthenticated(SessionUser sessionUser) {
@@ -139,5 +137,76 @@ public class StatisticsService {
     }
 
     private record DateRange(LocalDate dateFrom, LocalDate dateTo) {
+    }
+
+    private Map<String, ScaleListItemResponse> getScaleMetadataByCode() {
+        Map<String, ScaleListItemResponse> scaleMetadataByCode = new LinkedHashMap<>();
+        for (ScaleListItemResponse scale : scaleService.getScales()) {
+            scaleMetadataByCode.put(scale.scaleCode(), scale);
+        }
+        return scaleMetadataByCode;
+    }
+
+    private StatisticsScaleItemResponse enrichScaleItem(
+            StatisticsScaleItemResponse item,
+            ScaleListItemResponse scaleMetadata,
+            boolean isActive
+    ) {
+        String resolvedScaleName = resolveScaleName(item.scaleCode(), item.scaleName(), scaleMetadata);
+        return new StatisticsScaleItemResponse(
+                item.scaleCode(),
+                resolvedScaleName,
+                resolveDisplayTitle(item.scaleCode(), resolvedScaleName, scaleMetadata),
+                resolveDisplaySubtitle(scaleMetadata),
+                item.totalCount(),
+                item.alertCount(),
+                isActive
+        );
+    }
+
+    private StatisticsAlertItemResponse enrichAlertItem(
+            StatisticsAlertItemResponse item,
+            ScaleListItemResponse scaleMetadata
+    ) {
+        String resolvedScaleName = resolveScaleName(item.scaleCode(), item.scaleName(), scaleMetadata);
+        return new StatisticsAlertItemResponse(
+                item.clientName(),
+                item.sessionCompletedAt(),
+                item.performedByName(),
+                item.scaleCode(),
+                resolvedScaleName,
+                resolveDisplayTitle(item.scaleCode(), resolvedScaleName, scaleMetadata),
+                resolveDisplaySubtitle(scaleMetadata),
+                item.alertType(),
+                item.alertMessage(),
+                item.sessionId()
+        );
+    }
+
+    private String resolveScaleName(String scaleCode, String scaleName, ScaleListItemResponse scaleMetadata) {
+        if (scaleName != null && !scaleName.isBlank()) {
+            return scaleName;
+        }
+        if (scaleMetadata != null && scaleMetadata.scaleName() != null && !scaleMetadata.scaleName().isBlank()) {
+            return scaleMetadata.scaleName();
+        }
+        return scaleCode;
+    }
+
+    private String resolveDisplayTitle(String scaleCode, String scaleName, ScaleListItemResponse scaleMetadata) {
+        if (scaleMetadata != null && scaleMetadata.selectionTitle() != null && !scaleMetadata.selectionTitle().isBlank()) {
+            return scaleMetadata.selectionTitle();
+        }
+        if (scaleName != null && !scaleName.isBlank()) {
+            return scaleName;
+        }
+        return scaleCode;
+    }
+
+    private String resolveDisplaySubtitle(ScaleListItemResponse scaleMetadata) {
+        if (scaleMetadata == null || scaleMetadata.selectionSubtitle() == null || scaleMetadata.selectionSubtitle().isBlank()) {
+            return null;
+        }
+        return scaleMetadata.selectionSubtitle();
     }
 }

@@ -122,6 +122,8 @@ function createStatisticsScales(overrides?: Partial<Awaited<ReturnType<typeof fe
       {
         scaleCode: 'PHQ9',
         scaleName: 'PHQ-9',
+        displayTitle: 'PHQ-9',
+        displaySubtitle: '우울',
         totalCount: 18,
         alertCount: 6,
         isActive: true,
@@ -129,6 +131,8 @@ function createStatisticsScales(overrides?: Partial<Awaited<ReturnType<typeof fe
       {
         scaleCode: 'GAD7',
         scaleName: 'GAD-7',
+        displayTitle: 'GAD-7',
+        displaySubtitle: '불안',
         totalCount: 11,
         alertCount: 3,
         isActive: true,
@@ -136,6 +140,7 @@ function createStatisticsScales(overrides?: Partial<Awaited<ReturnType<typeof fe
       {
         scaleCode: 'OLDPHQ',
         scaleName: '구버전 PHQ',
+        displayTitle: '구버전 PHQ',
         totalCount: 4,
         alertCount: 1,
         isActive: false,
@@ -145,12 +150,36 @@ function createStatisticsScales(overrides?: Partial<Awaited<ReturnType<typeof fe
   }
 }
 
+const TEST_SCALE_DISPLAY_METADATA_BY_CODE = {
+  CRI: {
+    scaleName: '정신과적 위기 분류 평정척도 (CRI)',
+    displayTitle: 'CRI',
+    displaySubtitle: '정신과적 위기 분류 평정척도',
+  },
+  GAD7: {
+    scaleName: 'GAD-7',
+    displayTitle: 'GAD-7',
+    displaySubtitle: '불안',
+  },
+  PHQ9: {
+    scaleName: 'PHQ-9',
+    displayTitle: 'PHQ-9',
+    displaySubtitle: '우울',
+  },
+} as const
+
 function createStatisticsAlertItem(overrides?: Partial<Awaited<ReturnType<typeof fetchStatisticsAlerts>>['items'][number]>) {
+  const scaleCode = overrides?.scaleCode ?? 'PHQ9'
+  const metadata = TEST_SCALE_DISPLAY_METADATA_BY_CODE[scaleCode as keyof typeof TEST_SCALE_DISPLAY_METADATA_BY_CODE]
+
   return {
     clientName: '김대상',
     sessionCompletedAt: '2026-03-31 09:10',
     performedByName: '김담당',
-    scaleCode: 'PHQ9',
+    scaleCode,
+    scaleName: metadata?.scaleName ?? scaleCode,
+    displayTitle: metadata?.displayTitle,
+    displaySubtitle: metadata?.displaySubtitle,
     alertType: 'CAUTION',
     alertMessage: '우울 주의',
     sessionId: 101,
@@ -481,6 +510,8 @@ describe('statistics page', () => {
           {
             scaleCode: 'CRI',
             scaleName: '정신과적 위기 분류 평정척도 (CRI)',
+            displayTitle: 'CRI',
+            displaySubtitle: '정신과적 위기 분류 평정척도',
             totalCount: 5,
             alertCount: 2,
             isActive: true,
@@ -507,6 +538,8 @@ describe('statistics page', () => {
           {
             scaleCode: 'CRI',
             scaleName: '정신과적 위기 분류 평정척도 (CRI)',
+            displayTitle: 'CRI',
+            displaySubtitle: '정신과적 위기 분류 평정척도',
             totalCount: 5,
             alertCount: 2,
             isActive: true,

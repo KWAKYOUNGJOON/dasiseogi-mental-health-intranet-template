@@ -16,28 +16,36 @@ export interface StatisticsSummary {
   }>
 }
 
+export interface StatisticsScaleDisplayMetadata {
+  scaleCode: string
+  scaleName: string
+  displayTitle?: string | null
+  displaySubtitle?: string | null
+}
+
+export interface StatisticsScaleItem extends StatisticsScaleDisplayMetadata {
+  totalCount: number
+  alertCount: number
+  isActive: boolean
+}
+
 export interface StatisticsScaleResponse {
   dateFrom: string
   dateTo: string
-  items: Array<{
-    scaleCode: string
-    scaleName: string
-    totalCount: number
-    alertCount: number
-    isActive: boolean
-  }>
+  items: StatisticsScaleItem[]
+}
+
+export interface StatisticsAlertItem extends StatisticsScaleDisplayMetadata {
+  clientName: string
+  sessionCompletedAt: string
+  performedByName: string
+  alertType: string
+  alertMessage: string
+  sessionId: number
 }
 
 export interface StatisticsAlertPage {
-  items: Array<{
-    clientName: string
-    sessionCompletedAt: string
-    performedByName: string
-    scaleCode: string
-    alertType: string
-    alertMessage: string
-    sessionId: number
-  }>
+  items: StatisticsAlertItem[]
   page: number
   size: number
   totalItems: number

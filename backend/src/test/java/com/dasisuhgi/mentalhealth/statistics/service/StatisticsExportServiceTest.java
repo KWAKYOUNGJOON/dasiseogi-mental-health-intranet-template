@@ -148,6 +148,9 @@ class StatisticsExportServiceTest {
                                 "2026-03-31 09:10:00",
                                 "김담당",
                                 "PHQ9",
+                                "PHQ-9",
+                                "PHQ-9",
+                                "우울",
                                 "CAUTION",
                                 "우울 주의",
                                 101L

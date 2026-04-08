@@ -5,6 +5,9 @@ public record StatisticsAlertItemResponse(
         String sessionCompletedAt,
         String performedByName,
         String scaleCode,
+        String scaleName,
+        String displayTitle,
+        String displaySubtitle,
         String alertType,
         String alertMessage,
         Long sessionId

@@ -189,6 +189,8 @@ public class AssessmentQueryRepository {
                 .map(row -> new StatisticsScaleItemResponse(
                         row.scaleCode(),
                         row.scaleName(),
+                        null,
+                        null,
                         row.totalCount(),
                         row.alertCount() == null ? 0 : row.alertCount(),
                         false
@@ -207,6 +209,7 @@ public class AssessmentQueryRepository {
         StringBuilder fromClause = new StringBuilder("""
                 from SessionAlert a
                 join a.session s
+                left join a.sessionScale sc
                 join s.client c
                 join s.performedBy p
                 where c.status <> :misregisteredStatus
@@ -228,6 +231,7 @@ public class AssessmentQueryRepository {
                     s.sessionCompletedAt,
                     p.name,
                     a.scaleCode,
+                    sc.scaleName,
                     a.alertType,
                     a.alertMessage,
                     s.id
@@ -250,6 +254,9 @@ public class AssessmentQueryRepository {
                         SeoulDateTimeSupport.formatDateTime(row.sessionCompletedAt()),
                         row.performedByName(),
                         row.scaleCode(),
+                        row.scaleName(),
+                        null,
+                        null,
                         row.alertType().name(),
                         row.alertMessage(),
                         row.sessionId()
@@ -376,6 +383,7 @@ record StatisticsAlertRow(
         LocalDateTime sessionCompletedAt,
         String performedByName,
         String scaleCode,
+        String scaleName,
         AlertType alertType,
         String alertMessage,
         Long sessionId

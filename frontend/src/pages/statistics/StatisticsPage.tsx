@@ -89,7 +89,8 @@ export function StatisticsPage() {
   const alertScaleOptions = [...currentScaleItems, ...legacyScaleItems]
   const exportDateFrom = toValidDateText(dateFrom) || undefined
   const exportDateTo = toValidDateText(dateTo) || undefined
-  const selectedAlertScaleLabel = alertScaleCode ? formatStatisticsScaleLabel(alertScaleCode) : '전체 척도'
+  const selectedAlertScale = alertScaleOptions.find((item) => item.scaleCode === alertScaleCode)
+  const selectedAlertScaleLabel = alertScaleCode ? formatStatisticsScaleLabel(selectedAlertScale ?? alertScaleCode) : '전체 척도'
   const canExportStatistics = hasAdminAccess(user)
 
   return (
@@ -275,7 +276,7 @@ export function StatisticsPage() {
                           <td>{alert.sessionCompletedAt}</td>
                           <td>{alert.clientName}</td>
                           <td>{alert.performedByName}</td>
-                          <td>{formatStatisticsAlertScaleLabel(alert.scaleCode)}</td>
+                          <td>{formatStatisticsAlertScaleLabel(alert)}</td>
                           <td>{formatStatisticsAlertTypeLabel(alert.alertType)}</td>
                           <td>{alert.alertMessage}</td>
                         </tr>

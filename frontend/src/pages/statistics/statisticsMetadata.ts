@@ -1,6 +1,10 @@
-import type { StatisticsScaleResponse } from '../../features/statistics/api/statisticsApi'
+import type {
+  StatisticsAlertItem,
+  StatisticsScaleDisplayMetadata,
+  StatisticsScaleItem,
+} from '../../features/statistics/api/statisticsApi'
 
-type StatisticsScaleItem = StatisticsScaleResponse['items'][number]
+type StatisticsScaleDisplaySource = StatisticsScaleDisplayMetadata
 
 export const DEFAULT_STATISTICS_ALERT_PAGE_SIZE = 10
 
@@ -51,15 +55,20 @@ export function isStatisticsCriScaleCode(scaleCode: string) {
   return scaleCode === STATISTICS_CRI_METADATA.scaleCode
 }
 
-export function formatStatisticsScaleLabel(scaleCode: string, scaleName?: string) {
-  const resolvedScaleName = scaleName ?? STATISTICS_SCALE_DISPLAY_TITLE_BY_CODE[scaleCode]
-  const description = STATISTICS_SCALE_DESCRIPTION_BY_CODE[scaleCode]
+export function formatStatisticsScaleLabel(scale: StatisticsScaleDisplaySource | string, scaleName?: string) {
+  const source = normalizeStatisticsScaleDisplaySource(scale, scaleName)
+  const title = resolveStatisticsScaleDisplayTitle(source)
+  const subtitle = resolveStatisticsScaleDisplaySubtitle(source)
 
-  if (resolvedScaleName && description) {
-    return `${resolvedScaleName} (${description})`
+  if (isStatisticsCriScaleCode(source.scaleCode)) {
+    return title
   }
 
-  return resolvedScaleName ?? scaleCode
+  if (subtitle) {
+    return `${title} (${subtitle})`
+  }
+
+  return title
 }
 
 export function formatStatisticsCriBaseName(scaleName?: string) {
@@ -76,6 +85,52 @@ export function formatStatisticsCriBaseName(scaleName?: string) {
   return trimmedScaleName.slice(0, -STATISTICS_CRI_METADATA.nameSuffix.length).trimEnd()
 }
 
+function normalizeStatisticsScaleDisplaySource(
+  scale: StatisticsScaleDisplaySource | string,
+  scaleName?: string,
+): StatisticsScaleDisplaySource {
+  if (typeof scale !== 'string') {
+    return scale
+  }
+
+  return {
+    scaleCode: scale,
+    scaleName: scaleName ?? STATISTICS_SCALE_DISPLAY_TITLE_BY_CODE[scale] ?? scale,
+    displayTitle: undefined,
+    displaySubtitle: undefined,
+  }
+}
+
+function resolveStatisticsScaleDisplayTitle(source: StatisticsScaleDisplaySource) {
+  const displayTitle = source.displayTitle?.trim()
+
+  if (displayTitle) {
+    return displayTitle
+  }
+
+  const fallbackTitle = STATISTICS_SCALE_DISPLAY_TITLE_BY_CODE[source.scaleCode]
+  if (fallbackTitle) {
+    return fallbackTitle
+  }
+
+  const scaleName = source.scaleName?.trim()
+  if (scaleName) {
+    return scaleName
+  }
+
+  return source.scaleCode
+}
+
+function resolveStatisticsScaleDisplaySubtitle(source: StatisticsScaleDisplaySource) {
+  const displaySubtitle = source.displaySubtitle?.trim()
+
+  if (displaySubtitle) {
+    return displaySubtitle
+  }
+
+  return STATISTICS_SCALE_DESCRIPTION_BY_CODE[source.scaleCode]
+}
+
 function formatStatisticsScaleNameWithCode(scaleCode: string, scaleName: string) {
   const trimmedScaleName = scaleName.trimEnd()
   const scaleCodeSuffix = `(${scaleCode})`
@@ -87,24 +142,47 @@ function formatStatisticsScaleNameWithCode(scaleCode: string, scaleName: string)
   return `${trimmedScaleName} ${scaleCodeSuffix}`
 }
 
-export function formatStatisticsScaleDropdownLabel(item: StatisticsScaleItem) {
-  if (isStatisticsCriScaleCode(item.scaleCode)) {
-    return `${STATISTICS_CRI_METADATA.scaleCode} (${formatStatisticsCriBaseName(item.scaleName)})`
+function resolveStatisticsCriBaseName(item: StatisticsScaleItem | StatisticsAlertItem) {
+  if (item.scaleName?.trim()) {
+    return formatStatisticsCriBaseName(item.scaleName)
   }
 
-  const displayLabel = STATISTICS_SCALE_DESCRIPTION_BY_CODE[item.scaleCode]
-    ? formatStatisticsScaleLabel(item.scaleCode, item.scaleName)
-    : formatStatisticsScaleNameWithCode(item.scaleCode, item.scaleName)
+  if (item.displaySubtitle?.trim()) {
+    return formatStatisticsCriBaseName(item.displaySubtitle)
+  }
 
-  return displayLabel
+  return STATISTICS_CRI_METADATA.defaultBaseName
+}
+
+export function formatStatisticsScaleDropdownLabel(item: StatisticsScaleItem) {
+  if (isStatisticsCriScaleCode(item.scaleCode)) {
+    return `${resolveStatisticsScaleDisplayTitle(item)} (${resolveStatisticsCriBaseName(item)})`
+  }
+
+  const subtitle = resolveStatisticsScaleDisplaySubtitle(item)
+  if (subtitle) {
+    return `${resolveStatisticsScaleDisplayTitle(item)} (${subtitle})`
+  }
+
+  return formatStatisticsScaleNameWithCode(item.scaleCode, resolveStatisticsScaleDisplayTitle(item))
 }
 
 export function formatStatisticsScaleListLabel(item: StatisticsScaleItem) {
-  return formatStatisticsScaleLabel(item.scaleCode, item.scaleName)
+  if (isStatisticsCriScaleCode(item.scaleCode)) {
+    const scaleName = item.scaleName?.trim()
+
+    if (scaleName) {
+      return scaleName
+    }
+
+    return `${resolveStatisticsCriBaseName(item)} (${resolveStatisticsScaleDisplayTitle(item)})`
+  }
+
+  return formatStatisticsScaleLabel(item)
 }
 
-export function formatStatisticsAlertScaleLabel(scaleCode: string) {
-  return formatStatisticsScaleLabel(scaleCode)
+export function formatStatisticsAlertScaleLabel(item: StatisticsAlertItem | StatisticsScaleDisplaySource | string, scaleName?: string) {
+  return formatStatisticsScaleLabel(item, scaleName)
 }
 
 export function formatStatisticsScaleOptionLabel(item: StatisticsScaleItem) {
