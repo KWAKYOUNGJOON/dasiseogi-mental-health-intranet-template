@@ -3,6 +3,7 @@ import type { ApiResponse } from '../../../shared/types/api'
 import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 import {
   getDefaultSignupRequestFilterStatus,
+  isSignupRequestProcessableStatus,
   type AdminManagedUserStatus,
   type SignupRequestManagementStatus,
 } from '../adminManagementMetadata'
@@ -81,7 +82,7 @@ function mapSignupRequestApprovalItem(item: SignupRequestApprovalItemResponse): 
     teamName: normalizeText(item.teamName),
     requestNote: normalizeText(item.requestNote),
     status: item.requestStatus,
-    canProcess: item.requestStatus === getDefaultSignupRequestFilterStatus(),
+    canProcess: isSignupRequestProcessableStatus(item.requestStatus),
   }
 }
 

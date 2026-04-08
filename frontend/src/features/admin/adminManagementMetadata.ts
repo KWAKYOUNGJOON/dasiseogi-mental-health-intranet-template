@@ -20,6 +20,7 @@ export type AdminManagedUserStatus = UserManagementStatus
 
 export const DEFAULT_USER_MANAGEMENT_PAGE_SIZE: UserManagementPageSize = 20
 export const DEFAULT_SIGNUP_REQUEST_PAGE_SIZE: SignupRequestManagementPageSize = 20
+export const SIGNUP_REQUEST_PROCESSABLE_STATUS: SignupRequestManagementStatus = 'PENDING'
 
 export const USER_MANAGEMENT_ROLE_LABELS: Record<UserManagementRole, string> = {
   ADMIN: '관리자',
@@ -117,4 +118,10 @@ export function parseSignupRequestPageSize(value: string): SignupRequestManageme
 
 export function getDefaultSignupRequestFilterStatus(): SignupRequestManagementStatus {
   return 'PENDING'
+}
+
+export function isSignupRequestProcessableStatus(
+  status: SignupRequestManagementStatus,
+): status is typeof SIGNUP_REQUEST_PROCESSABLE_STATUS {
+  return status === SIGNUP_REQUEST_PROCESSABLE_STATUS
 }

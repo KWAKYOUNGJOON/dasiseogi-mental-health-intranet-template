@@ -15,8 +15,10 @@ import {
   USER_MANAGEMENT_STATUS_CHIP_STYLES,
   USER_MANAGEMENT_STATUS_LABELS,
   USER_MANAGEMENT_STATUS_OPTIONS,
+  SIGNUP_REQUEST_PROCESSABLE_STATUS,
   getDefaultSignupRequestFilterStatus,
   getDefaultUserManagementStatusDraft,
+  isSignupRequestProcessableStatus,
   isUserManagementEditableStatus,
   parseSignupRequestPageSize,
   parseUserManagementPageSize,
@@ -106,5 +108,9 @@ describe('admin management metadata', () => {
     expect(parseSignupRequestPageSize('100')).toBe(100)
     expect(parseSignupRequestPageSize('10')).toBe(DEFAULT_SIGNUP_REQUEST_PAGE_SIZE)
     expect(getDefaultSignupRequestFilterStatus()).toBe('PENDING')
+    expect(SIGNUP_REQUEST_PROCESSABLE_STATUS).toBe('PENDING')
+    expect(isSignupRequestProcessableStatus('PENDING')).toBe(true)
+    expect(isSignupRequestProcessableStatus('APPROVED')).toBe(false)
+    expect(isSignupRequestProcessableStatus('REJECTED')).toBe(false)
   })
 })
