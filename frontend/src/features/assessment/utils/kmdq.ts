@@ -1,7 +1,6 @@
 import type { ScaleDetail } from '../api/assessmentApi'
 
 const KMDQ_SCALE_CODE = 'KMDQ'
-const KMDQ_SYMPTOM_QUESTION_END_NO = 13
 const KMDQ_IMPAIRMENT_QUESTION_NO = 15
 
 function isKmdq(scale: ScaleDetail) {
@@ -24,12 +23,16 @@ function calculateQuestionAnswerScore(
   return selectedOption?.score ?? 0
 }
 
+function isKmdqBaseRequiredQuestion(question: ScaleDetail['questions'][number]) {
+  return question.options.some((option) => option.score !== 0)
+}
+
 function calculateKmdqSymptomYesCount(
   scale: ScaleDetail,
   answers: Record<number, string>,
 ) {
   return scale.questions.reduce((count, question) => {
-    if (question.questionNo > KMDQ_SYMPTOM_QUESTION_END_NO) {
+    if (!isKmdqBaseRequiredQuestion(question)) {
       return count
     }
 
@@ -77,7 +80,7 @@ export function getRenderableQuestions(
   const symptomYesCount = calculateKmdqSymptomYesCount(scale, answers)
 
   return scale.questions.filter((question) => {
-    if (question.questionNo <= KMDQ_SYMPTOM_QUESTION_END_NO) {
+    if (isKmdqBaseRequiredQuestion(question)) {
       return true
     }
 
@@ -102,7 +105,7 @@ export function getRequiredQuestions(
   }
 
   return scale.questions.filter((question) => {
-    if (question.questionNo <= KMDQ_SYMPTOM_QUESTION_END_NO) {
+    if (isKmdqBaseRequiredQuestion(question)) {
       return true
     }
 
@@ -132,7 +135,7 @@ export function calculateScalePreviewTotalScore(
   }
 
   return scale.questions.reduce((accumulator, question) => {
-    if (isKmdq(scale) && question.questionNo > KMDQ_SYMPTOM_QUESTION_END_NO) {
+    if (isKmdq(scale) && !isKmdqBaseRequiredQuestion(question)) {
       return accumulator
     }
 

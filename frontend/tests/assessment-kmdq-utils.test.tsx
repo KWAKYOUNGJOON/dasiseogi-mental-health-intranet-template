@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { type ScaleDetail } from '../src/features/assessment/api/assessmentApi'
 import {
+  calculateScalePreviewTotalScore,
   getIesrPreviewAlertMessages,
   getIesrPreviewResultLevel,
   getRenderableQuestions,
@@ -49,6 +50,28 @@ function createKmdqScaleDetail(): ScaleDetail {
           { value: 'MINOR', label: '경미한 문제', score: 0 },
           { value: 'MODERATE', label: '중등도의 문제', score: 0 },
           { value: 'SERIOUS', label: '심각한 문제', score: 0 },
+        ],
+      },
+    ],
+  }
+}
+
+function createKmdqScaleDetailWithExtendedSymptomQuestion(): ScaleDetail {
+  const scale = createKmdqScaleDetail()
+
+  return {
+    ...scale,
+    questionCount: 16,
+    questions: [
+      ...scale.questions,
+      {
+        questionNo: 16,
+        questionKey: 'kmdq_symptom_16',
+        questionText: '증상 문항 16',
+        reverseScored: false,
+        options: [
+          { value: 'N', label: '아니오', score: 0 },
+          { value: 'Y', label: '예', score: 1 },
         ],
       },
     ],
@@ -183,6 +206,34 @@ describe('kmdq metadata-driven conditional question handling', () => {
       requiredAtThreshold.map((question) => question.questionNo),
     ).not.toContain(15)
   })
+
+  it('shows question 15 when a score-bearing symptom question after question 13 is answered yes', () => {
+    const scale = createKmdqScaleDetailWithExtendedSymptomQuestion()
+
+    const renderableQuestions = getRenderableQuestions(scale, {
+      16: 'Y',
+    })
+
+    expect(
+      renderableQuestions.map((question) => question.questionNo),
+    ).not.toContain(14)
+    expect(
+      renderableQuestions.map((question) => question.questionNo),
+    ).toContain(15)
+  })
+
+  it('includes score-bearing questions after question 13 in the required question list', () => {
+    const scale = createKmdqScaleDetailWithExtendedSymptomQuestion()
+
+    const requiredQuestions = getRequiredQuestions(scale, {})
+
+    expect(
+      requiredQuestions.map((question) => question.questionNo),
+    ).toContain(16)
+    expect(
+      requiredQuestions.map((question) => question.questionNo),
+    ).not.toContain(15)
+  })
 })
 
 describe('IES-R preview metadata handling', () => {
@@ -201,5 +252,19 @@ describe('IES-R preview metadata handling', () => {
       '주의 필요',
       '상담 권고 또는 고위험 경고',
     ])
+  })
+})
+
+describe('K-MDQ preview score handling', () => {
+  it('includes score-bearing questions after question 13 in the preview total score', () => {
+    const scale = createKmdqScaleDetailWithExtendedSymptomQuestion()
+
+    expect(
+      calculateScalePreviewTotalScore(scale, {
+        1: 'Y',
+        15: 'SERIOUS',
+        16: 'Y',
+      }),
+    ).toBe(2)
   })
 })
