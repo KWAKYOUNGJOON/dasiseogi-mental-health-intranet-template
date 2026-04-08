@@ -1,13 +1,18 @@
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
 import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
+import {
+  getDefaultSignupRequestFilterStatus,
+  type AdminManagedUserStatus,
+  type SignupRequestManagementPageSize,
+  type SignupRequestManagementStatus,
+} from '../adminManagementMetadata'
 
-export const SIGNUP_REQUEST_STATUS_OPTIONS = ['PENDING', 'APPROVED', 'REJECTED'] as const
-export const SIGNUP_REQUEST_PAGE_SIZE_OPTIONS = [20, 50, 100] as const
-
-export type SignupRequestManagementStatus = (typeof SIGNUP_REQUEST_STATUS_OPTIONS)[number]
-export type SignupRequestManagementPageSize = (typeof SIGNUP_REQUEST_PAGE_SIZE_OPTIONS)[number]
-export type SignupRequestManagementUserStatus = 'ACTIVE' | 'PENDING' | 'INACTIVE' | 'REJECTED'
+export {
+  DEFAULT_SIGNUP_REQUEST_PAGE_SIZE,
+  SIGNUP_REQUEST_PAGE_SIZE_OPTIONS,
+  SIGNUP_REQUEST_STATUS_OPTIONS,
+} from '../adminManagementMetadata'
 
 interface SignupRequestListItemResponse {
   requestId: number
@@ -41,7 +46,7 @@ interface SignupRequestProcessResponse {
   requestId: number
   userId: number
   requestStatus: SignupRequestManagementStatus
-  userStatus: SignupRequestManagementUserStatus
+  userStatus: AdminManagedUserStatus
 }
 
 export interface SignupRequestListItem {
@@ -69,7 +74,7 @@ export interface SignupRequestProcessResult {
   requestId: number
   userId: number
   requestStatus: SignupRequestManagementStatus
-  userStatus: SignupRequestManagementUserStatus
+  userStatus: AdminManagedUserStatus
 }
 
 export interface SignupRequestListQuery {
@@ -77,8 +82,6 @@ export interface SignupRequestListQuery {
   page?: number
   size?: SignupRequestManagementPageSize
 }
-
-export const DEFAULT_SIGNUP_REQUEST_PAGE_SIZE: SignupRequestManagementPageSize = 20
 
 function normalizeText(value: string | null | undefined) {
   const trimmed = value?.trim()
@@ -101,7 +104,7 @@ function mapSignupRequestListItem(item: SignupRequestListItemResponse): SignupRe
     teamName: normalizeText(item.teamName),
     requestNote: normalizeText(item.requestNote),
     status: item.requestStatus,
-    canProcess: item.requestStatus === 'PENDING',
+    canProcess: item.requestStatus === getDefaultSignupRequestFilterStatus(),
   }
 }
 
@@ -144,3 +147,10 @@ export async function rejectSignupRequest(
   const response = await http.post<ApiResponse<SignupRequestProcessResponse>>(`/admin/signup-requests/${requestId}/reject`, payload)
   return mapSignupRequestProcessResult(response.data.data)
 }
+
+export type {
+  SignupRequestManagementPageSize,
+  SignupRequestManagementStatus,
+}
+
+export type SignupRequestManagementUserStatus = AdminManagedUserStatus

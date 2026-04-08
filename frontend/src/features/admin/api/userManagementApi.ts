@@ -1,18 +1,22 @@
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
 import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
+import {
+  type UserManagementEditableStatus,
+  type UserManagementPageSize,
+  type UserManagementPositionName,
+  type UserManagementRole,
+  type UserManagementStatus,
+} from '../adminManagementMetadata'
 
-export const USER_MANAGEMENT_ROLE_OPTIONS = ['ADMIN', 'USER'] as const
-export const USER_MANAGEMENT_STATUS_OPTIONS = ['ACTIVE', 'PENDING', 'INACTIVE', 'REJECTED'] as const
-export const USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS = ['ACTIVE', 'INACTIVE'] as const
-export const USER_MANAGEMENT_POSITION_NAME_OPTIONS = ['팀장', '대리', '실무자'] as const
-export const USER_MANAGEMENT_PAGE_SIZE_OPTIONS = [20, 50] as const
-
-export type UserManagementRole = (typeof USER_MANAGEMENT_ROLE_OPTIONS)[number]
-export type UserManagementStatus = (typeof USER_MANAGEMENT_STATUS_OPTIONS)[number]
-export type UserManagementEditableStatus = (typeof USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS)[number]
-export type UserManagementPositionName = (typeof USER_MANAGEMENT_POSITION_NAME_OPTIONS)[number]
-export type UserManagementPageSize = (typeof USER_MANAGEMENT_PAGE_SIZE_OPTIONS)[number]
+export {
+  DEFAULT_USER_MANAGEMENT_PAGE_SIZE,
+  USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS,
+  USER_MANAGEMENT_PAGE_SIZE_OPTIONS,
+  USER_MANAGEMENT_POSITION_NAME_OPTIONS,
+  USER_MANAGEMENT_ROLE_OPTIONS,
+  USER_MANAGEMENT_STATUS_OPTIONS,
+} from '../adminManagementMetadata'
 
 interface UserManagementListItemResponse {
   userId: number
@@ -102,8 +106,6 @@ export interface UserManagementChangeResult {
   positionName?: string
 }
 
-export const DEFAULT_USER_MANAGEMENT_PAGE_SIZE: UserManagementPageSize = 20
-
 function normalizeText(value: string | null | undefined) {
   const trimmed = value?.trim()
 
@@ -182,4 +184,12 @@ export async function updateUserManagementPositionName(
     payload,
   )
   return mapUserManagementChangeResult(response.data.data)
+}
+
+export type {
+  UserManagementEditableStatus,
+  UserManagementPageSize,
+  UserManagementPositionName,
+  UserManagementRole,
+  UserManagementStatus,
 }

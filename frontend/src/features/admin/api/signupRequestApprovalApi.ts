@@ -1,9 +1,14 @@
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
 import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
+import {
+  getDefaultSignupRequestFilterStatus,
+  type AdminManagedUserStatus,
+  type SignupRequestManagementStatus,
+} from '../adminManagementMetadata'
 
-export type SignupRequestApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
-export type SignupRequestApprovalUserStatus = 'ACTIVE' | 'PENDING' | 'INACTIVE' | 'REJECTED'
+export type SignupRequestApprovalStatus = SignupRequestManagementStatus
+export type SignupRequestApprovalUserStatus = AdminManagedUserStatus
 
 interface SignupRequestApprovalItemResponse {
   requestId: number
@@ -76,7 +81,7 @@ function mapSignupRequestApprovalItem(item: SignupRequestApprovalItemResponse): 
     teamName: normalizeText(item.teamName),
     requestNote: normalizeText(item.requestNote),
     status: item.requestStatus,
-    canProcess: item.requestStatus === 'PENDING',
+    canProcess: item.requestStatus === getDefaultSignupRequestFilterStatus(),
   }
 }
 
@@ -102,7 +107,7 @@ function mapSignupRequestProcessResult(response: SignupRequestProcessResponse): 
 export async function fetchSignupRequestApprovalQueue(params?: { page?: number; size?: number }) {
   const response = await http.get<ApiResponse<SignupRequestApprovalPageResponse>>('/admin/signup-requests', {
     params: {
-      status: 'PENDING',
+      status: getDefaultSignupRequestFilterStatus(),
       ...params,
     },
   })

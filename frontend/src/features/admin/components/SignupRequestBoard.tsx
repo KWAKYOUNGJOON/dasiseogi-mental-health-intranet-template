@@ -1,20 +1,26 @@
 import { isAxiosError } from 'axios'
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import type { ApiResponse } from '../../../shared/types/api'
 import {
   approveSignupRequest,
-  DEFAULT_SIGNUP_REQUEST_PAGE_SIZE,
   fetchSignupRequestPage,
   rejectSignupRequest,
-  SIGNUP_REQUEST_PAGE_SIZE_OPTIONS,
-  SIGNUP_REQUEST_STATUS_OPTIONS,
   type SignupRequestListItem,
   type SignupRequestListPage,
+} from '../api/signupRequestManagementApi'
+import {
+  DEFAULT_SIGNUP_REQUEST_PAGE_SIZE,
+  SIGNUP_REQUEST_PAGE_SIZE_OPTIONS,
+  SIGNUP_REQUEST_STATUS_CHIP_STYLES,
+  SIGNUP_REQUEST_STATUS_LABELS,
+  SIGNUP_REQUEST_STATUS_OPTIONS,
+  getDefaultSignupRequestFilterStatus,
+  parseSignupRequestPageSize,
   type SignupRequestManagementPageSize,
   type SignupRequestManagementStatus,
-} from '../api/signupRequestManagementApi'
+} from '../adminManagementMetadata'
 
 type ProcessMode = 'approve' | 'reject'
 type Notice = { type: 'success' | 'error'; text: string } | null
@@ -33,15 +39,10 @@ const EMPTY_STATE_MESSAGE = '조건에 맞는 가입 신청이 없습니다.'
 const GENERIC_VALIDATION_MESSAGE = '입력값을 다시 확인해주세요.'
 const GENERIC_LIST_ERROR_MESSAGE = '가입 신청 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
 const GENERIC_PROCESS_ERROR_MESSAGE = '가입 신청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
-const SIGNUP_REQUEST_STATUS_LABELS: Record<SignupRequestManagementStatus, string> = {
-  PENDING: '승인 대기',
-  APPROVED: '승인 완료',
-  REJECTED: '반려',
-}
 
 function createDefaultFilters(): FilterState {
   return {
-    status: 'PENDING',
+    status: getDefaultSignupRequestFilterStatus(),
     pageSize: DEFAULT_SIGNUP_REQUEST_PAGE_SIZE,
   }
 }
@@ -76,37 +77,6 @@ function getSignupRequestErrorMessage(response: ApiResponse<unknown> | undefined
     default:
       return fallbackMessage
   }
-}
-
-function getStatusLabel(status: SignupRequestManagementStatus) {
-  return SIGNUP_REQUEST_STATUS_LABELS[status]
-}
-
-function getStatusStyle(status: SignupRequestManagementStatus): CSSProperties {
-  switch (status) {
-    case 'APPROVED':
-      return {
-        color: '#1d6a53',
-        background: '#dff1ea',
-      }
-    case 'REJECTED':
-      return {
-        color: '#9d2f2f',
-        background: '#f8e1e1',
-      }
-    default:
-      return {
-        color: '#1d537d',
-        background: '#dceaf7',
-      }
-  }
-}
-
-function parsePageSize(value: string): SignupRequestManagementPageSize {
-  const parsedValue = Number(value)
-  const matchedOption = SIGNUP_REQUEST_PAGE_SIZE_OPTIONS.find((option) => option === parsedValue)
-
-  return matchedOption ?? DEFAULT_SIGNUP_REQUEST_PAGE_SIZE
 }
 
 function getSuccessMessage(mode: ProcessMode) {
@@ -308,7 +278,7 @@ export function SignupRequestBoard() {
             >
               {SIGNUP_REQUEST_STATUS_OPTIONS.map((statusOption) => (
                 <option key={statusOption} value={statusOption}>
-                  {getStatusLabel(statusOption)}
+                  {SIGNUP_REQUEST_STATUS_LABELS[statusOption]}
                 </option>
               ))}
             </select>
@@ -320,7 +290,7 @@ export function SignupRequestBoard() {
               onChange={(event) =>
                 setFilters((previous) => ({
                   ...previous,
-                  pageSize: parsePageSize(event.target.value),
+                  pageSize: parseSignupRequestPageSize(event.target.value),
                 }))
               }
               value={String(filters.pageSize)}
@@ -347,7 +317,7 @@ export function SignupRequestBoard() {
       <div className="card stack">
         <div className="toolbar" style={{ marginBottom: 0 }}>
           <strong>총 {signupRequestPage?.totalItems ?? 0}건</strong>
-          <span className="muted">현재 상태 필터: {getStatusLabel(query.status)}</span>
+          <span className="muted">현재 상태 필터: {SIGNUP_REQUEST_STATUS_LABELS[query.status]}</span>
           <button className="secondary-button" disabled={loading || processing} onClick={() => void loadSignupRequests()} type="button">
             재조회
           </button>
@@ -419,8 +389,8 @@ export function SignupRequestBoard() {
                     </div>
                   </td>
                   <td>
-                    <span className="status-chip" style={getStatusStyle(item.status)}>
-                      {getStatusLabel(item.status)}
+                    <span className="status-chip" style={SIGNUP_REQUEST_STATUS_CHIP_STYLES[item.status]}>
+                      {SIGNUP_REQUEST_STATUS_LABELS[item.status]}
                     </span>
                   </td>
                   <td>

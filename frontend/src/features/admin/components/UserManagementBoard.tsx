@@ -1,26 +1,38 @@
 import { isAxiosError } from 'axios'
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../../../app/providers/AuthProvider'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import type { ApiResponse } from '../../../shared/types/api'
 import {
-  DEFAULT_USER_MANAGEMENT_PAGE_SIZE,
-  USER_MANAGEMENT_PAGE_SIZE_OPTIONS,
-  USER_MANAGEMENT_POSITION_NAME_OPTIONS,
   fetchUserManagementPage,
   updateUserManagementPositionName,
   updateUserManagementRole,
   updateUserManagementStatus,
-  type UserManagementEditableStatus,
   type UserManagementListItem,
   type UserManagementPage,
+  type UserManagementQuery,
+} from '../api/userManagementApi'
+import {
+  DEFAULT_USER_MANAGEMENT_PAGE_SIZE,
+  USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS,
+  USER_MANAGEMENT_PAGE_SIZE_OPTIONS,
+  USER_MANAGEMENT_POSITION_NAME_OPTIONS,
+  USER_MANAGEMENT_ROLE_CHIP_STYLES,
+  USER_MANAGEMENT_ROLE_LABELS,
+  USER_MANAGEMENT_ROLE_OPTIONS,
+  USER_MANAGEMENT_STATUS_CHIP_STYLES,
+  USER_MANAGEMENT_STATUS_LABELS,
+  USER_MANAGEMENT_STATUS_OPTIONS,
+  getDefaultUserManagementStatusDraft,
+  isUserManagementEditableStatus,
+  parseUserManagementPageSize,
+  type UserManagementEditableStatus,
   type UserManagementPageSize,
   type UserManagementPositionName,
-  type UserManagementQuery,
   type UserManagementRole,
   type UserManagementStatus,
-} from '../api/userManagementApi'
+} from '../adminManagementMetadata'
 
 type Notice = { type: 'success' | 'error'; text: string } | null
 type ActionFieldErrors = Partial<Record<'role' | 'status' | 'positionName', string>>
@@ -188,81 +200,13 @@ function mapActionFieldErrors(
   }, {})
 }
 
-function getRoleLabel(role: UserManagementRole) {
-  return role === 'ADMIN' ? '관리자' : '일반 사용자'
-}
-
-function getStatusLabel(status: UserManagementStatus) {
-  switch (status) {
-    case 'ACTIVE':
-      return '활성'
-    case 'INACTIVE':
-      return '비활성'
-    case 'REJECTED':
-      return '반려'
-    default:
-      return '승인 대기'
-  }
-}
-
-function getRoleChipStyle(role: UserManagementRole): CSSProperties {
-  if (role === 'ADMIN') {
-    return {
-      color: '#204e72',
-      background: '#dceaf7',
-    }
-  }
-
-  return {
-    color: '#576b7d',
-    background: '#e9eef3',
-  }
-}
-
-function getStatusChipStyle(status: UserManagementStatus): CSSProperties {
-  switch (status) {
-    case 'ACTIVE':
-      return {
-        color: '#1d6a53',
-        background: '#dff1ea',
-      }
-    case 'INACTIVE':
-      return {
-        color: '#8c5a11',
-        background: '#f8e8cf',
-      }
-    case 'REJECTED':
-      return {
-        color: '#9d2f2f',
-        background: '#f8e1e1',
-      }
-    default:
-      return {
-        color: '#1d537d',
-        background: '#dceaf7',
-      }
-  }
-}
-
-function isStatusEditable(status: UserManagementStatus): status is UserManagementEditableStatus {
-  return status === 'ACTIVE' || status === 'INACTIVE'
-}
-
-function getDefaultStatusDraft(status: UserManagementStatus): UserManagementEditableStatus | '' {
-  if (isStatusEditable(status)) {
-    return status
-  }
-
-  return ''
-}
-
 function getRoleSuccessMessage(user: UserManagementListItem, nextRole: UserManagementRole) {
-  const nextRoleText = nextRole === 'ADMIN' ? '관리자로' : '일반 사용자로'
+  const nextRoleText = `${USER_MANAGEMENT_ROLE_LABELS[nextRole]}로`
   return `${user.name} 사용자의 역할을 ${nextRoleText} 변경했습니다.`
 }
 
 function getStatusSuccessMessage(user: UserManagementListItem, nextStatus: UserManagementEditableStatus) {
-  const nextStatusText = nextStatus === 'ACTIVE' ? '활성으로' : '비활성으로'
+  const nextStatusText = `${USER_MANAGEMENT_STATUS_LABELS[nextStatus]}으로`
   return `${user.name} 사용자의 상태를 ${nextStatusText} 변경했습니다.`
 }
 
@@ -322,13 +266,6 @@ function getPositionNameOptionLabel(positionName: string) {
   return positionName
 }
 
-function parsePageSize(value: string): UserManagementPageSize {
-  const parsedValue = Number(value)
-  const matchedOption = USER_MANAGEMENT_PAGE_SIZE_OPTIONS.find((option) => option === parsedValue)
-
-  return matchedOption ?? DEFAULT_USER_MANAGEMENT_PAGE_SIZE
-}
-
 function buildQuery(filters: FilterState): UserManagementQuery {
   return {
     keyword: filters.keyword.trim() || undefined,
@@ -367,7 +304,7 @@ export function UserManagementBoard() {
       setUserPage(response)
       setListError(null)
       setRoleDrafts(Object.fromEntries(response.items.map((item) => [item.id, item.role])))
-      setStatusDrafts(Object.fromEntries(response.items.map((item) => [item.id, getDefaultStatusDraft(item.status)])))
+      setStatusDrafts(Object.fromEntries(response.items.map((item) => [item.id, getDefaultUserManagementStatusDraft(item.status)])))
       setPositionNameDrafts(Object.fromEntries(response.items.map((item) => [item.id, item.positionName])))
     } catch (error) {
       setUserPage(null)
@@ -453,7 +390,7 @@ export function UserManagementBoard() {
   }
 
   function openStatusDialog(user: UserManagementListItem) {
-    if (processing || !isStatusEditable(user.status)) {
+    if (processing || !isUserManagementEditableStatus(user.status)) {
       return
     }
 
@@ -604,8 +541,11 @@ export function UserManagementBoard() {
               value={filters.role}
             >
               <option value="">전체</option>
-              <option value="ADMIN">관리자</option>
-              <option value="USER">일반 사용자</option>
+              {USER_MANAGEMENT_ROLE_OPTIONS.map((roleOption) => (
+                <option key={roleOption} value={roleOption}>
+                  {USER_MANAGEMENT_ROLE_LABELS[roleOption]}
+                </option>
+              ))}
             </select>
           </label>
           <label className="field">
@@ -621,10 +561,11 @@ export function UserManagementBoard() {
               value={filters.status}
             >
               <option value="">전체</option>
-              <option value="ACTIVE">활성</option>
-              <option value="PENDING">승인 대기</option>
-              <option value="INACTIVE">비활성</option>
-              <option value="REJECTED">반려</option>
+              {USER_MANAGEMENT_STATUS_OPTIONS.map((statusOption) => (
+                <option key={statusOption} value={statusOption}>
+                  {USER_MANAGEMENT_STATUS_LABELS[statusOption]}
+                </option>
+              ))}
             </select>
           </label>
           <label className="field">
@@ -634,7 +575,7 @@ export function UserManagementBoard() {
               onChange={(event) =>
                 setFilters((prev) => ({
                   ...prev,
-                  pageSize: parsePageSize(event.target.value),
+                  pageSize: parseUserManagementPageSize(event.target.value),
                 }))
               }
               value={String(filters.pageSize)}
@@ -713,8 +654,8 @@ export function UserManagementBoard() {
             ) : (
               items.map((item) => {
                 const roleDraft = roleDrafts[item.id] ?? item.role
-                const canEditStatus = isStatusEditable(item.status)
-                const statusDraft = statusDrafts[item.id] ?? getDefaultStatusDraft(item.status)
+                const canEditStatus = isUserManagementEditableStatus(item.status)
+                const statusDraft = statusDrafts[item.id] ?? getDefaultUserManagementStatusDraft(item.status)
                 const positionNameDraft = positionNameDrafts[item.id] ?? item.positionName
                 const selectablePositionNameOptions = getSelectablePositionNameOptions(item.positionName)
                 const canSubmitPositionNameChange =
@@ -727,13 +668,13 @@ export function UserManagementBoard() {
                     <td>{item.contact}</td>
                     <td>{item.positionName}</td>
                     <td>
-                      <span className="status-chip" style={getRoleChipStyle(item.role)}>
-                        {getRoleLabel(item.role)}
+                      <span className="status-chip" style={USER_MANAGEMENT_ROLE_CHIP_STYLES[item.role]}>
+                        {USER_MANAGEMENT_ROLE_LABELS[item.role]}
                       </span>
                     </td>
                     <td>
-                      <span className="status-chip" style={getStatusChipStyle(item.status)}>
-                        {getStatusLabel(item.status)}
+                      <span className="status-chip" style={USER_MANAGEMENT_STATUS_CHIP_STYLES[item.status]}>
+                        {USER_MANAGEMENT_STATUS_LABELS[item.status]}
                       </span>
                     </td>
                     <td>{item.approvedAt}</td>
@@ -788,8 +729,11 @@ export function UserManagementBoard() {
                             }
                             value={roleDraft}
                           >
-                            <option value="ADMIN">관리자</option>
-                            <option value="USER">일반 사용자</option>
+                            {USER_MANAGEMENT_ROLE_OPTIONS.map((roleOption) => (
+                              <option key={roleOption} value={roleOption}>
+                                {USER_MANAGEMENT_ROLE_LABELS[roleOption]}
+                              </option>
+                            ))}
                           </select>
                           <button
                             className="primary-button"
@@ -816,8 +760,11 @@ export function UserManagementBoard() {
                                 }
                                 value={statusDraft}
                               >
-                                <option value="ACTIVE">활성</option>
-                                <option value="INACTIVE">비활성</option>
+                                {USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS.map((statusOption) => (
+                                  <option key={statusOption} value={statusOption}>
+                                    {USER_MANAGEMENT_STATUS_LABELS[statusOption]}
+                                  </option>
+                                ))}
                               </select>
                               <button
                                 className="danger-button"
@@ -881,7 +828,7 @@ export function UserManagementBoard() {
                 {dialog.user.name} / {dialog.user.loginId}
               </strong>
               <span className="muted">
-                현재 권한 {getRoleLabel(dialog.user.role)} · 현재 상태 {getStatusLabel(dialog.user.status)}
+                현재 권한 {USER_MANAGEMENT_ROLE_LABELS[dialog.user.role]} · 현재 상태 {USER_MANAGEMENT_STATUS_LABELS[dialog.user.status]}
               </span>
             </div>
           ) : null}
@@ -896,11 +843,11 @@ export function UserManagementBoard() {
             <div className="stack" style={{ gap: 8 }}>
               <div className="management-dialog-summary">
                 <span className="muted">변경 전</span>
-                <strong>{getRoleLabel(dialog.user.role)}</strong>
+                <strong>{USER_MANAGEMENT_ROLE_LABELS[dialog.user.role]}</strong>
               </div>
               <div className="management-dialog-summary">
                 <span className="muted">변경 후</span>
-                <strong>{getRoleLabel(dialog.nextRole)}</strong>
+                <strong>{USER_MANAGEMENT_ROLE_LABELS[dialog.nextRole]}</strong>
               </div>
               {dialogFieldErrors.role ? <span className="field-error">{dialogFieldErrors.role}</span> : null}
             </div>
@@ -910,11 +857,11 @@ export function UserManagementBoard() {
             <div className="stack" style={{ gap: 8 }}>
               <div className="management-dialog-summary">
                 <span className="muted">변경 전</span>
-                <strong>{getStatusLabel(dialog.user.status)}</strong>
+                <strong>{USER_MANAGEMENT_STATUS_LABELS[dialog.user.status]}</strong>
               </div>
               <div className="management-dialog-summary">
                 <span className="muted">변경 후</span>
-                <strong>{getStatusLabel(dialog.nextStatus)}</strong>
+                <strong>{USER_MANAGEMENT_STATUS_LABELS[dialog.nextStatus]}</strong>
               </div>
               {dialogFieldErrors.status ? <span className="field-error">{dialogFieldErrors.status}</span> : null}
             </div>
