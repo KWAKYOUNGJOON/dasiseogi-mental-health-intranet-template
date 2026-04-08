@@ -16,12 +16,14 @@ import com.dasisuhgi.mentalhealth.user.entity.User;
 import com.dasisuhgi.mentalhealth.user.entity.UserStatus;
 import com.dasisuhgi.mentalhealth.user.repository.UserRepository;
 import jakarta.servlet.http.HttpSession;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -34,11 +36,18 @@ public class AuthService {
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final ActivityLogService activityLogService;
+    private final Duration sessionTimeout;
 
-    public AuthService(UserRepository userRepository, BCryptPasswordEncoder passwordEncoder, ActivityLogService activityLogService) {
+    public AuthService(
+            UserRepository userRepository,
+            BCryptPasswordEncoder passwordEncoder,
+            ActivityLogService activityLogService,
+            @Value("${server.servlet.session.timeout}") Duration sessionTimeout
+    ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.activityLogService = activityLogService;
+        this.sessionTimeout = Objects.requireNonNull(sessionTimeout, "sessionTimeout");
     }
 
     @Transactional
@@ -69,7 +78,7 @@ public class AuthService {
                 user.getLoginId(),
                 "로그인 성공"
         );
-        return new LoginResponse(toResponse(user), 120);
+        return new LoginResponse(toResponse(user), getSessionTimeoutMinutes());
     }
 
     public AuthUserResponse getCurrentUser(HttpSession session) {
@@ -169,5 +178,9 @@ public class AuthService {
                 user.getRole().name(),
                 user.getStatus().name()
         );
+    }
+
+    private int getSessionTimeoutMinutes() {
+        return Math.toIntExact(sessionTimeout.toMinutes());
     }
 }
