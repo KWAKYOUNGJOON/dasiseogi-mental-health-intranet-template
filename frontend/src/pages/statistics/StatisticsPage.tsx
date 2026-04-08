@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../app/providers/AuthProvider'
@@ -12,104 +13,24 @@ import {
 } from '../../features/statistics/api/statisticsApi'
 import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
+import type { ApiResponse } from '../../shared/types/api'
 import { getDefaultStatisticsSeoulDateRange, toValidDateText } from '../../shared/utils/dateText'
+import {
+  DEFAULT_STATISTICS_ALERT_PAGE_SIZE,
+  STATISTICS_ALERT_TYPE_OPTIONS,
+  formatStatisticsAlertScaleLabel,
+  formatStatisticsAlertTypeLabel,
+  formatStatisticsScaleLabel,
+  formatStatisticsScaleListLabel,
+  formatStatisticsScaleOptionLabel,
+} from './statisticsMetadata'
 
-const DEFAULT_ALERT_PAGE_SIZE = 10
-const ALERT_TYPE_OPTIONS = ['HIGH_RISK', 'CAUTION', 'CRITICAL_ITEM', 'COMPOSITE_RULE']
-const ALERT_TYPE_LABEL_BY_VALUE: Record<string, string> = {
-  HIGH_RISK: '고위험',
-  CAUTION: '주의',
-  CRITICAL_ITEM: '개별 위험 항목',
-  COMPOSITE_RULE: '복합 위험',
-}
-const STATISTICS_SCALE_NAME_BY_CODE: Record<string, string> = {
-  PHQ9: 'PHQ-9',
-  GAD7: 'GAD-7',
-  MKPQ16: 'mKPQ-16',
-  KMDQ: 'K-MDQ',
-  PSS10: 'PSS-10',
-  ISIK: 'ISI-K',
-  AUDITK: 'AUDIT-K',
-  IESR: 'IES-R',
-}
-const STATISTICS_SCALE_DESCRIPTION_BY_CODE: Record<string, string> = {
-  PHQ9: '우울',
-  GAD7: '불안',
-  MKPQ16: '정신증 위험',
-  KMDQ: '양극성(조울증)',
-  PSS10: '스트레스',
-  ISIK: '불면',
-  AUDITK: '알코올 사용',
-  IESR: '외상 후 스트레스(PTSD)',
-}
-const CRI_SCALE_CODE = 'CRI'
-const CRI_SCALE_NAME_SUFFIX = '(CRI)'
-const DEFAULT_CRI_SCALE_NAME = '정신과적 위기 분류 평정척도'
-
-function formatStatisticsScaleLabel(scaleCode: string, scaleName?: string) {
-  const resolvedScaleName = scaleName ?? STATISTICS_SCALE_NAME_BY_CODE[scaleCode]
-  const description = STATISTICS_SCALE_DESCRIPTION_BY_CODE[scaleCode]
-
-  if (resolvedScaleName && description) {
-    return `${resolvedScaleName} (${description})`
+function getStatisticsErrorMessage(error: unknown, fallbackMessage: string) {
+  if (!isAxiosError<ApiResponse<unknown>>(error)) {
+    return fallbackMessage
   }
 
-  return resolvedScaleName ?? scaleCode
-}
-
-function formatStatisticsScaleNameWithCode(scaleCode: string, scaleName: string) {
-  const trimmedScaleName = scaleName.trimEnd()
-  const scaleCodeSuffix = `(${scaleCode})`
-
-  if (trimmedScaleName.endsWith(scaleCodeSuffix)) {
-    return trimmedScaleName
-  }
-
-  return `${trimmedScaleName} ${scaleCodeSuffix}`
-}
-
-function formatStatisticsCriBaseName(scaleName?: string) {
-  const trimmedScaleName = scaleName?.trim()
-
-  if (!trimmedScaleName) {
-    return DEFAULT_CRI_SCALE_NAME
-  }
-
-  if (!trimmedScaleName.endsWith(CRI_SCALE_NAME_SUFFIX)) {
-    return trimmedScaleName
-  }
-
-  return trimmedScaleName.slice(0, -CRI_SCALE_NAME_SUFFIX.length).trimEnd()
-}
-
-function formatStatisticsScaleDropdownLabel(item: StatisticsScaleResponse['items'][number]) {
-  if (item.scaleCode === CRI_SCALE_CODE) {
-    return `CRI (${formatStatisticsCriBaseName(item.scaleName)})`
-  }
-
-  const displayLabel = STATISTICS_SCALE_DESCRIPTION_BY_CODE[item.scaleCode]
-    ? formatStatisticsScaleLabel(item.scaleCode, item.scaleName)
-    : formatStatisticsScaleNameWithCode(item.scaleCode, item.scaleName)
-
-  return displayLabel
-}
-
-function formatStatisticsScaleListLabel(item: StatisticsScaleResponse['items'][number]) {
-  return formatStatisticsScaleLabel(item.scaleCode, item.scaleName)
-}
-
-function formatStatisticsAlertScaleLabel(scaleCode: string) {
-  return formatStatisticsScaleLabel(scaleCode)
-}
-
-function formatStatisticsScaleOptionLabel(item: StatisticsScaleResponse['items'][number]) {
-  const displayLabel = formatStatisticsScaleDropdownLabel(item)
-
-  return `${displayLabel}${item.isActive ? '' : ' - 비활성'}`
-}
-
-function formatAlertTypeLabel(alertType: string) {
-  return ALERT_TYPE_LABEL_BY_VALUE[alertType] ?? alertType
+  return error.response?.data?.message ?? fallbackMessage
 }
 
 export function StatisticsPage() {
@@ -129,6 +50,7 @@ export function StatisticsPage() {
 
   useEffect(() => {
     void loadAll(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function loadAll(nextAlertPage = alertPage) {
@@ -146,7 +68,7 @@ export function StatisticsPage() {
           scaleCode: alertScaleCode || undefined,
           alertType: alertType || undefined,
           page: nextAlertPage,
-          size: DEFAULT_ALERT_PAGE_SIZE,
+          size: DEFAULT_STATISTICS_ALERT_PAGE_SIZE,
         }),
       ])
       setSummary(summaryData)
@@ -154,8 +76,8 @@ export function StatisticsPage() {
       setAlerts(alertData)
       setAlertPage(nextAlertPage)
       setError(null)
-    } catch (requestError: any) {
-      setError(requestError?.response?.data?.message ?? '통계 정보를 불러오지 못했습니다.')
+    } catch (requestError: unknown) {
+      setError(getStatisticsErrorMessage(requestError, '통계 정보를 불러오지 못했습니다.'))
     } finally {
       setLoading(false)
     }
@@ -212,9 +134,9 @@ export function StatisticsPage() {
           </select>
           <select aria-label="경고 유형" onChange={(event) => setAlertType(event.target.value)} value={alertType}>
             <option value="">전체 경고유형</option>
-            {ALERT_TYPE_OPTIONS.map((option) => (
+            {STATISTICS_ALERT_TYPE_OPTIONS.map((option) => (
               <option key={option} value={option}>
-                {formatAlertTypeLabel(option)}
+                {formatStatisticsAlertTypeLabel(option)}
               </option>
             ))}
           </select>
@@ -325,7 +247,7 @@ export function StatisticsPage() {
               <div className="actions" style={{ justifyContent: 'space-between' }}>
                 <h3 style={{ margin: 0 }}>경고 기록</h3>
                 <span className="muted">
-                  필터: {selectedAlertScaleLabel} / {alertType ? formatAlertTypeLabel(alertType) : '전체 유형'}
+                  필터: {selectedAlertScaleLabel} / {alertType ? formatStatisticsAlertTypeLabel(alertType) : '전체 유형'}
                 </span>
               </div>
               {alerts && alerts.items.length > 0 ? (
@@ -352,7 +274,7 @@ export function StatisticsPage() {
                           <td>{alert.clientName}</td>
                           <td>{alert.performedByName}</td>
                           <td>{formatStatisticsAlertScaleLabel(alert.scaleCode)}</td>
-                          <td>{formatAlertTypeLabel(alert.alertType)}</td>
+                          <td>{formatStatisticsAlertTypeLabel(alert.alertType)}</td>
                           <td>{alert.alertMessage}</td>
                         </tr>
                       ))}
