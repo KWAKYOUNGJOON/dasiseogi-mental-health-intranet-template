@@ -3,30 +3,13 @@ import { Link } from 'react-router-dom'
 import { fetchClients, type ClientListPage } from '../../features/clients/api/clientApi'
 import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
+import { getClientGenderLabel, getClientStatusLabel } from '../../shared/display/entityDisplayMetadata'
 import { toValidDateText } from '../../shared/utils/dateText'
 
 const DEFAULT_PAGE_SIZE = 20
 const CLIENT_LIST_ERROR_MESSAGE = '대상자 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
 const EMPTY_CLIENTS_MESSAGE = '등록된 대상자가 없습니다.'
 const EMPTY_SEARCH_RESULTS_MESSAGE = '검색 조건에 맞는 대상자가 없습니다.'
-const GENDER_LABELS: Record<string, string> = {
-  MALE: '남성',
-  FEMALE: '여성',
-}
-const STATUS_LABELS: Record<string, string> = {
-  ACTIVE: '활성',
-  INACTIVE: '비활성',
-  MISREGISTERED: '오등록',
-}
-
-function toDisplayLabel(value: string | null | undefined, labels: Record<string, string>) {
-  if (!value) {
-    return '-'
-  }
-
-  return labels[value] ?? value
-}
-
 export function ClientListPage() {
   const [clientPage, setClientPage] = useState<ClientListPage | null>(null)
   const [name, setName] = useState('')
@@ -133,11 +116,11 @@ export function ClientListPage() {
                   <tr key={client.id}>
                     <td>{client.name}</td>
                     <td>{client.birthDate}</td>
-                    <td>{toDisplayLabel(client.gender, GENDER_LABELS)}</td>
+                    <td>{getClientGenderLabel(client.gender)}</td>
                     <td>{client.clientNo}</td>
                     <td>{client.primaryWorkerName}</td>
                     <td>{client.latestSessionDate ?? '-'}</td>
-                    <td>{toDisplayLabel(client.status, STATUS_LABELS)}</td>
+                    <td>{getClientStatusLabel(client.status)}</td>
                     <td>
                       <Link className="secondary-button" to={`/clients/${client.id}`}>
                         상세보기

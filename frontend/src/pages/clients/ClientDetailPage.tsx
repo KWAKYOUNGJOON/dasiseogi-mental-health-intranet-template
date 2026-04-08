@@ -5,6 +5,7 @@ import { fetchClientDetail, markClientMisregistered, type ClientDetail } from '.
 import { useAuth } from '../../app/providers/AuthProvider'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { PageHeader } from '../../shared/components/PageHeader'
+import { getClientStatusLabel } from '../../shared/display/entityDisplayMetadata'
 import type { ApiResponse } from '../../shared/types/api'
 import { hasAdminAccess } from '../../shared/user/userMetadata'
 
@@ -122,7 +123,7 @@ export function ClientDetailPage() {
         </div>
         <div className="field">
           <span className="muted">상태</span>
-          <strong>{client.status}</strong>
+          <strong>{getClientStatusLabel(client.status)}</strong>
         </div>
       </div>
       {client.status === 'MISREGISTERED' ? (

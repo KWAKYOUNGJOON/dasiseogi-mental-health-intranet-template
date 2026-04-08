@@ -9,6 +9,7 @@ import {
 } from '../../features/assessment/api/assessmentApi'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { PageHeader } from '../../shared/components/PageHeader'
+import { getClientGenderLabel, getSessionStatusLabel } from '../../shared/display/entityDisplayMetadata'
 import { hasAdminAccess } from '../../shared/user/userMetadata'
 import { formatAssessmentLocalDateTimeText } from '../../shared/utils/dateText'
 import type { ApiResponse } from '../../shared/types/api'
@@ -25,14 +26,6 @@ const HIGHLIGHT_SCALE_FALLBACK_MESSAGE = '강조할 척도를 찾지 못해 세�
 const DEFAULT_RECORD_LIST_PATH = '/assessment-records'
 const SAVED_NOTICE_MESSAGE = '세션이 저장되었습니다.'
 const NOTICE_AUTO_DISMISS_MS = 3000
-const CLIENT_GENDER_LABELS: Record<string, string> = {
-  MALE: '남성',
-  FEMALE: '여성',
-}
-const SESSION_STATUS_LABELS: Record<string, string> = {
-  COMPLETED: '완료',
-  MISENTERED: '오입력',
-}
 
 function getErrorResponse(error: unknown) {
   if (!isAxiosError<ApiResponse<unknown>>(error)) {
@@ -123,14 +116,6 @@ function getAssessmentRecordReturnTo(searchParams: URLSearchParams) {
   }
 
   return DEFAULT_RECORD_LIST_PATH
-}
-
-function getSessionStatusLabel(status: SessionDetail['status']) {
-  return SESSION_STATUS_LABELS[status] ?? status
-}
-
-function getClientGenderLabel(gender: SessionDetail['clientGender']) {
-  return CLIENT_GENDER_LABELS[gender] ?? gender
 }
 
 function getAlertScaleLabel(session: SessionDetail, scaleCode: string) {

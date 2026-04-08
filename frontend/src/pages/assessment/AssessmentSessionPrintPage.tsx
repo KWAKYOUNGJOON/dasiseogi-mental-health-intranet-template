@@ -1,16 +1,10 @@
+import { isAxiosError } from 'axios'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { fetchSessionPrintData, type SessionPrintData } from '../../features/assessment/api/assessmentApi'
+import { getClientGenderLabel } from '../../shared/display/entityDisplayMetadata'
+import type { ApiResponse } from '../../shared/types/api'
 import { formatAssessmentLocalDateTimeText } from '../../shared/utils/dateText'
-
-const CLIENT_GENDER_LABELS: Record<string, string> = {
-  MALE: '남성',
-  FEMALE: '여성',
-}
-
-function getClientGenderLabel(gender: SessionPrintData['client']['gender']) {
-  return CLIENT_GENDER_LABELS[gender] ?? gender
-}
 
 export function AssessmentSessionPrintPage() {
   const { sessionId } = useParams()
@@ -24,8 +18,12 @@ export function AssessmentSessionPrintPage() {
     }
     void fetchSessionPrintData(Number(sessionId))
       .then(setData)
-      .catch((requestError: any) => {
-        setError(requestError?.response?.data?.message ?? '출력 데이터를 불러오지 못했습니다.')
+      .catch((requestError: unknown) => {
+        setError(
+          isAxiosError<ApiResponse<unknown>>(requestError)
+            ? requestError.response?.data?.message ?? '출력 데이터를 불러오지 못했습니다.'
+            : '출력 데이터를 불러오지 못했습니다.',
+        )
       })
   }, [sessionId])
 
