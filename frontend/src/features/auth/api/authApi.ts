@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios'
 import { http } from '../../../shared/api/http'
 import type { ApiResponse } from '../../../shared/types/api'
+import type { UserRole, UserStatus } from '../../../shared/user/userMetadata'
 
 export interface AuthUser {
   id: number
@@ -9,8 +10,8 @@ export interface AuthUser {
   phone: string | null
   positionName: string | null
   teamName: string | null
-  role: 'ADMIN' | 'USER'
-  status: 'ACTIVE' | 'PENDING' | 'INACTIVE' | 'REJECTED'
+  role: UserRole
+  status: UserStatus
 }
 
 export interface LoginResponse {

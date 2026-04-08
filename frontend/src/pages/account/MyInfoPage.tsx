@@ -4,6 +4,7 @@ import { useAuth } from '../../app/providers/AuthProvider'
 import { updateMyProfile, type AuthUser, type UpdateMyProfilePayload } from '../../features/auth/api/authApi'
 import { PageHeader } from '../../shared/components/PageHeader'
 import type { ApiResponse } from '../../shared/types/api'
+import { getUserRoleLabel, getUserStatusLabel } from '../../shared/user/userMetadata'
 
 const MY_INFO_EDITABLE_FIELDS = ['name', 'phone', 'teamName'] as const
 const PHONE_PATTERN = /^\d{2,3}-?\d{3,4}-?\d{4}$/
@@ -225,23 +226,6 @@ function getFieldDescribedBy(field: MyInfoDisplayFieldName, hasHint: boolean, ha
   return ids.length > 0 ? ids.join(' ') : undefined
 }
 
-function getRoleLabel(role: AuthUser['role']) {
-  return role === 'ADMIN' ? '관리자' : '일반 사용자'
-}
-
-function getStatusLabel(status: AuthUser['status']) {
-  switch (status) {
-    case 'ACTIVE':
-      return '활성'
-    case 'PENDING':
-      return '승인 대기'
-    case 'INACTIVE':
-      return '비활성'
-    case 'REJECTED':
-      return '반려'
-  }
-}
-
 export function MyInfoPage() {
   const { refresh, user } = useAuth()
   const [form, setForm] = useState<MyInfoFormValues>(() =>
@@ -379,11 +363,11 @@ export function MyInfoPage() {
           </label>
           <label className="field">
             <span>권한</span>
-            <input disabled value={getRoleLabel(user.role)} />
+            <input disabled value={getUserRoleLabel(user.role)} />
           </label>
           <label className="field">
             <span>계정 상태</span>
-            <input disabled value={getStatusLabel(user.status)} />
+            <input disabled value={getUserStatusLabel(user.status)} />
           </label>
         </div>
       </section>

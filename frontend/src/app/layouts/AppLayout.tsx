@@ -1,9 +1,12 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../providers/AuthProvider'
+import { getUserRoleLabel, hasAdminAccess } from '../../shared/user/userMetadata'
 
 export function AppLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const canAccessAdmin = hasAdminAccess(user)
+  const userRoleLabel = user ? getUserRoleLabel(user.role) : ''
 
   async function handleLogout() {
     await logout()
@@ -21,17 +24,21 @@ export function AppLayout() {
           <NavLink to="/clients">대상자</NavLink>
           <NavLink to="/assessment-records">검사기록</NavLink>
           <NavLink to="/statistics">통계</NavLink>
-          {user?.role === 'ADMIN' ? <NavLink to="/admin/signup-requests">승인 대기</NavLink> : null}
-          {user?.role === 'ADMIN' ? <NavLink to="/admin/users">사용자 관리</NavLink> : null}
-          {user?.role === 'ADMIN' ? <NavLink to="/admin/logs">로그 확인</NavLink> : null}
-          {user?.role === 'ADMIN' ? <NavLink to="/admin/backups">백업 관리</NavLink> : null}
+          {canAccessAdmin ? (
+            <>
+              <NavLink to="/admin/signup-requests">승인 대기</NavLink>
+              <NavLink to="/admin/users">사용자 관리</NavLink>
+              <NavLink to="/admin/logs">로그 확인</NavLink>
+              <NavLink to="/admin/backups">백업 관리</NavLink>
+            </>
+          ) : null}
         </nav>
       </aside>
       <div className="content-shell">
         <header className="topbar">
           <div className="topbar-user">
             <strong>{user?.name}</strong>
-            <span>{user?.role === 'ADMIN' ? '관리자' : '일반 사용자'}</span>
+            <span>{userRoleLabel}</span>
           </div>
           <div className="topbar-actions">
             <NavLink className="secondary-button" to="/my-info">

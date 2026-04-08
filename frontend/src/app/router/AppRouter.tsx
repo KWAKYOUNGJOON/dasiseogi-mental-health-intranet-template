@@ -18,6 +18,7 @@ import { ClientDetailPage } from '../../pages/clients/ClientDetailPage'
 import { ClientEditPage } from '../../pages/clients/ClientEditPage'
 import { ClientListPage } from '../../pages/clients/ClientListPage'
 import { StatisticsPage } from '../../pages/statistics/StatisticsPage'
+import { hasAdminAccess } from '../../shared/user/userMetadata'
 import { AppLayout } from '../layouts/AppLayout'
 import { useAuth, type AuthRedirectNotice } from '../providers/AuthProvider'
 
@@ -117,7 +118,7 @@ function AdminOnly({ children }: { children: ReactElement }) {
   if (!user) {
     return <Navigate to={getLoginRedirect(authNotice)} replace />
   }
-  if (user.role !== 'ADMIN') {
+  if (!hasAdminAccess(user)) {
     return <Navigate to="/clients" replace />
   }
   return children
