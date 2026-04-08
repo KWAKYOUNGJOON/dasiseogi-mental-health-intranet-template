@@ -5,6 +5,8 @@ import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 export interface ScaleListItem {
   scaleCode: string
   scaleName: string
+  selectionTitle?: string
+  selectionSubtitle?: string
   displayOrder: number
   isActive: boolean
   implemented: boolean

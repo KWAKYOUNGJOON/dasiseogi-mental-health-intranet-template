@@ -41,6 +41,8 @@ class ScaleResourceLoaderTest {
                     {
                       "scaleCode": "PHQ9",
                       "scaleName": "PHQ-9 External",
+                      "selectionTitle": "PHQ-9 카드",
+                      "selectionSubtitle": "외부 우울",
                       "displayOrder": 1,
                       "isActive": true,
                       "implemented": true,
@@ -62,6 +64,8 @@ class ScaleResourceLoaderTest {
         ScaleResourceLoader.LoadedScaleResources loaded = loader.load();
 
         assertThat(loaded.registryItems()).containsKey("PHQ9");
+        assertThat(loaded.registryItems().get("PHQ9").selectionTitle()).isEqualTo("PHQ-9 카드");
+        assertThat(loaded.registryItems().get("PHQ9").selectionSubtitle()).isEqualTo("외부 우울");
         assertThat(loaded.definitions()).containsKey("PHQ9");
         assertThat(loaded.definitions().get("PHQ9").scaleName()).isEqualTo("PHQ-9 External File");
     }
@@ -152,6 +156,33 @@ class ScaleResourceLoaderTest {
                         java.util.List.of("B"),
                         java.util.List.of("C"),
                         java.util.List.of("D")
+                );
+    }
+
+    @Test
+    void getScalesExposesSelectionCardMetadataFromRegistry() {
+        ScaleProperties scaleProperties = new ScaleProperties();
+        scaleProperties.setResourcePath(null);
+        ScaleResourceLoader loader = new ScaleResourceLoader(objectMapper, resourceLoader, scaleProperties);
+        ScaleService scaleService = new ScaleService(loader);
+
+        scaleService.load();
+
+        assertThat(scaleService.getScales())
+                .extracting(
+                        item -> item.scaleCode(),
+                        item -> item.scaleName(),
+                        item -> item.selectionTitle(),
+                        item -> item.selectionSubtitle()
+                )
+                .contains(
+                        org.assertj.core.groups.Tuple.tuple("PHQ9", "PHQ-9", "PHQ-9", "우울"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "CRI",
+                                "정신과적 위기 분류 평정척도 (CRI)",
+                                "CRI",
+                                "정신과적 위기 분류 평정척도"
+                        )
                 );
     }
 

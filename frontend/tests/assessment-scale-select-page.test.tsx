@@ -19,41 +19,46 @@ vi.mock('../src/features/assessment/api/assessmentApi', () => ({
 const mockedFetchScales = vi.mocked(fetchScales)
 
 const SCALE_SELECTION_CARD_EXPECTATIONS = [
-  { scaleCode: 'PHQ9', scaleName: 'PHQ-9', title: 'PHQ-9', subtitle: '우울', displayOrder: 1 },
-  { scaleCode: 'GAD7', scaleName: 'GAD-7', title: 'GAD-7', subtitle: '불안', displayOrder: 2 },
-  { scaleCode: 'MKPQ16', scaleName: 'mKPQ-16', title: 'mKPQ-16', subtitle: '정신증 위험', displayOrder: 3 },
-  { scaleCode: 'KMDQ', scaleName: 'K-MDQ', title: 'K-MDQ', subtitle: '양극성(조울증)', displayOrder: 4 },
-  { scaleCode: 'PSS10', scaleName: 'PSS-10', title: 'PSS-10', subtitle: '스트레스', displayOrder: 5 },
-  { scaleCode: 'ISIK', scaleName: 'ISI-K', title: 'ISI-K', subtitle: '불면', displayOrder: 6 },
-  { scaleCode: 'AUDITK', scaleName: 'AUDIT-K', title: 'AUDIT-K', subtitle: '알코올 사용', displayOrder: 7 },
-  { scaleCode: 'IESR', scaleName: 'IES-R', title: 'IES-R', subtitle: '외상 후 스트레스(PTSD)', displayOrder: 8 },
+  { scaleCode: 'PHQ9', scaleName: 'PHQ-9', selectionTitle: 'PHQ-9', selectionSubtitle: '우울', displayOrder: 1 },
+  { scaleCode: 'GAD7', scaleName: 'GAD-7', selectionTitle: 'GAD-7', selectionSubtitle: '불안', displayOrder: 2 },
+  { scaleCode: 'MKPQ16', scaleName: 'mKPQ-16', selectionTitle: 'mKPQ-16', selectionSubtitle: '정신증 위험', displayOrder: 3 },
+  { scaleCode: 'KMDQ', scaleName: 'K-MDQ', selectionTitle: 'K-MDQ', selectionSubtitle: '양극성(조울증)', displayOrder: 4 },
+  { scaleCode: 'PSS10', scaleName: 'PSS-10', selectionTitle: 'PSS-10', selectionSubtitle: '스트레스', displayOrder: 5 },
+  { scaleCode: 'ISIK', scaleName: 'ISI-K', selectionTitle: 'ISI-K', selectionSubtitle: '불면', displayOrder: 6 },
+  { scaleCode: 'AUDITK', scaleName: 'AUDIT-K', selectionTitle: 'AUDIT-K', selectionSubtitle: '알코올 사용', displayOrder: 7 },
+  { scaleCode: 'IESR', scaleName: 'IES-R', selectionTitle: 'IES-R', selectionSubtitle: '외상 후 스트레스(PTSD)', displayOrder: 8 },
   {
     scaleCode: 'CRI',
     scaleName: '정신과적 위기 분류 평정척도 (CRI)',
-    title: 'CRI',
-    subtitle: '정신과적 위기 분류 평정척도',
+    selectionTitle: 'CRI',
+    selectionSubtitle: '정신과적 위기 분류 평정척도',
     displayOrder: 9,
   },
 ] satisfies Array<{
   displayOrder: number
   scaleCode: string
   scaleName: string
-  subtitle: string
-  title: string
+  selectionSubtitle: string
+  selectionTitle: string
 }>
 
-const ALL_SCALE_LIST_ITEMS = SCALE_SELECTION_CARD_EXPECTATIONS.map(({ scaleCode, scaleName, displayOrder }) =>
-  createScaleListItem({
-    displayOrder,
-    scaleCode,
-    scaleName,
-  }),
+const ALL_SCALE_LIST_ITEMS = SCALE_SELECTION_CARD_EXPECTATIONS.map(
+  ({ scaleCode, scaleName, selectionTitle, selectionSubtitle, displayOrder }) =>
+    createScaleListItem({
+      displayOrder,
+      scaleCode,
+      scaleName,
+      selectionTitle,
+      selectionSubtitle,
+    }),
 )
 
 function createScaleListItem(overrides?: Partial<ScaleListItem>): ScaleListItem {
   return {
     scaleCode: 'PHQ9',
     scaleName: 'PHQ-9',
+    selectionTitle: 'PHQ-9',
+    selectionSubtitle: '우울',
     displayOrder: 1,
     isActive: true,
     implemented: true,
@@ -91,7 +96,7 @@ afterEach(() => {
 })
 
 describe('assessment scale select page', () => {
-  it('renders all nine scale cards with the mapped title/subtitle pairs when the page opens', async () => {
+  it('renders all nine scale cards with the API selectionTitle/selectionSubtitle pairs when the page opens', async () => {
     renderAssessmentScaleSelectPage()
 
     await waitFor(() => {
@@ -102,9 +107,9 @@ describe('assessment scale select page', () => {
     expect(screen.getAllByRole('checkbox')).toHaveLength(SCALE_SELECTION_CARD_EXPECTATIONS.length)
     expect(screen.getByText(/대상자 ID 42/)).toBeTruthy()
 
-    for (const { title, subtitle } of SCALE_SELECTION_CARD_EXPECTATIONS) {
-      expect(screen.getByText(title)).toBeTruthy()
-      expect(screen.getByText(subtitle)).toBeTruthy()
+    for (const { selectionTitle, selectionSubtitle } of SCALE_SELECTION_CARD_EXPECTATIONS) {
+      expect(screen.getByText(selectionTitle)).toBeTruthy()
+      expect(screen.getByText(selectionSubtitle)).toBeTruthy()
     }
 
     expect(screen.queryByText('정신과적 위기 분류 평정척도 (CRI)')).toBeNull()
@@ -132,11 +137,15 @@ describe('assessment scale select page', () => {
       createScaleListItem({
         scaleCode: 'GAD7',
         scaleName: 'GAD-7',
+        selectionTitle: 'GAD-7',
+        selectionSubtitle: '불안',
         displayOrder: 2,
       }),
       createScaleListItem({
         scaleCode: 'PHQ9',
         scaleName: 'PHQ-9',
+        selectionTitle: 'PHQ-9',
+        selectionSubtitle: '우울',
         displayOrder: 1,
       }),
     ])
@@ -165,6 +174,8 @@ describe('assessment scale select page', () => {
       createScaleListItem({
         scaleCode: 'CRI',
         scaleName: '정신과적 위기 분류 평정척도 (CRI)',
+        selectionTitle: 'CRI',
+        selectionSubtitle: '정신과적 위기 분류 평정척도',
         displayOrder: 9,
       }),
     ])
@@ -189,5 +200,21 @@ describe('assessment scale select page', () => {
 
     expect(draftState.clientId).toBe(42)
     expect(draftState.selectedScaleCodes).toEqual(['CRI'])
+  })
+
+  it('falls back to scaleName and hides subtitle when selection metadata is missing', async () => {
+    mockedFetchScales.mockResolvedValue([
+      createScaleListItem({
+        scaleCode: 'PHQ9',
+        scaleName: 'PHQ-9',
+        selectionTitle: undefined,
+        selectionSubtitle: undefined,
+      }),
+    ])
+
+    renderAssessmentScaleSelectPage()
+
+    expect(await screen.findByText('PHQ-9')).toBeTruthy()
+    expect(screen.queryByText('우울')).toBeNull()
   })
 })

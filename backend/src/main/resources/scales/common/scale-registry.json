@@ -3,6 +3,8 @@
     {
       "scaleCode": "PHQ9",
       "scaleName": "PHQ-9",
+      "selectionTitle": "PHQ-9",
+      "selectionSubtitle": "우울",
       "displayOrder": 1,
       "isActive": true,
       "implemented": true,
@@ -11,6 +13,8 @@
     {
       "scaleCode": "GAD7",
       "scaleName": "GAD-7",
+      "selectionTitle": "GAD-7",
+      "selectionSubtitle": "불안",
       "displayOrder": 2,
       "isActive": true,
       "implemented": true,
@@ -19,6 +23,8 @@
     {
       "scaleCode": "MKPQ16",
       "scaleName": "mKPQ-16",
+      "selectionTitle": "mKPQ-16",
+      "selectionSubtitle": "정신증 위험",
       "displayOrder": 3,
       "isActive": true,
       "implemented": true,
@@ -27,6 +33,8 @@
     {
       "scaleCode": "KMDQ",
       "scaleName": "K-MDQ",
+      "selectionTitle": "K-MDQ",
+      "selectionSubtitle": "양극성(조울증)",
       "displayOrder": 4,
       "isActive": true,
       "implemented": true,
@@ -35,6 +43,8 @@
     {
       "scaleCode": "PSS10",
       "scaleName": "PSS-10",
+      "selectionTitle": "PSS-10",
+      "selectionSubtitle": "스트레스",
       "displayOrder": 5,
       "isActive": true,
       "implemented": true,
@@ -43,6 +53,8 @@
     {
       "scaleCode": "ISIK",
       "scaleName": "ISI-K",
+      "selectionTitle": "ISI-K",
+      "selectionSubtitle": "불면",
       "displayOrder": 6,
       "isActive": true,
       "implemented": true,
@@ -51,6 +63,8 @@
     {
       "scaleCode": "AUDITK",
       "scaleName": "AUDIT-K",
+      "selectionTitle": "AUDIT-K",
+      "selectionSubtitle": "알코올 사용",
       "displayOrder": 7,
       "isActive": true,
       "implemented": true,
@@ -59,6 +73,8 @@
     {
       "scaleCode": "IESR",
       "scaleName": "IES-R",
+      "selectionTitle": "IES-R",
+      "selectionSubtitle": "외상 후 스트레스(PTSD)",
       "displayOrder": 8,
       "isActive": true,
       "implemented": true,
@@ -67,6 +83,8 @@
     {
       "scaleCode": "CRI",
       "scaleName": "정신과적 위기 분류 평정척도 (CRI)",
+      "selectionTitle": "CRI",
+      "selectionSubtitle": "정신과적 위기 분류 평정척도",
       "displayOrder": 9,
       "isActive": true,
       "implemented": true,

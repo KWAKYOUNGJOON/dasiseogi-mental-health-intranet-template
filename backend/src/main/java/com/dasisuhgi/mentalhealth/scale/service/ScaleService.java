@@ -37,6 +37,8 @@ public class ScaleService {
                 .map(item -> new ScaleListItemResponse(
                         item.scaleCode(),
                         item.scaleName(),
+                        item.selectionTitle(),
+                        item.selectionSubtitle(),
                         item.displayOrder(),
                         item.isActive(),
                         item.implemented()
