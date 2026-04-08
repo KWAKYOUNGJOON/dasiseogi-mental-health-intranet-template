@@ -44,14 +44,15 @@ public class StatisticsService {
     public StatisticsScaleResponse getScaleStatistics(LocalDate dateFrom, LocalDate dateTo, SessionUser sessionUser) {
         validateAuthenticated(sessionUser);
         DateRange dateRange = resolveDateRange(dateFrom, dateTo);
-        Map<String, ScaleListItemResponse> scaleMetadataByCode = getScaleMetadataByCode();
+        List<ScaleListItemResponse> scaleMetadataItems = scaleService.getScales();
+        Map<String, ScaleListItemResponse> scaleMetadataByCode = getScaleMetadataByCode(scaleMetadataItems);
 
         Map<String, StatisticsScaleItemResponse> countedByCode = new LinkedHashMap<>();
         for (StatisticsScaleItemResponse item : assessmentQueryRepository.findScaleStatistics(dateRange.dateFrom(), dateRange.dateTo())) {
             countedByCode.put(item.scaleCode(), item);
         }
 
-        List<StatisticsScaleItemResponse> orderedItems = new ArrayList<>(scaleService.getScales().stream()
+        List<StatisticsScaleItemResponse> orderedItems = new ArrayList<>(scaleMetadataItems.stream()
                 .filter(ScaleListItemResponse::isActive)
                 .filter(ScaleListItemResponse::implemented)
                 .map(scale -> enrichScaleItem(
@@ -90,7 +91,7 @@ public class StatisticsService {
 
         DateRange dateRange = resolveDateRange(dateFrom, dateTo);
         AlertType parsedAlertType = parseAlertType(alertType);
-        Map<String, ScaleListItemResponse> scaleMetadataByCode = getScaleMetadataByCode();
+        Map<String, ScaleListItemResponse> scaleMetadataByCode = getScaleMetadataByCode(scaleService.getScales());
         PageResponse<StatisticsAlertItemResponse> alertPage = assessmentQueryRepository.findStatisticsAlerts(
                 dateRange.dateFrom(),
                 dateRange.dateTo(),
@@ -139,9 +140,9 @@ public class StatisticsService {
     private record DateRange(LocalDate dateFrom, LocalDate dateTo) {
     }
 
-    private Map<String, ScaleListItemResponse> getScaleMetadataByCode() {
+    private Map<String, ScaleListItemResponse> getScaleMetadataByCode(List<ScaleListItemResponse> scaleMetadataItems) {
         Map<String, ScaleListItemResponse> scaleMetadataByCode = new LinkedHashMap<>();
-        for (ScaleListItemResponse scale : scaleService.getScales()) {
+        for (ScaleListItemResponse scale : scaleMetadataItems) {
             scaleMetadataByCode.put(scale.scaleCode(), scale);
         }
         return scaleMetadataByCode;
@@ -156,8 +157,8 @@ public class StatisticsService {
         return new StatisticsScaleItemResponse(
                 item.scaleCode(),
                 resolvedScaleName,
-                resolveDisplayTitle(item.scaleCode(), resolvedScaleName, scaleMetadata),
-                resolveDisplaySubtitle(scaleMetadata),
+                resolveSelectionTitle(item.selectionTitle(), item.scaleCode(), resolvedScaleName, scaleMetadata),
+                resolveSelectionSubtitle(item.selectionSubtitle(), scaleMetadata),
                 item.totalCount(),
                 item.alertCount(),
                 isActive
@@ -193,7 +194,15 @@ public class StatisticsService {
         return scaleCode;
     }
 
-    private String resolveDisplayTitle(String scaleCode, String scaleName, ScaleListItemResponse scaleMetadata) {
+    private String resolveSelectionTitle(
+            String selectionTitle,
+            String scaleCode,
+            String scaleName,
+            ScaleListItemResponse scaleMetadata
+    ) {
+        if (selectionTitle != null && !selectionTitle.isBlank()) {
+            return selectionTitle;
+        }
         if (scaleMetadata != null && scaleMetadata.selectionTitle() != null && !scaleMetadata.selectionTitle().isBlank()) {
             return scaleMetadata.selectionTitle();
         }
@@ -203,10 +212,21 @@ public class StatisticsService {
         return scaleCode;
     }
 
-    private String resolveDisplaySubtitle(ScaleListItemResponse scaleMetadata) {
+    private String resolveSelectionSubtitle(String selectionSubtitle, ScaleListItemResponse scaleMetadata) {
+        if (selectionSubtitle != null && !selectionSubtitle.isBlank()) {
+            return selectionSubtitle;
+        }
         if (scaleMetadata == null || scaleMetadata.selectionSubtitle() == null || scaleMetadata.selectionSubtitle().isBlank()) {
             return null;
         }
         return scaleMetadata.selectionSubtitle();
+    }
+
+    private String resolveDisplayTitle(String scaleCode, String scaleName, ScaleListItemResponse scaleMetadata) {
+        return resolveSelectionTitle(null, scaleCode, scaleName, scaleMetadata);
+    }
+
+    private String resolveDisplaySubtitle(ScaleListItemResponse scaleMetadata) {
+        return resolveSelectionSubtitle(null, scaleMetadata);
     }
 }

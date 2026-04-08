@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import {
@@ -8,34 +9,10 @@ import {
 } from '../../features/assessment/api/assessmentApi'
 import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
+import { formatScaleSelectionLabel, formatScaleShortLabel } from '../../shared/scales/scaleDisplay'
 import { formatAssessmentLocalDateTimeText, toValidDateText } from '../../shared/utils/dateText'
 
 const DEFAULT_SIZE = 20
-const ASSESSMENT_RECORD_SCALE_NAME_BY_CODE: Record<string, string> = {
-  PHQ9: 'PHQ-9',
-  GAD7: 'GAD-7',
-  MKPQ16: 'mKPQ-16',
-  KMDQ: 'K-MDQ',
-  PSS10: 'PSS-10',
-  ISIK: 'ISI-K',
-  AUDITK: 'AUDIT-K',
-  IESR: 'IES-R',
-  CRI: 'CRI',
-}
-const ASSESSMENT_RECORD_SCALE_DESCRIPTION_BY_CODE: Record<string, string> = {
-  PHQ9: '우울',
-  GAD7: '불안',
-  MKPQ16: '정신증 위험',
-  KMDQ: '양극성(조울증)',
-  PSS10: '스트레스',
-  ISIK: '불면',
-  AUDITK: '알코올 사용',
-  IESR: '외상 후 스트레스(PTSD)',
-  CRI: '정신과적 위기 분류',
-}
-const ASSESSMENT_RECORD_SCALE_OPTION_LABEL_BY_CODE: Record<string, string> = {
-  CRI: 'CRI (정신과적 위기 분류 평정척도)',
-}
 
 interface RecordFilters {
   dateFrom: string
@@ -109,33 +86,47 @@ function buildSessionDetailPath(
 }
 
 function formatAssessmentRecordScaleOptionLabel(item: ScaleListItem) {
-  const optionLabel = ASSESSMENT_RECORD_SCALE_OPTION_LABEL_BY_CODE[item.scaleCode]
-
-  if (optionLabel) {
-    return optionLabel
-  }
-
-  const description = ASSESSMENT_RECORD_SCALE_DESCRIPTION_BY_CODE[item.scaleCode]
-
-  if (description) {
-    return `${item.scaleName} (${description})`
-  }
-
-  return `${item.scaleName} (${item.scaleCode})`
+  return formatScaleSelectionLabel(item, {
+    criMode: 'titleWithSubtitle',
+    fallbackWithCode: true,
+  })
 }
 
-function formatAssessmentRecordScaleCellLabel(record: AssessmentRecordPage['items'][number]) {
+function formatAssessmentRecordScaleCellLabel(
+  record: AssessmentRecordPage['items'][number],
+  scaleMetadataByCode: Map<string, ScaleListItem>,
+) {
   const scaleCode = record.scaleCode?.trim()
 
   if (scaleCode) {
-    const shortLabel = ASSESSMENT_RECORD_SCALE_NAME_BY_CODE[scaleCode]
+    const scaleMetadata = scaleMetadataByCode.get(scaleCode)
 
-    if (shortLabel) {
-      return shortLabel
+    if (scaleMetadata) {
+      return formatScaleShortLabel(scaleMetadata)
     }
   }
 
   return record.scaleName || scaleCode || ''
+}
+
+function getAssessmentRecordErrorMessage(error: unknown, fallbackMessage: string) {
+  if (!isAxiosError<{ message?: string }>(error)) {
+    if (typeof error === 'object' && error !== null) {
+      const response = 'response' in error ? error.response : null
+
+      if (typeof response === 'object' && response !== null) {
+        const data = 'data' in response ? response.data : null
+
+        if (typeof data === 'object' && data !== null && 'message' in data && typeof data.message === 'string') {
+          return data.message
+        }
+      }
+    }
+
+    return fallbackMessage
+  }
+
+  return error.response?.data?.message ?? fallbackMessage
 }
 
 export function AssessmentRecordListPage() {
@@ -161,6 +152,10 @@ export function AssessmentRecordListPage() {
     () => [...scaleItems].sort((left, right) => left.displayOrder - right.displayOrder),
     [scaleItems],
   )
+  const scaleMetadataByCode = useMemo(
+    () => new Map(scaleItems.map((item) => [item.scaleCode, item])),
+    [scaleItems],
+  )
 
   async function loadScaleOptions() {
     setScaleLoading(true)
@@ -169,9 +164,9 @@ export function AssessmentRecordListPage() {
       const data = await fetchScales()
       setScaleItems(data)
       setScaleError(null)
-    } catch (requestError: any) {
+    } catch (requestError: unknown) {
       setScaleItems([])
-      setScaleError(requestError?.response?.data?.message ?? '척도 목록을 불러오지 못했습니다.')
+      setScaleError(getAssessmentRecordErrorMessage(requestError, '척도 목록을 불러오지 못했습니다.'))
     } finally {
       setScaleLoading(false)
     }
@@ -210,13 +205,13 @@ export function AssessmentRecordListPage() {
       if (location.search !== (nextSearch ? `?${nextSearch}` : '')) {
         setSearchParams(nextSearchParams, { replace: true })
       }
-    } catch (requestError: any) {
+    } catch (requestError: unknown) {
       if (requestId !== requestSequence.current) {
         return
       }
 
       setRecords(null)
-      setError(requestError?.response?.data?.message ?? '검사기록 목록을 불러오지 못했습니다.')
+      setError(getAssessmentRecordErrorMessage(requestError, '검사기록 목록을 불러오지 못했습니다.'))
     } finally {
       if (requestId === requestSequence.current) {
         setLoading(false)
@@ -337,7 +332,7 @@ export function AssessmentRecordListPage() {
                     <td>{formatAssessmentLocalDateTimeText(record.sessionCompletedAt)}</td>
                     <td>{record.clientName}</td>
                     <td>{record.performedByName}</td>
-                    <td>{formatAssessmentRecordScaleCellLabel(record)}</td>
+                    <td>{formatAssessmentRecordScaleCellLabel(record, scaleMetadataByCode)}</td>
                     <td>{record.totalScore}</td>
                     <td>{record.resultLevel}</td>
                     <td>{record.hasAlert ? '있음' : '없음'}</td>

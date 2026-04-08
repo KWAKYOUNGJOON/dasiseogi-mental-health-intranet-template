@@ -19,6 +19,8 @@ export interface StatisticsSummary {
 export interface StatisticsScaleDisplayMetadata {
   scaleCode: string
   scaleName: string
+  selectionTitle?: string | null
+  selectionSubtitle?: string | null
   displayTitle?: string | null
   displaySubtitle?: string | null
 }

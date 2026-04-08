@@ -25,15 +25,22 @@ describe('statistics metadata', () => {
     expect(formatStatisticsAlertTypeLabel('CAUTION')).toBe('주의')
     expect(formatStatisticsAlertTypeLabel('UNKNOWN')).toBe('UNKNOWN')
 
-    expect(formatStatisticsScaleLabel('PHQ9')).toBe('PHQ-9 (우울)')
+    expect(
+      formatStatisticsScaleLabel({
+        scaleCode: 'PHQ9',
+        scaleName: 'PHQ-9',
+        selectionTitle: 'PHQ-9',
+        selectionSubtitle: '우울',
+      }),
+    ).toBe('PHQ-9 (우울)')
     expect(formatStatisticsScaleLabel('CRI')).toBe('CRI')
     expect(formatStatisticsAlertScaleLabel('CRI')).toBe('CRI')
     expect(
       formatStatisticsScaleLabel({
         scaleCode: 'PHQ9',
         scaleName: 'PHQ-9',
-        displayTitle: 'PHQ-9 서버',
-        displaySubtitle: '우울 서버',
+        selectionTitle: 'PHQ-9 서버',
+        selectionSubtitle: '우울 서버',
       }),
     ).toBe('PHQ-9 서버 (우울 서버)')
 
@@ -41,8 +48,8 @@ describe('statistics metadata', () => {
       formatStatisticsScaleDropdownLabel({
         scaleCode: 'CRI',
         scaleName: '정신과적 위기 분류 평정척도 (CRI)',
-        displayTitle: 'CRI',
-        displaySubtitle: '정신과적 위기 분류 평정척도',
+        selectionTitle: 'CRI',
+        selectionSubtitle: '정신과적 위기 분류 평정척도',
         totalCount: 5,
         alertCount: 2,
         isActive: true,
@@ -53,8 +60,8 @@ describe('statistics metadata', () => {
       formatStatisticsScaleListLabel({
         scaleCode: 'CRI',
         scaleName: '정신과적 위기 분류 평정척도 (CRI)',
-        displayTitle: 'CRI',
-        displaySubtitle: '정신과적 위기 분류 평정척도',
+        selectionTitle: 'CRI',
+        selectionSubtitle: '정신과적 위기 분류 평정척도',
         totalCount: 5,
         alertCount: 2,
         isActive: true,
@@ -65,7 +72,7 @@ describe('statistics metadata', () => {
       formatStatisticsScaleOptionLabel({
         scaleCode: 'OLDPHQ',
         scaleName: '구버전 PHQ',
-        displayTitle: '구버전 PHQ',
+        selectionTitle: '구버전 PHQ',
         totalCount: 4,
         alertCount: 1,
         isActive: false,
