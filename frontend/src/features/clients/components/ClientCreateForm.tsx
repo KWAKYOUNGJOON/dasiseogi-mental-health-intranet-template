@@ -4,6 +4,13 @@ import { useAuth } from '../../../app/providers/AuthProvider'
 import { DateTextInput } from '../../../shared/components/DateTextInput'
 import { CLIENT_GENDER_OPTIONS, getClientStatusLabel } from '../../../shared/display/entityDisplayMetadata'
 import {
+  CLIENT_FORM_FIELD_DEFINITIONS,
+  getClientFormFieldDescribedBy,
+  getClientFormFieldErrorId,
+  getClientFormFieldInputClassName,
+  getClientFormFieldInputId,
+} from '../clientFormMetadata'
+import {
   CLIENT_CREATE_FIELDS,
   CLIENT_CREATE_VALIDATION_MESSAGE,
   getClientCreateApiResponse,
@@ -22,48 +29,8 @@ import {
   type ClientCreateTouched,
 } from '../api/clientCreateApi'
 
-interface BaseFieldDefinition {
-  label: string
-  autoComplete?: string
-  inputMode?: 'tel' | 'text'
-  maxLength?: number
-}
-
-interface DateFieldDefinition extends BaseFieldDefinition {
-  name: 'birthDate'
-  type: 'date'
-}
-
-interface TextFieldDefinition extends BaseFieldDefinition {
-  name: Extract<ClientCreateFieldName, 'name' | 'phone'>
-  type?: 'text'
-}
-
-type FieldDefinition = DateFieldDefinition | TextFieldDefinition
-
-const FIELD_DEFINITIONS: ReadonlyArray<FieldDefinition> = [
-  { name: 'name', label: '이름', autoComplete: 'name', maxLength: 50 },
-  { name: 'birthDate', label: '생년월일', type: 'date' },
-  { name: 'phone', label: '연락처', autoComplete: 'tel', inputMode: 'tel', maxLength: 20 },
-]
-
 type DuplicateCandidate = Awaited<ReturnType<typeof requestClientDuplicateCheck>>['candidates'][number]
-
-function getFieldInputClassName(error: string | undefined) {
-  return error ? 'input-error' : undefined
-}
-
-function getFieldInputId(field: ClientCreateFieldName) {
-  return `client-create-${field}`
-}
-
-function getFieldErrorId(field: ClientCreateFieldName) {
-  return `client-create-${field}-error`
-}
-
-function getFieldDescribedBy(field: ClientCreateFieldName, hasError: boolean) {
-  return hasError ? getFieldErrorId(field) : undefined
-}
+const CLIENT_CREATE_FORM_VARIANT = 'create' as const
 
 export function ClientCreateForm() {
   const navigate = useNavigate()
@@ -250,108 +217,129 @@ export function ClientCreateForm() {
       ) : null}
 
       <div className="grid-2">
-        <label className="field" htmlFor={getFieldInputId('name')}>
-          <span>이름</span>
-          <input
-            aria-describedby={getFieldDescribedBy('name', Boolean(fieldErrors.name))}
-            aria-invalid={fieldErrors.name ? 'true' : undefined}
-            autoComplete="name"
-            className={getFieldInputClassName(fieldErrors.name)}
-            id={getFieldInputId('name')}
-            maxLength={50}
-            onBlur={handleBlur('name')}
-            onChange={handleFieldChange('name')}
-            value={form.name}
-          />
-          {fieldErrors.name ? (
-            <span className="field-error" id={getFieldErrorId('name')}>
-              {fieldErrors.name}
-            </span>
-          ) : null}
-        </label>
-
-        <label className="field" htmlFor={getFieldInputId('gender')}>
-          <span>성별</span>
-          <select
-            aria-describedby={getFieldDescribedBy('gender', Boolean(fieldErrors.gender))}
-            aria-invalid={fieldErrors.gender ? 'true' : undefined}
-            className={getFieldInputClassName(fieldErrors.gender)}
-            id={getFieldInputId('gender')}
-            onBlur={handleBlur('gender')}
-            onChange={handleFieldChange('gender')}
-            value={form.gender}
-          >
-            {CLIENT_GENDER_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {fieldErrors.gender ? (
-            <span className="field-error" id={getFieldErrorId('gender')}>
-              {fieldErrors.gender}
-            </span>
-          ) : null}
-        </label>
-
-        {FIELD_DEFINITIONS.filter((field) => field.name !== 'name').map((field) => {
+        {CLIENT_FORM_FIELD_DEFINITIONS.map((field) => {
           const errorMessage = fieldErrors[field.name]
+          const inputId = getClientFormFieldInputId(CLIENT_CREATE_FORM_VARIANT, field.name)
+          const errorId = getClientFormFieldErrorId(CLIENT_CREATE_FORM_VARIANT, field.name)
+          const describedBy = getClientFormFieldDescribedBy(CLIENT_CREATE_FORM_VARIANT, field.name, Boolean(errorMessage))
 
-          return (
-            <label className="field" htmlFor={getFieldInputId(field.name)} key={field.name}>
-              <span>{field.label}</span>
-              {field.type === 'date' ? (
-                <DateTextInput
-                  aria-describedby={getFieldDescribedBy(field.name, Boolean(errorMessage))}
-                  aria-invalid={errorMessage ? 'true' : undefined}
-                  autoComplete={field.autoComplete}
-                  className={getFieldInputClassName(errorMessage)}
-                  id={getFieldInputId(field.name)}
-                  onBlur={handleBlur(field.name)}
-                  onChange={handleDateFieldChange(field.name)}
-                  value={form[field.name]}
-                />
-              ) : (
-                <input
-                  aria-describedby={getFieldDescribedBy(field.name, Boolean(errorMessage))}
-                  aria-invalid={errorMessage ? 'true' : undefined}
-                  autoComplete={field.autoComplete}
-                  className={getFieldInputClassName(errorMessage)}
-                  id={getFieldInputId(field.name)}
-                  inputMode={field.inputMode}
-                  maxLength={field.maxLength}
-                  onBlur={handleBlur(field.name)}
-                  onChange={handleFieldChange(field.name)}
-                  type={field.type ?? 'text'}
-                  value={form[field.name]}
-                />
-              )}
-              {errorMessage ? (
-                <span className="field-error" id={getFieldErrorId(field.name)}>
-                  {errorMessage}
-                </span>
-              ) : null}
-            </label>
-          )
+          switch (field.name) {
+            case 'name':
+              return (
+                <label className="field" htmlFor={inputId} key={field.name}>
+                  <span>{field.label}</span>
+                  <input
+                    aria-describedby={describedBy}
+                    aria-invalid={errorMessage ? 'true' : undefined}
+                    autoComplete={field.autoComplete}
+                    className={getClientFormFieldInputClassName(errorMessage)}
+                    id={inputId}
+                    maxLength={field.maxLength}
+                    onBlur={handleBlur(field.name)}
+                    onChange={handleFieldChange(field.name)}
+                    value={form.name}
+                  />
+                  {errorMessage ? (
+                    <span className="field-error" id={errorId}>
+                      {errorMessage}
+                    </span>
+                  ) : null}
+                </label>
+              )
+            case 'gender':
+              return (
+                <label className="field" htmlFor={inputId} key={field.name}>
+                  <span>{field.label}</span>
+                  <select
+                    aria-describedby={describedBy}
+                    aria-invalid={errorMessage ? 'true' : undefined}
+                    className={getClientFormFieldInputClassName(errorMessage)}
+                    id={inputId}
+                    onBlur={handleBlur(field.name)}
+                    onChange={handleFieldChange(field.name)}
+                    value={form.gender}
+                  >
+                    {CLIENT_GENDER_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {errorMessage ? (
+                    <span className="field-error" id={errorId}>
+                      {errorMessage}
+                    </span>
+                  ) : null}
+                </label>
+              )
+            case 'birthDate':
+              return (
+                <label className="field" htmlFor={inputId} key={field.name}>
+                  <span>{field.label}</span>
+                  <DateTextInput
+                    aria-describedby={describedBy}
+                    aria-invalid={errorMessage ? 'true' : undefined}
+                    autoComplete={field.autoComplete}
+                    className={getClientFormFieldInputClassName(errorMessage)}
+                    id={inputId}
+                    onBlur={handleBlur(field.name)}
+                    onChange={handleDateFieldChange(field.name)}
+                    value={form.birthDate}
+                  />
+                  {errorMessage ? (
+                    <span className="field-error" id={errorId}>
+                      {errorMessage}
+                    </span>
+                  ) : null}
+                </label>
+              )
+            case 'phone':
+              return (
+                <label className="field" htmlFor={inputId} key={field.name}>
+                  <span>{field.label}</span>
+                  <input
+                    aria-describedby={describedBy}
+                    aria-invalid={errorMessage ? 'true' : undefined}
+                    autoComplete={field.autoComplete}
+                    className={getClientFormFieldInputClassName(errorMessage)}
+                    id={inputId}
+                    inputMode={field.inputMode}
+                    maxLength={field.maxLength}
+                    onBlur={handleBlur(field.name)}
+                    onChange={handleFieldChange(field.name)}
+                    value={form.phone}
+                  />
+                  {errorMessage ? (
+                    <span className="field-error" id={errorId}>
+                      {errorMessage}
+                    </span>
+                  ) : null}
+                </label>
+              )
+            case 'primaryWorkerId':
+              return (
+                <label className="field" htmlFor={inputId} key={field.name} style={{ gridColumn: '1 / -1' }}>
+                  <span>{field.label}</span>
+                  <input
+                    aria-describedby={describedBy}
+                    aria-invalid={errorMessage ? 'true' : undefined}
+                    className={getClientFormFieldInputClassName(errorMessage)}
+                    disabled
+                    id={inputId}
+                    onBlur={handleBlur(field.name)}
+                    value={user?.name ?? ''}
+                  />
+                  {errorMessage ? (
+                    <span className="field-error" id={errorId}>
+                      {errorMessage}
+                    </span>
+                  ) : null}
+                </label>
+              )
+          }
+
+          return null
         })}
-
-        <label className="field" htmlFor={getFieldInputId('primaryWorkerId')} style={{ gridColumn: '1 / -1' }}>
-          <span>담당자</span>
-          <input
-            aria-describedby={getFieldDescribedBy('primaryWorkerId', Boolean(fieldErrors.primaryWorkerId))}
-            aria-invalid={fieldErrors.primaryWorkerId ? 'true' : undefined}
-            className={getFieldInputClassName(fieldErrors.primaryWorkerId)}
-            disabled
-            id={getFieldInputId('primaryWorkerId')}
-            onBlur={handleBlur('primaryWorkerId')}
-            value={user?.name ?? ''}
-          />
-          {fieldErrors.primaryWorkerId ? (
-            <span className="field-error" id={getFieldErrorId('primaryWorkerId')}>
-              {fieldErrors.primaryWorkerId}
-            </span>
-          ) : null}
-        </label>
       </div>
 
       <div className="actions">

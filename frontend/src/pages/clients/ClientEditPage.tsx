@@ -1,6 +1,6 @@
 import { isAxiosError } from 'axios'
 import type { ChangeEvent, FormEvent } from 'react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../app/providers/AuthProvider'
 import { fetchAdminUsers } from '../../features/admin/api/adminApi'
@@ -18,6 +18,13 @@ import {
   type ClientCreateTouched,
 } from '../../features/clients/api/clientCreateApi'
 import { fetchClientDetail, updateClient, type ClientDetail } from '../../features/clients/api/clientApi'
+import {
+  CLIENT_FORM_FIELD_DEFINITIONS,
+  getClientFormFieldDescribedBy,
+  getClientFormFieldErrorId,
+  getClientFormFieldInputClassName,
+  getClientFormFieldInputId,
+} from '../../features/clients/clientFormMetadata'
 import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
 import { CLIENT_GENDER_OPTIONS } from '../../shared/display/entityDisplayMetadata'
@@ -25,22 +32,7 @@ import type { ApiResponse } from '../../shared/types/api'
 import { hasAdminAccess } from '../../shared/user/userMetadata'
 
 const DEFAULT_CLIENT_EDIT_ERROR_MESSAGE = '대상자 수정에 실패했습니다.'
-
-function getFieldInputClassName(error: string | undefined) {
-  return error ? 'input-error' : undefined
-}
-
-function getFieldInputId(field: ClientCreateFieldName) {
-  return `client-edit-${field}`
-}
-
-function getFieldErrorId(field: ClientCreateFieldName) {
-  return `client-edit-${field}-error`
-}
-
-function getFieldDescribedBy(field: ClientCreateFieldName, hasError: boolean) {
-  return hasError ? getFieldErrorId(field) : undefined
-}
+const CLIENT_EDIT_FORM_VARIANT = 'edit' as const
 
 function resolveClientEditRepresentativeMessage(response: ReturnType<typeof getClientCreateApiResponse>) {
   if (response?.errorCode === 'VALIDATION_ERROR') {
@@ -79,14 +71,7 @@ export function ClientEditPage() {
   const [formMessage, setFormMessage] = useState<string | null>(null)
   const hasAdminPrivileges = hasAdminAccess(user)
 
-  useEffect(() => {
-    if (!clientId) {
-      return
-    }
-    void load(Number(clientId))
-  }, [clientId, hasAdminPrivileges])
-
-  async function load(id: number) {
+  const load = useCallback(async (id: number) => {
     setLoading(true)
     setLoadError(null)
     try {
@@ -118,7 +103,14 @@ export function ClientEditPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [hasAdminPrivileges])
+
+  useEffect(() => {
+    if (!clientId) {
+      return
+    }
+    void load(Number(clientId))
+  }, [clientId, load])
 
   function getNextFieldErrors(
     currentFieldErrors: ClientCreateFieldErrors,
@@ -265,124 +257,147 @@ export function ClientEditPage() {
         ) : null}
 
         <div className="grid-2">
-          <label className="field" htmlFor={getFieldInputId('name')}>
-            <span>이름</span>
-            <input
-              aria-describedby={getFieldDescribedBy('name', Boolean(fieldErrors.name))}
-              aria-invalid={fieldErrors.name ? 'true' : undefined}
-              autoComplete="name"
-              className={getFieldInputClassName(fieldErrors.name)}
-              id={getFieldInputId('name')}
-              maxLength={50}
-              onBlur={handleBlur('name')}
-              onChange={handleFieldChange('name')}
-              value={form.name}
-            />
-            {fieldErrors.name ? (
-              <span className="field-error" id={getFieldErrorId('name')}>
-                {fieldErrors.name}
-              </span>
-            ) : null}
-          </label>
+          {CLIENT_FORM_FIELD_DEFINITIONS.map((field) => {
+            const errorMessage = fieldErrors[field.name]
+            const inputId = getClientFormFieldInputId(CLIENT_EDIT_FORM_VARIANT, field.name)
+            const errorId = getClientFormFieldErrorId(CLIENT_EDIT_FORM_VARIANT, field.name)
+            const describedBy = getClientFormFieldDescribedBy(CLIENT_EDIT_FORM_VARIANT, field.name, Boolean(errorMessage))
 
-          <label className="field" htmlFor={getFieldInputId('gender')}>
-            <span>성별</span>
-            <select
-              aria-describedby={getFieldDescribedBy('gender', Boolean(fieldErrors.gender))}
-              aria-invalid={fieldErrors.gender ? 'true' : undefined}
-              className={getFieldInputClassName(fieldErrors.gender)}
-              id={getFieldInputId('gender')}
-              onBlur={handleBlur('gender')}
-              onChange={handleFieldChange('gender')}
-              value={form.gender}
-            >
-              {CLIENT_GENDER_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            {fieldErrors.gender ? (
-              <span className="field-error" id={getFieldErrorId('gender')}>
-                {fieldErrors.gender}
-              </span>
-            ) : null}
-          </label>
+            switch (field.name) {
+              case 'name':
+                return (
+                  <label className="field" htmlFor={inputId} key={field.name}>
+                    <span>{field.label}</span>
+                    <input
+                      aria-describedby={describedBy}
+                      aria-invalid={errorMessage ? 'true' : undefined}
+                      autoComplete={field.autoComplete}
+                      className={getClientFormFieldInputClassName(errorMessage)}
+                      id={inputId}
+                      maxLength={field.maxLength}
+                      onBlur={handleBlur(field.name)}
+                      onChange={handleFieldChange(field.name)}
+                      value={form.name}
+                    />
+                    {errorMessage ? (
+                      <span className="field-error" id={errorId}>
+                        {errorMessage}
+                      </span>
+                    ) : null}
+                  </label>
+                )
+              case 'gender':
+                return (
+                  <label className="field" htmlFor={inputId} key={field.name}>
+                    <span>{field.label}</span>
+                    <select
+                      aria-describedby={describedBy}
+                      aria-invalid={errorMessage ? 'true' : undefined}
+                      className={getClientFormFieldInputClassName(errorMessage)}
+                      id={inputId}
+                      onBlur={handleBlur(field.name)}
+                      onChange={handleFieldChange(field.name)}
+                      value={form.gender}
+                    >
+                      {CLIENT_GENDER_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    {errorMessage ? (
+                      <span className="field-error" id={errorId}>
+                        {errorMessage}
+                      </span>
+                    ) : null}
+                  </label>
+                )
+              case 'birthDate':
+                return (
+                  <label className="field" htmlFor={inputId} key={field.name}>
+                    <span>{field.label}</span>
+                    <DateTextInput
+                      aria-describedby={describedBy}
+                      aria-invalid={errorMessage ? 'true' : undefined}
+                      autoComplete={field.autoComplete}
+                      className={getClientFormFieldInputClassName(errorMessage)}
+                      id={inputId}
+                      onBlur={handleBlur(field.name)}
+                      onChange={handleDateFieldChange(field.name)}
+                      value={form.birthDate}
+                    />
+                    {errorMessage ? (
+                      <span className="field-error" id={errorId}>
+                        {errorMessage}
+                      </span>
+                    ) : null}
+                  </label>
+                )
+              case 'phone':
+                return (
+                  <label className="field" htmlFor={inputId} key={field.name}>
+                    <span>{field.label}</span>
+                    <input
+                      aria-describedby={describedBy}
+                      aria-invalid={errorMessage ? 'true' : undefined}
+                      autoComplete={field.autoComplete}
+                      className={getClientFormFieldInputClassName(errorMessage)}
+                      id={inputId}
+                      inputMode={field.inputMode}
+                      maxLength={field.maxLength}
+                      onBlur={handleBlur(field.name)}
+                      onChange={handleFieldChange(field.name)}
+                      value={form.phone}
+                    />
+                    {errorMessage ? (
+                      <span className="field-error" id={errorId}>
+                        {errorMessage}
+                      </span>
+                    ) : null}
+                  </label>
+                )
+              case 'primaryWorkerId':
+                return (
+                  <label className="field" htmlFor={inputId} key={field.name} style={{ gridColumn: '1 / -1' }}>
+                    <span>{field.label}</span>
+                    {hasAdminPrivileges ? (
+                      <select
+                        aria-describedby={describedBy}
+                        aria-invalid={errorMessage ? 'true' : undefined}
+                        className={getClientFormFieldInputClassName(errorMessage)}
+                        id={inputId}
+                        onBlur={handleBlur(field.name)}
+                        onChange={handleFieldChange(field.name)}
+                        value={form.primaryWorkerId ?? ''}
+                      >
+                        {workerOptions.map((item) => (
+                          <option key={item.userId} value={item.userId}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        aria-describedby={describedBy}
+                        aria-invalid={errorMessage ? 'true' : undefined}
+                        className={getClientFormFieldInputClassName(errorMessage)}
+                        disabled
+                        id={inputId}
+                        onBlur={handleBlur(field.name)}
+                        value={client.primaryWorkerName}
+                      />
+                    )}
+                    {errorMessage ? (
+                      <span className="field-error" id={errorId}>
+                        {errorMessage}
+                      </span>
+                    ) : null}
+                  </label>
+                )
+            }
 
-          <label className="field" htmlFor={getFieldInputId('birthDate')}>
-            <span>생년월일</span>
-            <DateTextInput
-              aria-describedby={getFieldDescribedBy('birthDate', Boolean(fieldErrors.birthDate))}
-              aria-invalid={fieldErrors.birthDate ? 'true' : undefined}
-              className={getFieldInputClassName(fieldErrors.birthDate)}
-              id={getFieldInputId('birthDate')}
-              onBlur={handleBlur('birthDate')}
-              onChange={handleDateFieldChange('birthDate')}
-              value={form.birthDate}
-            />
-            {fieldErrors.birthDate ? (
-              <span className="field-error" id={getFieldErrorId('birthDate')}>
-                {fieldErrors.birthDate}
-              </span>
-            ) : null}
-          </label>
-
-          <label className="field" htmlFor={getFieldInputId('phone')}>
-            <span>연락처</span>
-            <input
-              aria-describedby={getFieldDescribedBy('phone', Boolean(fieldErrors.phone))}
-              aria-invalid={fieldErrors.phone ? 'true' : undefined}
-              autoComplete="tel"
-              className={getFieldInputClassName(fieldErrors.phone)}
-              id={getFieldInputId('phone')}
-              inputMode="tel"
-              maxLength={20}
-              onBlur={handleBlur('phone')}
-              onChange={handleFieldChange('phone')}
-              value={form.phone}
-            />
-            {fieldErrors.phone ? (
-              <span className="field-error" id={getFieldErrorId('phone')}>
-                {fieldErrors.phone}
-              </span>
-            ) : null}
-          </label>
-
-          <label className="field" htmlFor={getFieldInputId('primaryWorkerId')} style={{ gridColumn: '1 / -1' }}>
-            <span>담당자</span>
-            {hasAdminPrivileges ? (
-              <select
-                aria-describedby={getFieldDescribedBy('primaryWorkerId', Boolean(fieldErrors.primaryWorkerId))}
-                aria-invalid={fieldErrors.primaryWorkerId ? 'true' : undefined}
-                className={getFieldInputClassName(fieldErrors.primaryWorkerId)}
-                id={getFieldInputId('primaryWorkerId')}
-                onBlur={handleBlur('primaryWorkerId')}
-                onChange={handleFieldChange('primaryWorkerId')}
-                value={form.primaryWorkerId ?? ''}
-              >
-                {workerOptions.map((item) => (
-                  <option key={item.userId} value={item.userId}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                aria-describedby={getFieldDescribedBy('primaryWorkerId', Boolean(fieldErrors.primaryWorkerId))}
-                aria-invalid={fieldErrors.primaryWorkerId ? 'true' : undefined}
-                className={getFieldInputClassName(fieldErrors.primaryWorkerId)}
-                disabled
-                id={getFieldInputId('primaryWorkerId')}
-                onBlur={handleBlur('primaryWorkerId')}
-                value={client.primaryWorkerName}
-              />
-            )}
-            {fieldErrors.primaryWorkerId ? (
-              <span className="field-error" id={getFieldErrorId('primaryWorkerId')}>
-                {fieldErrors.primaryWorkerId}
-              </span>
-            ) : null}
-          </label>
+            return null
+          })}
         </div>
 
         <div className="actions">
