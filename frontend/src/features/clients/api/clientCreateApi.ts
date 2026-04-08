@@ -1,9 +1,8 @@
 import { isAxiosError } from 'axios'
+import { CLIENT_GENDER_VALUES, type ClientGenderValue } from '../../../shared/display/entityDisplayMetadata'
 import type { ApiResponse } from '../../../shared/types/api'
 import { getTodayDateText, isValidDateText } from '../../../shared/utils/dateText'
 import { createClient, duplicateCheck } from './clientApi'
-
-const CLIENT_CREATE_GENDERS = ['MALE', 'FEMALE', 'OTHER', 'UNKNOWN'] as const
 
 export const CLIENT_CREATE_FIELDS = ['name', 'gender', 'birthDate', 'phone', 'primaryWorkerId'] as const
 export const CLIENT_CREATE_VALIDATION_MESSAGE = '입력값을 다시 확인해주세요.'
@@ -23,7 +22,7 @@ const SERVER_FIELD_ALIASES: Readonly<Record<string, ClientCreateFieldName>> = {
 }
 
 export type ClientCreateFieldName = (typeof CLIENT_CREATE_FIELDS)[number]
-export type ClientGender = (typeof CLIENT_CREATE_GENDERS)[number]
+export type ClientGender = ClientGenderValue
 export type ClientCreateFieldErrors = Partial<Record<ClientCreateFieldName, string>>
 export type ClientCreateTouched = Partial<Record<ClientCreateFieldName, boolean>>
 
@@ -60,7 +59,7 @@ function normalizeFormValues(values: ClientCreateFormValues): ClientCreateFormVa
 }
 
 function isGenderValue(value: string): value is ClientGender {
-  return CLIENT_CREATE_GENDERS.includes(value as ClientGender)
+  return CLIENT_GENDER_VALUES.includes(value as ClientGender)
 }
 
 export function validateClientCreateField(field: ClientCreateFieldName, values: ClientCreateFormValues) {

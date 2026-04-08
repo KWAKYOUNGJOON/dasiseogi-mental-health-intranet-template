@@ -5,12 +5,16 @@ const CLIENT_GENDER_OPTION_LABELS = {
   UNKNOWN: '미상',
 } as const
 
-export const CLIENT_GENDER_OPTIONS = [
+const CLIENT_GENDER_METADATA = [
   { value: 'MALE', label: CLIENT_GENDER_OPTION_LABELS.MALE },
   { value: 'FEMALE', label: CLIENT_GENDER_OPTION_LABELS.FEMALE },
   { value: 'OTHER', label: CLIENT_GENDER_OPTION_LABELS.OTHER },
   { value: 'UNKNOWN', label: CLIENT_GENDER_OPTION_LABELS.UNKNOWN },
 ] as const satisfies ReadonlyArray<{ value: string; label: string }>
+
+export const CLIENT_GENDER_OPTIONS = CLIENT_GENDER_METADATA
+export type ClientGenderValue = (typeof CLIENT_GENDER_METADATA)[number]['value']
+export const CLIENT_GENDER_VALUES = Object.freeze(CLIENT_GENDER_METADATA.map((option) => option.value)) as ReadonlyArray<ClientGenderValue>
 
 export const CLIENT_GENDER_LABELS: Readonly<Record<string, string>> = {
   MALE: CLIENT_GENDER_OPTION_LABELS.MALE,

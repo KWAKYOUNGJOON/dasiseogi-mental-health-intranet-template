@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { validateClientCreateField, type ClientCreateFormValues } from '../src/features/clients/api/clientCreateApi'
 import {
+  CLIENT_GENDER_VALUES,
   CLIENT_GENDER_OPTIONS,
   CLIENT_GENDER_LABELS,
   CLIENT_STATUS_LABELS,
@@ -11,6 +13,7 @@ import {
 
 describe('entity display metadata', () => {
   it('exports the expected client gender options and client/session display labels', () => {
+    expect(CLIENT_GENDER_VALUES).toEqual(['MALE', 'FEMALE', 'OTHER', 'UNKNOWN'])
     expect(CLIENT_GENDER_OPTIONS).toEqual([
       { value: 'MALE', label: '남성' },
       { value: 'FEMALE', label: '여성' },
@@ -30,6 +33,29 @@ describe('entity display metadata', () => {
       COMPLETED: '완료',
       MISENTERED: '오입력',
     })
+  })
+
+  it('keeps the shared gender option values aligned with client create validation', () => {
+    expect(CLIENT_GENDER_OPTIONS.map((option) => option.value)).toEqual(CLIENT_GENDER_VALUES)
+
+    const baseValues: ClientCreateFormValues = {
+      name: '김대상',
+      gender: 'MALE',
+      birthDate: '1990-01-02',
+      phone: '',
+      primaryWorkerId: 1,
+    }
+
+    for (const gender of CLIENT_GENDER_VALUES) {
+      expect(validateClientCreateField('gender', { ...baseValues, gender })).toBeUndefined()
+    }
+
+    expect(
+      validateClientCreateField('gender', {
+        ...baseValues,
+        gender: 'UNEXPECTED' as ClientCreateFormValues['gender'],
+      }),
+    ).toBe('성별을 다시 확인해주세요.')
   })
 
   it('returns the shared Korean labels for known client and session values', () => {
