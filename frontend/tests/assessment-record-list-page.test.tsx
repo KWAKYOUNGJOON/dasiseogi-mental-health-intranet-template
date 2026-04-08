@@ -522,6 +522,36 @@ describe('assessment record list page', () => {
     expect(statusChip.className).toContain('status-chip-danger')
   })
 
+  it('renders non-misentered and unknown session statuses through the shared record-list helper', async () => {
+    mockedFetchAssessmentRecords.mockResolvedValueOnce(
+      createAssessmentRecordPage([
+        createRecord({
+          sessionId: 504,
+          sessionScaleId: 9004,
+          sessionStatus: 'COMPLETED',
+        }),
+        createRecord({
+          sessionId: 505,
+          sessionScaleId: 9005,
+          sessionStatus: 'PENDING_REVIEW',
+        }),
+      ]),
+    )
+
+    renderAssessmentRecordFlow()
+
+    const completedStatusChip = await screen.findByTestId('record-status-9004')
+    const unknownStatusChip = await screen.findByTestId('record-status-9005')
+
+    expect(completedStatusChip.textContent).toBe('정상')
+    expect(completedStatusChip.getAttribute('data-status')).toBe('COMPLETED')
+    expect(completedStatusChip.className).toBe('status-chip')
+
+    expect(unknownStatusChip.textContent).toBe('PENDING_REVIEW')
+    expect(unknownStatusChip.getAttribute('data-status')).toBe('PENDING_REVIEW')
+    expect(unknownStatusChip.className).toBe('status-chip')
+  })
+
   it('does not expose detail navigation UI while the record list is still loading', async () => {
     const deferred = createDeferredPromise<AssessmentRecordPage>()
 

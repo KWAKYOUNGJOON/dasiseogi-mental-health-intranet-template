@@ -9,6 +9,7 @@ import {
 } from '../../features/assessment/api/assessmentApi'
 import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
+import { getAssessmentRecordSessionStatusDisplayMetadata } from '../../shared/display/assessmentRecordDisplayMetadata'
 import { formatScaleSelectionLabel, formatScaleShortLabel } from '../../shared/scales/scaleDisplay'
 import { formatAssessmentLocalDateTimeText, toValidDateText } from '../../shared/utils/dateText'
 
@@ -327,31 +328,35 @@ export function AssessmentRecordListPage() {
                 </tr>
               </thead>
               <tbody>
-                {records.items.map((record) => (
-                  <tr key={record.sessionScaleId}>
-                    <td>{formatAssessmentLocalDateTimeText(record.sessionCompletedAt)}</td>
-                    <td>{record.clientName}</td>
-                    <td>{record.performedByName}</td>
-                    <td>{formatAssessmentRecordScaleCellLabel(record, scaleMetadataByCode)}</td>
-                    <td>{record.totalScore}</td>
-                    <td>{record.resultLevel}</td>
-                    <td>{record.hasAlert ? '있음' : '없음'}</td>
-                    <td>
-                      <span
-                        className={record.sessionStatus === 'MISENTERED' ? 'status-chip status-chip-danger' : 'status-chip'}
-                        data-status={record.sessionStatus}
-                        data-testid={`record-status-${record.sessionScaleId}`}
-                      >
-                        {record.sessionStatus === 'MISENTERED' ? '오입력' : '정상'}
-                      </span>
-                    </td>
-                    <td>
-                      <Link className="secondary-button" to={buildSessionDetailPath(record, returnTo)}>
-                        상세 보기
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {records.items.map((record) => {
+                  const sessionStatusDisplay = getAssessmentRecordSessionStatusDisplayMetadata(record.sessionStatus)
+
+                  return (
+                    <tr key={record.sessionScaleId}>
+                      <td>{formatAssessmentLocalDateTimeText(record.sessionCompletedAt)}</td>
+                      <td>{record.clientName}</td>
+                      <td>{record.performedByName}</td>
+                      <td>{formatAssessmentRecordScaleCellLabel(record, scaleMetadataByCode)}</td>
+                      <td>{record.totalScore}</td>
+                      <td>{record.resultLevel}</td>
+                      <td>{record.hasAlert ? '있음' : '없음'}</td>
+                      <td>
+                        <span
+                          className={sessionStatusDisplay.chipClassName}
+                          data-status={sessionStatusDisplay.dataStatus}
+                          data-testid={`record-status-${record.sessionScaleId}`}
+                        >
+                          {sessionStatusDisplay.label}
+                        </span>
+                      </td>
+                      <td>
+                        <Link className="secondary-button" to={buildSessionDetailPath(record, returnTo)}>
+                          상세 보기
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
             <div className="actions" style={{ justifyContent: 'space-between' }}>
