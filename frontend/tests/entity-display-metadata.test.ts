@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CLIENT_GENDER_OPTIONS,
   CLIENT_GENDER_LABELS,
   CLIENT_STATUS_LABELS,
   SESSION_STATUS_LABELS,
@@ -9,7 +10,13 @@ import {
 } from '../src/shared/display/entityDisplayMetadata'
 
 describe('entity display metadata', () => {
-  it('exports the expected client and session display labels', () => {
+  it('exports the expected client gender options and client/session display labels', () => {
+    expect(CLIENT_GENDER_OPTIONS).toEqual([
+      { value: 'MALE', label: '남성' },
+      { value: 'FEMALE', label: '여성' },
+      { value: 'OTHER', label: '기타' },
+      { value: 'UNKNOWN', label: '미상' },
+    ])
     expect(CLIENT_GENDER_LABELS).toEqual({
       MALE: '남성',
       FEMALE: '여성',

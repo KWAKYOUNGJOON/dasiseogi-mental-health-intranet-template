@@ -2,6 +2,7 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../app/providers/AuthProvider'
 import { DateTextInput } from '../../../shared/components/DateTextInput'
+import { CLIENT_GENDER_OPTIONS, getClientStatusLabel } from '../../../shared/display/entityDisplayMetadata'
 import {
   CLIENT_CREATE_FIELDS,
   CLIENT_CREATE_VALIDATION_MESSAGE,
@@ -45,11 +46,6 @@ const FIELD_DEFINITIONS: ReadonlyArray<FieldDefinition> = [
   { name: 'birthDate', label: '생년월일', type: 'date' },
   { name: 'phone', label: '연락처', autoComplete: 'tel', inputMode: 'tel', maxLength: 20 },
 ]
-const DUPLICATE_CANDIDATE_STATUS_LABELS: Readonly<Record<string, string>> = {
-  ACTIVE: '활성',
-  INACTIVE: '비활성',
-  MISREGISTERED: '오등록',
-}
 
 type DuplicateCandidate = Awaited<ReturnType<typeof requestClientDuplicateCheck>>['candidates'][number]
 
@@ -67,14 +63,6 @@ function getFieldErrorId(field: ClientCreateFieldName) {
 
 function getFieldDescribedBy(field: ClientCreateFieldName, hasError: boolean) {
   return hasError ? getFieldErrorId(field) : undefined
-}
-
-function getDuplicateCandidateStatusLabel(status: string | null | undefined) {
-  if (!status) {
-    return '-'
-  }
-
-  return DUPLICATE_CANDIDATE_STATUS_LABELS[status] ?? status
 }
 
 export function ClientCreateForm() {
@@ -293,10 +281,11 @@ export function ClientCreateForm() {
             onChange={handleFieldChange('gender')}
             value={form.gender}
           >
-            <option value="MALE">남성</option>
-            <option value="FEMALE">여성</option>
-            <option value="OTHER">기타</option>
-            <option value="UNKNOWN">미상</option>
+            {CLIENT_GENDER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
           {fieldErrors.gender ? (
             <span className="field-error" id={getFieldErrorId('gender')}>
@@ -394,7 +383,7 @@ export function ClientCreateForm() {
                     <td>{candidate.name}</td>
                     <td>{candidate.birthDate}</td>
                     <td>{candidate.primaryWorkerName || '-'}</td>
-                    <td>{getDuplicateCandidateStatusLabel(candidate.status)}</td>
+                    <td>{getClientStatusLabel(candidate.status)}</td>
                   </tr>
                 ))}
               </tbody>

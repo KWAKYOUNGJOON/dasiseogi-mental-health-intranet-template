@@ -1,6 +1,20 @@
-export const CLIENT_GENDER_LABELS: Readonly<Record<string, string>> = {
+const CLIENT_GENDER_OPTION_LABELS = {
   MALE: '남성',
   FEMALE: '여성',
+  OTHER: '기타',
+  UNKNOWN: '미상',
+} as const
+
+export const CLIENT_GENDER_OPTIONS = [
+  { value: 'MALE', label: CLIENT_GENDER_OPTION_LABELS.MALE },
+  { value: 'FEMALE', label: CLIENT_GENDER_OPTION_LABELS.FEMALE },
+  { value: 'OTHER', label: CLIENT_GENDER_OPTION_LABELS.OTHER },
+  { value: 'UNKNOWN', label: CLIENT_GENDER_OPTION_LABELS.UNKNOWN },
+] as const satisfies ReadonlyArray<{ value: string; label: string }>
+
+export const CLIENT_GENDER_LABELS: Readonly<Record<string, string>> = {
+  MALE: CLIENT_GENDER_OPTION_LABELS.MALE,
+  FEMALE: CLIENT_GENDER_OPTION_LABELS.FEMALE,
 }
 
 export const CLIENT_STATUS_LABELS: Readonly<Record<string, string>> = {

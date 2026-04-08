@@ -20,6 +20,7 @@ import {
 import { fetchClientDetail, updateClient, type ClientDetail } from '../../features/clients/api/clientApi'
 import { DateTextInput } from '../../shared/components/DateTextInput'
 import { PageHeader } from '../../shared/components/PageHeader'
+import { CLIENT_GENDER_OPTIONS } from '../../shared/display/entityDisplayMetadata'
 import type { ApiResponse } from '../../shared/types/api'
 import { hasAdminAccess } from '../../shared/user/userMetadata'
 
@@ -295,10 +296,11 @@ export function ClientEditPage() {
               onChange={handleFieldChange('gender')}
               value={form.gender}
             >
-              <option value="MALE">남성</option>
-              <option value="FEMALE">여성</option>
-              <option value="OTHER">기타</option>
-              <option value="UNKNOWN">미상</option>
+              {CLIENT_GENDER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
             {fieldErrors.gender ? (
               <span className="field-error" id={getFieldErrorId('gender')}>
