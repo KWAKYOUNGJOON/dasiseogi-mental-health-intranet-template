@@ -5,7 +5,10 @@ import { fetchScaleDetail, type ScaleDetail } from '../../features/assessment/ap
 import { AssessmentProgressHeader } from '../../features/assessment/components/AssessmentProgressHeader'
 import { ScaleQuestionForm } from '../../features/assessment/components/ScaleQuestionForm'
 import { useAssessmentDraftStore } from '../../features/assessment/store/assessmentDraftStore'
-import { countAnsweredQuestions, getRequiredQuestions } from '../../features/assessment/utils/kmdq'
+import {
+  countAnsweredQuestions,
+  getAssessmentRequiredQuestions,
+} from '../../features/assessment/utils/assessmentScaleUiRules'
 import { PageHeader } from '../../shared/components/PageHeader'
 import type { ApiResponse } from '../../shared/types/api'
 
@@ -66,7 +69,10 @@ export function AssessmentInputPage() {
     }
   }, [currentScaleCode, hasValidDraft])
 
-  const requiredQuestions = useMemo(() => (scale ? getRequiredQuestions(scale, currentAnswers) : []), [currentAnswers, scale])
+  const requiredQuestions = useMemo(
+    () => (scale ? getAssessmentRequiredQuestions(scale, currentAnswers) : []),
+    [currentAnswers, scale],
+  )
   const answeredCount = useMemo(() => countAnsweredQuestions(requiredQuestions, currentAnswers), [currentAnswers, requiredQuestions])
   const requiredQuestionCount = requiredQuestions.length
   const isFirstScale = currentScaleIndex === 0

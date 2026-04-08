@@ -1,5 +1,8 @@
 import type { ScaleDetail } from '../api/assessmentApi'
-import { getRenderableQuestions } from '../utils/kmdq'
+import {
+  getAssessmentRenderableQuestions,
+  getAssessmentScaleFormNotice,
+} from '../utils/assessmentScaleUiRules'
 
 export function ScaleQuestionForm({
   scale,
@@ -10,16 +13,16 @@ export function ScaleQuestionForm({
   answers: Record<number, string>
   onSelect: (questionNo: number, value: string) => void
 }) {
-  const questions = getRenderableQuestions(scale, answers)
-  const isIesr = scale.scaleCode === 'IESR'
+  const questions = getAssessmentRenderableQuestions(scale, answers)
+  const formNotice = getAssessmentScaleFormNotice(scale.scaleCode)
 
   return (
     <div className="assessment-question-list">
-      {isIesr ? (
+      {formNotice ? (
         <div className="card stack">
-          <strong>기간 안내</strong>
+          <strong>{formNotice.title}</strong>
           <p className="muted" style={{ margin: 0 }}>
-            IES-R는 &quot;지난 일주일 동안&quot; 어떠셨는지를 기준으로 응답합니다.
+            {formNotice.description}
           </p>
         </div>
       ) : null}

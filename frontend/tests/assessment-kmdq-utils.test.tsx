@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { type ScaleDetail } from '../src/features/assessment/api/assessmentApi'
 import {
-  calculateScalePreviewTotalScore,
-  getIesrPreviewAlertMessages,
-  getIesrPreviewResultLevel,
-  getRenderableQuestions,
-  getRequiredQuestions,
+  calculateAssessmentScalePreviewTotalScore,
+  canPreviewAssessmentScaleAlert,
+  canPreviewAssessmentScaleResult,
+  getAssessmentPreviewAlertMessages,
+  getAssessmentPreviewResultLevel,
+  getAssessmentRenderableQuestions,
+  getAssessmentRequiredQuestions,
+  getAssessmentScaleFormNotice,
+} from '../src/features/assessment/utils/assessmentScaleUiRules'
+import {
+  calculateKmdqPreviewTotalScore,
+  getKmdqRenderableQuestions,
+  getKmdqRequiredQuestions,
 } from '../src/features/assessment/utils/kmdq'
 
 function createKmdqScaleDetail(): ScaleDetail {
@@ -113,11 +121,10 @@ function createIesrScaleDetail(): ScaleDetail {
   }
 }
 
-describe('kmdq metadata-driven conditional question handling', () => {
+describe('K-MDQ UI rules', () => {
   it('renders question 14 when the conditionalRequired score threshold is met', () => {
     const scale = createKmdqScaleDetail()
-
-    const renderableQuestions = getRenderableQuestions(scale, {
+    const answers = {
       1: 'Y',
       2: 'Y',
       3: 'N',
@@ -131,17 +138,23 @@ describe('kmdq metadata-driven conditional question handling', () => {
       11: 'N',
       12: 'N',
       13: 'N',
-    })
+    }
+
+    const renderableQuestions = getKmdqRenderableQuestions(scale, answers)
 
     expect(
       renderableQuestions.map((question) => question.questionNo),
+    ).toContain(14)
+    expect(
+      getAssessmentRenderableQuestions(scale, answers).map(
+        (question) => question.questionNo,
+      ),
     ).toContain(14)
   })
 
   it('hides question 14 when the conditionalRequired score threshold is not met', () => {
     const scale = createKmdqScaleDetail()
-
-    const renderableQuestions = getRenderableQuestions(scale, {
+    const answers = {
       1: 'Y',
       2: 'N',
       3: 'N',
@@ -155,17 +168,24 @@ describe('kmdq metadata-driven conditional question handling', () => {
       11: 'N',
       12: 'N',
       13: 'N',
-    })
+    }
+
+    const renderableQuestions = getKmdqRenderableQuestions(scale, answers)
 
     expect(
       renderableQuestions.map((question) => question.questionNo),
+    ).not.toContain(14)
+    expect(
+      getAssessmentRenderableQuestions(scale, answers).map(
+        (question) => question.questionNo,
+      ),
     ).not.toContain(14)
   })
 
   it('marks question 14 as required only while the same metadata condition is active', () => {
     const scale = createKmdqScaleDetail()
 
-    const requiredBeforeThreshold = getRequiredQuestions(scale, {
+    const requiredBeforeThreshold = getKmdqRequiredQuestions(scale, {
       1: 'Y',
       2: 'N',
       3: 'N',
@@ -180,7 +200,7 @@ describe('kmdq metadata-driven conditional question handling', () => {
       12: 'N',
       13: 'N',
     })
-    const requiredAtThreshold = getRequiredQuestions(scale, {
+    const requiredAtThreshold = getKmdqRequiredQuestions(scale, {
       1: 'Y',
       2: 'Y',
       3: 'N',
@@ -205,12 +225,29 @@ describe('kmdq metadata-driven conditional question handling', () => {
     expect(
       requiredAtThreshold.map((question) => question.questionNo),
     ).not.toContain(15)
+    expect(
+      getAssessmentRequiredQuestions(scale, {
+        1: 'Y',
+        2: 'Y',
+        3: 'N',
+        4: 'N',
+        5: 'N',
+        6: 'N',
+        7: 'N',
+        8: 'N',
+        9: 'N',
+        10: 'N',
+        11: 'N',
+        12: 'N',
+        13: 'N',
+      }).map((question) => question.questionNo),
+    ).toContain(14)
   })
 
   it('shows question 15 when a score-bearing symptom question after question 13 is answered yes', () => {
     const scale = createKmdqScaleDetailWithExtendedSymptomQuestion()
 
-    const renderableQuestions = getRenderableQuestions(scale, {
+    const renderableQuestions = getKmdqRenderableQuestions(scale, {
       16: 'Y',
     })
 
@@ -225,7 +262,7 @@ describe('kmdq metadata-driven conditional question handling', () => {
   it('includes score-bearing questions after question 13 in the required question list', () => {
     const scale = createKmdqScaleDetailWithExtendedSymptomQuestion()
 
-    const requiredQuestions = getRequiredQuestions(scale, {})
+    const requiredQuestions = getKmdqRequiredQuestions(scale, {})
 
     expect(
       requiredQuestions.map((question) => question.questionNo),
@@ -234,37 +271,52 @@ describe('kmdq metadata-driven conditional question handling', () => {
       requiredQuestions.map((question) => question.questionNo),
     ).not.toContain(15)
   })
+
+  it('includes score-bearing questions after question 13 in the preview total score', () => {
+    const scale = createKmdqScaleDetailWithExtendedSymptomQuestion()
+    const answers = {
+      1: 'Y',
+      15: 'SERIOUS',
+      16: 'Y',
+    }
+
+    expect(calculateKmdqPreviewTotalScore(scale, answers)).toBe(2)
+    expect(calculateAssessmentScalePreviewTotalScore(scale, answers)).toBe(2)
+  })
 })
 
 describe('IES-R preview metadata handling', () => {
+  it('enables shared preview and form guidance helpers only for supported scales', () => {
+    const iesrScale = createIesrScaleDetail()
+    const genericScale = createKmdqScaleDetail()
+
+    expect(canPreviewAssessmentScaleResult(iesrScale)).toBe(true)
+    expect(canPreviewAssessmentScaleAlert(iesrScale)).toBe(true)
+    expect(getAssessmentScaleFormNotice(iesrScale.scaleCode)).toEqual({
+      title: '기간 안내',
+      description:
+        'IES-R는 "지난 일주일 동안" 어떠셨는지를 기준으로 응답합니다.',
+    })
+
+    expect(canPreviewAssessmentScaleResult(genericScale)).toBe(false)
+    expect(canPreviewAssessmentScaleAlert(genericScale)).toBe(false)
+    expect(getAssessmentScaleFormNotice(genericScale.scaleCode)).toBeNull()
+  })
+
   it('shows the metadata-based result level and caution message at total score 18', () => {
     const scale = createIesrScaleDetail()
 
-    expect(getIesrPreviewResultLevel(18, scale)).toBe('정상')
-    expect(getIesrPreviewAlertMessages(18, scale)).toEqual(['주의 필요'])
+    expect(getAssessmentPreviewResultLevel(18, scale)).toBe('정상')
+    expect(getAssessmentPreviewAlertMessages(18, scale)).toEqual(['주의 필요'])
   })
 
   it('adds the second alert message when the total score is 25 or higher', () => {
     const scale = createIesrScaleDetail()
 
-    expect(getIesrPreviewResultLevel(25, scale)).toBe('약간 충격')
-    expect(getIesrPreviewAlertMessages(25, scale)).toEqual([
+    expect(getAssessmentPreviewResultLevel(25, scale)).toBe('약간 충격')
+    expect(getAssessmentPreviewAlertMessages(25, scale)).toEqual([
       '주의 필요',
       '상담 권고 또는 고위험 경고',
     ])
-  })
-})
-
-describe('K-MDQ preview score handling', () => {
-  it('includes score-bearing questions after question 13 in the preview total score', () => {
-    const scale = createKmdqScaleDetailWithExtendedSymptomQuestion()
-
-    expect(
-      calculateScalePreviewTotalScore(scale, {
-        1: 'Y',
-        15: 'SERIOUS',
-        16: 'Y',
-      }),
-    ).toBe(2)
   })
 })

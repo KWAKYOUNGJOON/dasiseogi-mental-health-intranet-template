@@ -1,18 +1,16 @@
 import type { ScaleDetail } from '../api/assessmentApi'
 
-const KMDQ_SCALE_CODE = 'KMDQ'
+export const KMDQ_SCALE_CODE = 'KMDQ'
 const KMDQ_IMPAIRMENT_QUESTION_NO = 15
+
+type ScaleQuestion = ScaleDetail['questions'][number]
 
 function isKmdq(scale: ScaleDetail) {
   return scale.scaleCode === KMDQ_SCALE_CODE
 }
 
-function hasAnsweredValue(value: string | undefined) {
-  return typeof value === 'string' && value.length > 0
-}
-
 function calculateQuestionAnswerScore(
-  question: ScaleDetail['questions'][number],
+  question: ScaleQuestion,
   answers: Record<number, string>,
 ) {
   const selectedValue = answers[question.questionNo]
@@ -23,7 +21,7 @@ function calculateQuestionAnswerScore(
   return selectedOption?.score ?? 0
 }
 
-function isKmdqBaseRequiredQuestion(question: ScaleDetail['questions'][number]) {
+function isKmdqBaseRequiredQuestion(question: ScaleQuestion) {
   return question.options.some((option) => option.score !== 0)
 }
 
@@ -42,7 +40,7 @@ function calculateKmdqSymptomYesCount(
 
 function isConditionalQuestionActive(
   scale: ScaleDetail,
-  question: ScaleDetail['questions'][number],
+  question: ScaleQuestion,
   answers: Record<number, string>,
 ) {
   const conditionalRequired = question.conditionalRequired
@@ -69,7 +67,7 @@ function isConditionalQuestionActive(
   return scoreSum >= conditionalRequired.minScoreSum
 }
 
-export function getRenderableQuestions(
+export function getKmdqRenderableQuestions(
   scale: ScaleDetail,
   answers: Record<number, string>,
 ) {
@@ -96,7 +94,7 @@ export function getRenderableQuestions(
   })
 }
 
-export function getRequiredQuestions(
+export function getKmdqRequiredQuestions(
   scale: ScaleDetail,
   answers: Record<number, string>,
 ) {
@@ -117,89 +115,19 @@ export function getRequiredQuestions(
   })
 }
 
-export function countAnsweredQuestions(
-  questions: ScaleDetail['questions'],
+export function calculateKmdqPreviewTotalScore(
+  scale: ScaleDetail,
   answers: Record<number, string>,
 ) {
-  return questions.filter((question) =>
-    hasAnsweredValue(answers[question.questionNo]),
-  ).length
-}
-
-export function calculateScalePreviewTotalScore(
-  scale: ScaleDetail | undefined,
-  answers: Record<number, string>,
-) {
-  if (!scale) {
+  if (!isKmdq(scale)) {
     return 0
   }
 
   return scale.questions.reduce((accumulator, question) => {
-    if (isKmdq(scale) && !isKmdqBaseRequiredQuestion(question)) {
+    if (!isKmdqBaseRequiredQuestion(question)) {
       return accumulator
     }
 
-    const selectedValue = answers[question.questionNo]
-    const option = question.options.find(
-      (candidate) => candidate.value === selectedValue,
-    )
-
-    if (!option) {
-      return accumulator
-    }
-
-    const maxScore = Math.max(
-      ...question.options.map((candidate) => candidate.score),
-    )
-    const minScore = Math.min(
-      ...question.options.map((candidate) => candidate.score),
-    )
-    const appliedScore = question.reverseScored
-      ? minScore + maxScore - option.score
-      : option.score
-
-    return accumulator + appliedScore
+    return accumulator + calculateQuestionAnswerScore(question, answers)
   }, 0)
-}
-
-function getMatchedIesrInterpretationRule(
-  totalScore: number,
-  scale?: ScaleDetail,
-) {
-  if (!scale?.interpretationRules || scale.interpretationRules.length === 0) {
-    return null
-  }
-
-  return (
-    scale.interpretationRules.find(
-      (rule) => totalScore >= rule.min && totalScore <= rule.max,
-    ) ?? null
-  )
-}
-
-export function getIesrPreviewResultLevel(
-  totalScore: number,
-  scale?: ScaleDetail,
-) {
-  return getMatchedIesrInterpretationRule(totalScore, scale)?.label ?? null
-}
-
-export function getIesrPreviewAlertMessages(
-  totalScore: number,
-  scale?: ScaleDetail,
-) {
-  if (!scale?.alertRules || scale.alertRules.length === 0) {
-    return null
-  }
-
-  return scale.alertRules
-    .filter(
-      (rule) =>
-        typeof rule.minTotalScore === 'number' &&
-        totalScore >= rule.minTotalScore,
-    )
-    .sort(
-      (left, right) => (left.minTotalScore ?? 0) - (right.minTotalScore ?? 0),
-    )
-    .map((rule) => rule.message)
 }

@@ -8,18 +8,19 @@ import {
 } from '../../features/assessment/api/assessmentApi'
 import { useAssessmentDraftStore } from '../../features/assessment/store/assessmentDraftStore'
 import {
-  calculateScalePreviewTotalScore,
+  calculateAssessmentScalePreviewTotalScore,
+  canPreviewAssessmentScaleAlert,
+  canPreviewAssessmentScaleResult,
   countAnsweredQuestions,
-  getIesrPreviewAlertMessages,
-  getIesrPreviewResultLevel,
-  getRequiredQuestions,
-} from '../../features/assessment/utils/kmdq'
+  getAssessmentPreviewAlertMessages,
+  getAssessmentPreviewResultLevel,
+  getAssessmentRequiredQuestions,
+} from '../../features/assessment/utils/assessmentScaleUiRules'
 import { PageHeader } from '../../shared/components/PageHeader'
 import { createCurrentSeoulDateTimeText } from '../../shared/utils/dateText'
 import type { ApiResponse } from '../../shared/types/api'
 
 const SESSION_MEMO_MAX_LENGTH = 1000
-const IESR_SCALE_CODE = 'IESR'
 
 function getErrorMessage(error: unknown, fallbackMessage: string) {
   if (!isAxiosError<ApiResponse<unknown>>(error)) {
@@ -119,21 +120,21 @@ export function AssessmentSummaryPage() {
         const definition = definitions[code]
         const answers = answersByScale[code] ?? {}
         const requiredQuestions = definition
-          ? getRequiredQuestions(definition, answers)
+          ? getAssessmentRequiredQuestions(definition, answers)
           : []
         const answeredCount = countAnsweredQuestions(requiredQuestions, answers)
         const questionCount = requiredQuestions.length
-        const totalScorePreview = calculateScalePreviewTotalScore(
+        const totalScorePreview = calculateAssessmentScalePreviewTotalScore(
           definition,
           answers,
         )
-        const canPreviewIesrResult =
-          code === IESR_SCALE_CODE && Boolean(definition)
-        const iesrResultLevel = canPreviewIesrResult
-          ? getIesrPreviewResultLevel(totalScorePreview, definition)
+        const canPreviewResult = canPreviewAssessmentScaleResult(definition)
+        const canPreviewAlert = canPreviewAssessmentScaleAlert(definition)
+        const previewResultLevel = canPreviewResult
+          ? getAssessmentPreviewResultLevel(totalScorePreview, definition)
           : null
-        const iesrAlertMessages = canPreviewIesrResult
-          ? getIesrPreviewAlertMessages(totalScorePreview, definition)
+        const previewAlertMessages = canPreviewAlert
+          ? getAssessmentPreviewAlertMessages(totalScorePreview, definition)
           : null
 
         return {
@@ -142,11 +143,11 @@ export function AssessmentSummaryPage() {
           answeredCount,
           questionCount,
           totalScorePreview,
-          resultLevelPreview: canPreviewIesrResult ? iesrResultLevel : null,
-          alertPreview: canPreviewIesrResult
-            ? iesrAlertMessages
-              ? iesrAlertMessages.length > 0
-                ? iesrAlertMessages.join(' / ')
+          resultLevelPreview: canPreviewResult ? previewResultLevel : null,
+          alertPreview: canPreviewAlert
+            ? previewAlertMessages
+              ? previewAlertMessages.length > 0
+                ? previewAlertMessages.join(' / ')
                 : '-'
               : null
             : null,
@@ -212,12 +213,13 @@ export function AssessmentSummaryPage() {
       }
 
       const answers = answersByScale[code] ?? {}
-      const hasMissingAnswer = getRequiredQuestions(definition, answers).some(
-        (question) => {
-          const answerValue = answers[question.questionNo]
-          return typeof answerValue !== 'string' || answerValue.length === 0
-        },
-      )
+      const hasMissingAnswer = getAssessmentRequiredQuestions(
+        definition,
+        answers,
+      ).some((question) => {
+        const answerValue = answers[question.questionNo]
+        return typeof answerValue !== 'string' || answerValue.length === 0
+      })
 
       return hasMissingAnswer ? [definition.scaleName] : []
     })
