@@ -29,6 +29,7 @@ import {
   getClientFormChangeValidationState,
   getClientFormSubmitValidationState,
 } from '../clientFormValidationState'
+import { getNextClientFormFromDateValue, getNextClientFormFromInputValue } from '../clientFormInputState'
 
 type DuplicateCandidate = Awaited<ReturnType<typeof requestClientDuplicateCheck>>['candidates'][number]
 const CLIENT_CREATE_FORM_VARIANT = 'create' as const
@@ -65,9 +66,7 @@ export function ClientCreateForm() {
 
   function handleFieldChange(field: ClientCreateFieldName) {
     return (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      const value =
-        field === 'primaryWorkerId' ? Number(event.target.value) || null : (event.target.value as ClientCreateFormValues[typeof field])
-      const nextForm = { ...form, [field]: value } as ClientCreateFormValues
+      const nextForm = getNextClientFormFromInputValue(form, field, event.target.value)
 
       setForm(nextForm)
 
@@ -91,7 +90,7 @@ export function ClientCreateForm() {
 
   function handleDateFieldChange(field: Extract<ClientCreateFieldName, 'birthDate'>) {
     return (value: string) => {
-      const nextForm = { ...form, [field]: value } as ClientCreateFormValues
+      const nextForm = getNextClientFormFromDateValue(form, field, value)
 
       setForm(nextForm)
       resetDuplicateCheckResult()

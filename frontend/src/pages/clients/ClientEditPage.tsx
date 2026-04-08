@@ -19,6 +19,7 @@ import {
   getClientFormChangeValidationState,
   getClientFormSubmitValidationState,
 } from '../../features/clients/clientFormValidationState'
+import { getNextClientFormFromDateValue, getNextClientFormFromInputValue } from '../../features/clients/clientFormInputState'
 import {
   CLIENT_FORM_FIELD_DEFINITIONS,
   getClientFormFieldDescribedBy,
@@ -115,9 +116,7 @@ export function ClientEditPage() {
 
   function handleFieldChange(field: ClientCreateFieldName) {
     return (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      const value =
-        field === 'primaryWorkerId' ? Number(event.target.value) || null : (event.target.value as ClientCreateFormValues[typeof field])
-      const nextForm = { ...form, [field]: value } as ClientCreateFormValues
+      const nextForm = getNextClientFormFromInputValue(form, field, event.target.value)
 
       setForm(nextForm)
 
@@ -137,7 +136,7 @@ export function ClientEditPage() {
 
   function handleDateFieldChange(field: Extract<ClientCreateFieldName, 'birthDate'>) {
     return (value: string) => {
-      const nextForm = { ...form, [field]: value } as ClientCreateFormValues
+      const nextForm = getNextClientFormFromDateValue(form, field, value)
 
       setForm(nextForm)
 
