@@ -18,6 +18,22 @@ export interface ScaleDetail {
   displayOrder: number
   questionCount: number
   screeningThreshold: number | null
+  metadata?: {
+    resultLevelLabels?: Record<string, string>
+    ui?: {
+      formNotice?: {
+        title: string
+        description: string
+      }
+      preview?: {
+        showResultLevel?: boolean
+        showAlertMessages?: boolean
+      }
+      kmdq?: {
+        impairmentQuestionNo?: number
+      }
+    }
+  }
   interpretationRules?: Array<{
     min: number
     max: number

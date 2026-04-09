@@ -242,7 +242,7 @@ class AssessmentServiceTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                new ScaleDefinition.Metadata(resultLevelLabels)
+                new ScaleDefinition.Metadata(resultLevelLabels, null)
         );
     }
 

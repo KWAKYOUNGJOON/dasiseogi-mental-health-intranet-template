@@ -1,12 +1,37 @@
 import type { ScaleDetail } from '../api/assessmentApi'
 
 export const KMDQ_SCALE_CODE = 'KMDQ'
-const KMDQ_IMPAIRMENT_QUESTION_NO = 15
+const FALLBACK_KMDQ_IMPAIRMENT_QUESTION_NO = 15
 
 type ScaleQuestion = ScaleDetail['questions'][number]
 
+function getKmdqUiMetadata(scale: ScaleDetail) {
+  if (scale.metadata?.ui?.kmdq) {
+    return scale.metadata.ui.kmdq
+  }
+
+  if (scale.scaleCode !== KMDQ_SCALE_CODE) {
+    return null
+  }
+
+  return {
+    impairmentQuestionNo: FALLBACK_KMDQ_IMPAIRMENT_QUESTION_NO,
+  }
+}
+
+export function hasKmdqUiRules(scale: ScaleDetail) {
+  return getKmdqUiMetadata(scale) !== null
+}
+
 function isKmdq(scale: ScaleDetail) {
-  return scale.scaleCode === KMDQ_SCALE_CODE
+  return hasKmdqUiRules(scale)
+}
+
+function getKmdqImpairmentQuestionNo(scale: ScaleDetail) {
+  return (
+    getKmdqUiMetadata(scale)?.impairmentQuestionNo ??
+    FALLBACK_KMDQ_IMPAIRMENT_QUESTION_NO
+  )
 }
 
 function calculateQuestionAnswerScore(
@@ -86,7 +111,7 @@ export function getKmdqRenderableQuestions(
       return isConditionalQuestionActive(scale, question, answers)
     }
 
-    if (question.questionNo === KMDQ_IMPAIRMENT_QUESTION_NO) {
+    if (question.questionNo === getKmdqImpairmentQuestionNo(scale)) {
       return symptomYesCount >= 1
     }
 

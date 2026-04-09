@@ -58,6 +58,13 @@ function createKmdqScaleDetail(): ScaleDetail {
     displayOrder: 4,
     questionCount: 15,
     screeningThreshold: 7,
+    metadata: {
+      ui: {
+        kmdq: {
+          impairmentQuestionNo: 15,
+        },
+      },
+    },
     questions: [
       ...Array.from({ length: 13 }, (_, index) => ({
         questionNo: index + 1,
@@ -114,6 +121,19 @@ function createIesrScaleDetail(): ScaleDetail {
     displayOrder: 8,
     questionCount: 22,
     screeningThreshold: 18,
+    metadata: {
+      ui: {
+        formNotice: {
+          title: '기간 안내',
+          description:
+            'IES-R는 "지난 일주일 동안" 어떠셨는지를 기준으로 응답합니다.',
+        },
+        preview: {
+          showResultLevel: true,
+          showAlertMessages: true,
+        },
+      },
+    },
     questions: Array.from({ length: 22 }, (_, index) => ({
       questionNo: index + 1,
       questionKey: `iesr_q${index + 1}`,

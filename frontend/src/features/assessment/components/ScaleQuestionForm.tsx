@@ -14,7 +14,7 @@ export function ScaleQuestionForm({
   onSelect: (questionNo: number, value: string) => void
 }) {
   const questions = getAssessmentRenderableQuestions(scale, answers)
-  const formNotice = getAssessmentScaleFormNotice(scale.scaleCode)
+  const formNotice = getAssessmentScaleFormNotice(scale)
 
   return (
     <div className="assessment-question-list">

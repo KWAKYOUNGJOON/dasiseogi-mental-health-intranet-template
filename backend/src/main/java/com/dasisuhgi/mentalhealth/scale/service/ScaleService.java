@@ -98,8 +98,62 @@ public class ScaleService {
                                 rule.minTotalScore(),
                                 rule.message()
                         ))
-                        .toList()
+                        .toList(),
+                toMetadataResponse(definition.metadata())
         );
+    }
+
+    private ScaleDefinitionResponse.MetadataResponse toMetadataResponse(ScaleDefinition.Metadata metadata) {
+        if (metadata == null) {
+            return null;
+        }
+
+        return new ScaleDefinitionResponse.MetadataResponse(
+                metadata.resultLevelLabels(),
+                toUiMetadataResponse(metadata.ui())
+        );
+    }
+
+    private ScaleDefinitionResponse.UiMetadataResponse toUiMetadataResponse(ScaleDefinition.UiMetadata uiMetadata) {
+        if (uiMetadata == null) {
+            return null;
+        }
+
+        return new ScaleDefinitionResponse.UiMetadataResponse(
+                toFormNoticeResponse(uiMetadata.formNotice()),
+                toPreviewResponse(uiMetadata.preview()),
+                toKmdqMetadataResponse(uiMetadata.kmdq())
+        );
+    }
+
+    private ScaleDefinitionResponse.FormNoticeResponse toFormNoticeResponse(ScaleDefinition.FormNotice formNotice) {
+        if (formNotice == null) {
+            return null;
+        }
+
+        return new ScaleDefinitionResponse.FormNoticeResponse(
+                formNotice.title(),
+                formNotice.description()
+        );
+    }
+
+    private ScaleDefinitionResponse.PreviewResponse toPreviewResponse(ScaleDefinition.Preview preview) {
+        if (preview == null) {
+            return null;
+        }
+
+        return new ScaleDefinitionResponse.PreviewResponse(
+                preview.showResultLevel(),
+                preview.showAlertMessages()
+        );
+    }
+
+    private ScaleDefinitionResponse.KmdqMetadataResponse toKmdqMetadataResponse(ScaleDefinition.KmdqMetadata kmdqMetadata) {
+        if (kmdqMetadata == null) {
+            return null;
+        }
+
+        return new ScaleDefinitionResponse.KmdqMetadataResponse(kmdqMetadata.impairmentQuestionNo());
     }
 
     public boolean isRegistryLoaded() {

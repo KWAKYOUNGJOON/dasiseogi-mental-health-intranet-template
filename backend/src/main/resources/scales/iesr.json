@@ -295,6 +295,18 @@
       ]
     }
   ],
+  "metadata": {
+    "ui": {
+      "formNotice": {
+        "title": "기간 안내",
+        "description": "IES-R는 \"지난 일주일 동안\" 어떠셨는지를 기준으로 응답합니다."
+      },
+      "preview": {
+        "showResultLevel": true,
+        "showAlertMessages": true
+      }
+    }
+  },
   "interpretationRules": [
     { "min": 0, "max": 24, "code": "NORMAL_RANGE", "label": "정상" },
     { "min": 25, "max": 39, "code": "MILD_IMPACT", "label": "약간 충격" },

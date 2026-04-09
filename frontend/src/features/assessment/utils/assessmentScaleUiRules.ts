@@ -3,10 +3,9 @@ import {
   calculateKmdqPreviewTotalScore,
   getKmdqRenderableQuestions,
   getKmdqRequiredQuestions,
-  KMDQ_SCALE_CODE,
+  hasKmdqUiRules,
 } from './kmdq'
 
-const CRI_SCALE_CODE = 'CRI'
 const IESR_SCALE_CODE = 'IESR'
 
 type AssessmentScaleAnswers = Record<number, string>
@@ -15,52 +14,53 @@ type AssessmentScaleFormNotice = Readonly<{
   title: string
   description: string
 }>
-type AssessmentScaleUiRule = {
-  getRenderableQuestions?: (
-    scale: ScaleDetail,
-    answers: AssessmentScaleAnswers,
-  ) => ScaleDetail['questions']
-  getRequiredQuestions?: (
-    scale: ScaleDetail,
-    answers: AssessmentScaleAnswers,
-  ) => ScaleDetail['questions']
-  calculatePreviewTotalScore?: (
-    scale: ScaleDetail,
-    answers: AssessmentScaleAnswers,
-  ) => number
-  getPreviewResultLevel?: (
-    totalScore: number,
-    scale?: ScaleDetail,
-  ) => string | null
-  getPreviewAlertMessages?: (
-    totalScore: number,
-    scale?: ScaleDetail,
-  ) => string[] | null
-  formNotice?: AssessmentScaleFormNotice
-}
+type AssessmentScalePreviewUi = Readonly<{
+  showResultLevel?: boolean
+  showAlertMessages?: boolean
+}>
 
-const IESR_FORM_NOTICE: AssessmentScaleFormNotice = {
+const FALLBACK_IESR_FORM_NOTICE: AssessmentScaleFormNotice = {
   title: '기간 안내',
   description:
     'IES-R는 "지난 일주일 동안" 어떠셨는지를 기준으로 응답합니다.',
 }
 
-const assessmentScaleUiRules: Partial<Record<string, AssessmentScaleUiRule>> = {
-  [CRI_SCALE_CODE]: {},
-  [IESR_SCALE_CODE]: {
-    formNotice: IESR_FORM_NOTICE,
-    getPreviewAlertMessages: getIesrPreviewAlertMessagesFromMetadata,
-    getPreviewResultLevel: getIesrPreviewResultLevelFromMetadata,
-  },
-  [KMDQ_SCALE_CODE]: {
-    calculatePreviewTotalScore: calculateKmdqPreviewTotalScore,
-    getRenderableQuestions: getKmdqRenderableQuestions,
-    getRequiredQuestions: getKmdqRequiredQuestions,
-  },
+const FALLBACK_IESR_PREVIEW_UI: AssessmentScalePreviewUi = {
+  showResultLevel: true,
+  showAlertMessages: true,
 }
 
-function getAssessmentScaleUiRule(scaleCode: string) {
-  return assessmentScaleUiRules[scaleCode]
+function getAssessmentScaleFormNoticeFromMetadata(scale?: ScaleDetail) {
+  return scale?.metadata?.ui?.formNotice ?? null
+}
+
+function getFallbackAssessmentScaleFormNotice(scale?: ScaleDetail) {
+  if (scale?.scaleCode !== IESR_SCALE_CODE) {
+    return null
+  }
+
+  return FALLBACK_IESR_FORM_NOTICE
+}
+
+function getResolvedAssessmentScaleFormNotice(scale?: ScaleDetail) {
+  return (
+    getAssessmentScaleFormNoticeFromMetadata(scale) ??
+    getFallbackAssessmentScaleFormNotice(scale)
+  )
+}
+
+function getResolvedAssessmentScalePreviewUi(
+  scale?: ScaleDetail,
+): AssessmentScalePreviewUi | null {
+  if (scale?.metadata?.ui?.preview) {
+    return scale.metadata.ui.preview
+  }
+
+  if (scale?.scaleCode === IESR_SCALE_CODE) {
+    return FALLBACK_IESR_PREVIEW_UI
+  }
+
+  return null
 }
 
 function hasAnsweredValue(value: string | undefined) {
@@ -105,7 +105,7 @@ function calculateDefaultPreviewTotalScore(
   }, 0)
 }
 
-function getMatchedIesrInterpretationRule(
+function getMatchedInterpretationRule(
   totalScore: number,
   scale?: ScaleDetail,
 ) {
@@ -120,14 +120,14 @@ function getMatchedIesrInterpretationRule(
   )
 }
 
-function getIesrPreviewResultLevelFromMetadata(
+function getPreviewResultLevelFromMetadata(
   totalScore: number,
   scale?: ScaleDetail,
 ) {
-  return getMatchedIesrInterpretationRule(totalScore, scale)?.label ?? null
+  return getMatchedInterpretationRule(totalScore, scale)?.label ?? null
 }
 
-function getIesrPreviewAlertMessagesFromMetadata(
+function getPreviewAlertMessagesFromMetadata(
   totalScore: number,
   scale?: ScaleDetail,
 ) {
@@ -151,24 +151,18 @@ export function getAssessmentRenderableQuestions(
   scale: ScaleDetail,
   answers: AssessmentScaleAnswers,
 ) {
-  return (
-    getAssessmentScaleUiRule(scale.scaleCode)?.getRenderableQuestions?.(
-      scale,
-      answers,
-    ) ?? scale.questions
-  )
+  return hasKmdqUiRules(scale)
+    ? getKmdqRenderableQuestions(scale, answers)
+    : scale.questions
 }
 
 export function getAssessmentRequiredQuestions(
   scale: ScaleDetail,
   answers: AssessmentScaleAnswers,
 ) {
-  return (
-    getAssessmentScaleUiRule(scale.scaleCode)?.getRequiredQuestions?.(
-      scale,
-      answers,
-    ) ?? scale.questions
-  )
+  return hasKmdqUiRules(scale)
+    ? getKmdqRequiredQuestions(scale, answers)
+    : scale.questions
 }
 
 export function countAnsweredQuestions(
@@ -188,63 +182,45 @@ export function calculateAssessmentScalePreviewTotalScore(
     return 0
   }
 
-  return (
-    getAssessmentScaleUiRule(scale.scaleCode)?.calculatePreviewTotalScore?.(
-      scale,
-      answers,
-    ) ?? calculateDefaultPreviewTotalScore(scale, answers)
-  )
+  return hasKmdqUiRules(scale)
+    ? calculateKmdqPreviewTotalScore(scale, answers)
+    : calculateDefaultPreviewTotalScore(scale, answers)
 }
 
 export function canPreviewAssessmentScaleResult(scale: ScaleDetail | undefined) {
-  return Boolean(
-    scale && getAssessmentScaleUiRule(scale.scaleCode)?.getPreviewResultLevel,
-  )
+  return Boolean(getResolvedAssessmentScalePreviewUi(scale)?.showResultLevel)
 }
 
 export function canPreviewAssessmentScaleAlert(scale: ScaleDetail | undefined) {
-  return Boolean(
-    scale &&
-      getAssessmentScaleUiRule(scale.scaleCode)?.getPreviewAlertMessages,
-  )
+  return Boolean(getResolvedAssessmentScalePreviewUi(scale)?.showAlertMessages)
 }
 
 export function getAssessmentPreviewResultLevel(
   totalScore: number,
   scale?: ScaleDetail,
 ) {
-  if (!scale) {
+  if (!scale || !canPreviewAssessmentScaleResult(scale)) {
     return null
   }
 
-  return (
-    getAssessmentScaleUiRule(scale.scaleCode)?.getPreviewResultLevel?.(
-      totalScore,
-      scale,
-    ) ?? null
-  )
+  return getPreviewResultLevelFromMetadata(totalScore, scale)
 }
 
 export function getAssessmentPreviewAlertMessages(
   totalScore: number,
   scale?: ScaleDetail,
 ) {
+  if (!scale || !canPreviewAssessmentScaleAlert(scale)) {
+    return null
+  }
+
+  return getPreviewAlertMessagesFromMetadata(totalScore, scale)
+}
+
+export function getAssessmentScaleFormNotice(scale: ScaleDetail | undefined) {
   if (!scale) {
     return null
   }
 
-  return (
-    getAssessmentScaleUiRule(scale.scaleCode)?.getPreviewAlertMessages?.(
-      totalScore,
-      scale,
-    ) ?? null
-  )
-}
-
-export function getAssessmentScaleFormNotice(scaleCode: string | undefined) {
-  if (!scaleCode) {
-    return null
-  }
-
-  return getAssessmentScaleUiRule(scaleCode)?.formNotice ?? null
+  return getResolvedAssessmentScaleFormNotice(scale)
 }

@@ -195,11 +195,17 @@ class ScaleResourceLoaderTest {
 
         scaleService.load();
 
-        var question14 = scaleService.getScaleDetail("KMDQ").questions().stream()
+        var kmdq = scaleService.getScaleDetail("KMDQ");
+
+        var question14 = kmdq.questions().stream()
                 .filter(question -> question.questionNo() == 14)
                 .findFirst()
                 .orElseThrow();
 
+        assertThat(kmdq.metadata()).isNotNull();
+        assertThat(kmdq.metadata().ui()).isNotNull();
+        assertThat(kmdq.metadata().ui().kmdq()).isNotNull();
+        assertThat(kmdq.metadata().ui().kmdq().impairmentQuestionNo()).isEqualTo(15);
         assertThat(question14.conditionalRequired()).isNotNull();
         assertThat(question14.conditionalRequired().sourceQuestionNos())
                 .containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
@@ -215,7 +221,18 @@ class ScaleResourceLoaderTest {
 
         scaleService.load();
 
-        assertThat(scaleService.getScaleDetail("IESR").interpretationRules())
+        var iesr = scaleService.getScaleDetail("IESR");
+
+        assertThat(iesr.metadata()).isNotNull();
+        assertThat(iesr.metadata().ui()).isNotNull();
+        assertThat(iesr.metadata().ui().formNotice()).isNotNull();
+        assertThat(iesr.metadata().ui().formNotice().title()).isEqualTo("기간 안내");
+        assertThat(iesr.metadata().ui().formNotice().description())
+                .isEqualTo("IES-R는 \"지난 일주일 동안\" 어떠셨는지를 기준으로 응답합니다.");
+        assertThat(iesr.metadata().ui().preview()).isNotNull();
+        assertThat(iesr.metadata().ui().preview().showResultLevel()).isTrue();
+        assertThat(iesr.metadata().ui().preview().showAlertMessages()).isTrue();
+        assertThat(iesr.interpretationRules())
                 .extracting(
                         rule -> rule.min(),
                         rule -> rule.max(),
@@ -247,6 +264,24 @@ class ScaleResourceLoaderTest {
                         org.assertj.core.groups.Tuple.tuple(18, "주의 필요"),
                         org.assertj.core.groups.Tuple.tuple(25, "상담 권고 또는 고위험 경고")
                 );
+    }
+
+    @Test
+    void getScaleDetailKeepsCriResultLevelLabelsInMetadata() {
+        ScaleProperties scaleProperties = new ScaleProperties();
+        scaleProperties.setResourcePath(null);
+        ScaleResourceLoader loader = new ScaleResourceLoader(objectMapper, resourceLoader, scaleProperties);
+        ScaleService scaleService = new ScaleService(loader);
+
+        scaleService.load();
+
+        assertThat(scaleService.getScaleDetail("CRI").metadata()).isNotNull();
+        assertThat(scaleService.getScaleDetail("CRI").metadata().resultLevelLabels())
+                .containsEntry("A", "극도의 위기")
+                .containsEntry("B", "위기")
+                .containsEntry("C", "고위험")
+                .containsEntry("D", "주의")
+                .containsEntry("E", "위기상황 아님");
     }
 
     private String readClasspathResource(String location) throws IOException {
