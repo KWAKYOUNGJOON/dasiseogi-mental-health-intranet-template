@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "code": "HIGH_RISK",
+      "label": "고위험"
+    },
+    {
+      "code": "CAUTION",
+      "label": "주의"
+    },
+    {
+      "code": "CRITICAL_ITEM",
+      "label": "개별 위험 항목"
+    },
+    {
+      "code": "COMPOSITE_RULE",
+      "label": "복합 위험"
+    }
+  ]
+}

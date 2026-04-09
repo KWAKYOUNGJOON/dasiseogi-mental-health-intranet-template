@@ -36,16 +36,18 @@ vi.mock('../src/shared/utils/dateText', async () => {
 vi.mock('../src/features/statistics/api/statisticsApi', () => ({
   downloadStatisticsExport: vi.fn(),
   fetchStatisticsAlerts: vi.fn(),
+  fetchStatisticsMetadata: vi.fn(),
   fetchStatisticsScales: vi.fn(),
   fetchStatisticsSummary: vi.fn(),
 }))
 
-import { fetchStatisticsAlerts, fetchStatisticsScales, fetchStatisticsSummary } from '../src/features/statistics/api/statisticsApi'
+import { fetchStatisticsAlerts, fetchStatisticsMetadata, fetchStatisticsScales, fetchStatisticsSummary } from '../src/features/statistics/api/statisticsApi'
 import { StatisticsPage } from '../src/pages/statistics/StatisticsPage'
 
 const mockedFetchStatisticsSummary = vi.mocked(fetchStatisticsSummary)
 const mockedFetchStatisticsScales = vi.mocked(fetchStatisticsScales)
 const mockedFetchStatisticsAlerts = vi.mocked(fetchStatisticsAlerts)
+const mockedFetchStatisticsMetadata = vi.mocked(fetchStatisticsMetadata)
 
 function createUser(overrides?: Partial<AuthUser>): AuthUser {
   return {
@@ -66,6 +68,7 @@ beforeEach(() => {
   mockedFetchStatisticsSummary.mockReset()
   mockedFetchStatisticsScales.mockReset()
   mockedFetchStatisticsAlerts.mockReset()
+  mockedFetchStatisticsMetadata.mockReset()
 
   mockUseAuth.mockReturnValue({
     authNotice: null,
@@ -91,6 +94,14 @@ beforeEach(() => {
     dateFrom: '2026-03-30',
     dateTo: '2026-04-05',
     items: [],
+  })
+  mockedFetchStatisticsMetadata.mockResolvedValue({
+    alertTypes: [
+      { code: 'HIGH_RISK', label: '고위험' },
+      { code: 'CAUTION', label: '주의' },
+      { code: 'CRITICAL_ITEM', label: '개별 위험 항목' },
+      { code: 'COMPOSITE_RULE', label: '복합 위험' },
+    ],
   })
 })
 

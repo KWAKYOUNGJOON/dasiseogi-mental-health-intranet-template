@@ -42,6 +42,7 @@ vi.mock('../src/shared/utils/dateText', async () => {
 vi.mock('../src/features/statistics/api/statisticsApi', () => ({
   downloadStatisticsExport: vi.fn(),
   fetchStatisticsAlerts: vi.fn(),
+  fetchStatisticsMetadata: vi.fn(),
   fetchStatisticsScales: vi.fn(),
   fetchStatisticsSummary: vi.fn(),
 }))
@@ -58,6 +59,7 @@ import { AppRouter } from '../src/app/router/AppRouter'
 import {
   downloadStatisticsExport,
   fetchStatisticsAlerts,
+  fetchStatisticsMetadata,
   fetchStatisticsScales,
   fetchStatisticsSummary,
 } from '../src/features/statistics/api/statisticsApi'
@@ -67,6 +69,7 @@ const mockedDownloadStatisticsExport = vi.mocked(downloadStatisticsExport)
 const mockedFetchStatisticsSummary = vi.mocked(fetchStatisticsSummary)
 const mockedFetchStatisticsScales = vi.mocked(fetchStatisticsScales)
 const mockedFetchStatisticsAlerts = vi.mocked(fetchStatisticsAlerts)
+const mockedFetchStatisticsMetadata = vi.mocked(fetchStatisticsMetadata)
 
 function createUser(overrides?: Partial<AuthUser>): AuthUser {
   return {
@@ -109,6 +112,18 @@ function createStatisticsSummary(overrides?: Partial<Awaited<ReturnType<typeof f
         userName: '김담당',
         sessionCount: 14,
       },
+    ],
+    ...overrides,
+  }
+}
+
+function createStatisticsMetadata(overrides?: Partial<Awaited<ReturnType<typeof fetchStatisticsMetadata>>>) {
+  return {
+    alertTypes: [
+      { code: 'HIGH_RISK', label: '고위험' },
+      { code: 'CAUTION', label: '주의' },
+      { code: 'CRITICAL_ITEM', label: '개별 위험 항목' },
+      { code: 'COMPOSITE_RULE', label: '복합 위험' },
     ],
     ...overrides,
   }
@@ -250,6 +265,7 @@ beforeEach(() => {
   mockedFetchStatisticsSummary.mockReset()
   mockedFetchStatisticsScales.mockReset()
   mockedFetchStatisticsAlerts.mockReset()
+  mockedFetchStatisticsMetadata.mockReset()
 
   mockLogin.mockResolvedValue(undefined)
   mockLogout.mockResolvedValue(undefined)
@@ -260,6 +276,7 @@ beforeEach(() => {
     dateTo: '2026-04-03',
   })
   mockedDownloadStatisticsExport.mockResolvedValue(undefined)
+  mockedFetchStatisticsMetadata.mockResolvedValue(createStatisticsMetadata())
 
   mockedFetchStatisticsSummary.mockImplementation(async () => createStatisticsSummary())
   mockedFetchStatisticsScales.mockImplementation(async () => createStatisticsScales())
@@ -286,6 +303,7 @@ describe('statistics page', () => {
     renderStatisticsRoute()
 
     await waitFor(() => {
+      expect(mockedFetchStatisticsMetadata).toHaveBeenCalledTimes(1)
       expect(mockedFetchStatisticsSummary).toHaveBeenCalledTimes(1)
       expect(mockedFetchStatisticsScales).toHaveBeenCalledTimes(1)
       expect(mockedFetchStatisticsAlerts).toHaveBeenCalledTimes(1)
@@ -376,6 +394,7 @@ describe('statistics page', () => {
     renderStatisticsRoute()
 
     await waitFor(() => {
+      expect(mockedFetchStatisticsMetadata).toHaveBeenCalledTimes(1)
       expect(mockedFetchStatisticsSummary).toHaveBeenCalledTimes(1)
       expect(mockedFetchStatisticsScales).toHaveBeenCalledTimes(1)
       expect(mockedFetchStatisticsAlerts).toHaveBeenCalledTimes(1)
@@ -461,6 +480,7 @@ describe('statistics page', () => {
     fireEvent.click(screen.getByRole('button', { name: '조회' }))
 
     await waitFor(() => {
+      expect(mockedFetchStatisticsMetadata).toHaveBeenCalledTimes(3)
       expect(mockedFetchStatisticsSummary).toHaveBeenCalledTimes(3)
       expect(mockedFetchStatisticsScales).toHaveBeenCalledTimes(3)
       expect(mockedFetchStatisticsAlerts).toHaveBeenCalledTimes(3)

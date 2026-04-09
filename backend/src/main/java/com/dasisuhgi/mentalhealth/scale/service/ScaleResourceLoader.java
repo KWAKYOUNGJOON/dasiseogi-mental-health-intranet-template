@@ -37,16 +37,7 @@ public class ScaleResourceLoader {
     }
 
     public LoadedScaleResources load() {
-        ScaleLocation scaleLocation;
-        try {
-            scaleLocation = ScaleLocation.from(scaleProperties.getResourcePath());
-        } catch (InvalidPathException exception) {
-            String configuredResourcePath = scaleProperties.getResourcePath();
-            String configuredPath = configuredResourcePath == null || configuredResourcePath.isBlank()
-                    ? ScaleProperties.DEFAULT_RESOURCE_PATH
-                    : configuredResourcePath.trim();
-            throw fail("Invalid configured scale resource path: " + configuredPath, exception);
-        }
+        ScaleLocation scaleLocation = resolveScaleLocation();
         log.info("Loading scale resources from {}", scaleLocation.description());
 
         ScaleRegistryFile registryFile = readRegistry(scaleLocation);
@@ -74,6 +65,23 @@ public class ScaleResourceLoader {
                 scaleLocation.description()
         );
         return new LoadedScaleResources(Map.copyOf(registryItems), Map.copyOf(definitions));
+    }
+
+    public <T> T readCommonResource(String relativePath, Class<T> targetType, String resourceLabel) {
+        ScaleLocation scaleLocation = resolveScaleLocation();
+        String label = resourceLabel == null || resourceLabel.isBlank() ? "common resource" : resourceLabel.trim();
+        String description;
+        try {
+            description = scaleLocation.commonResourceDescription(relativePath);
+        } catch (RuntimeException exception) {
+            throw fail("Failed to resolve " + label + " path '" + relativePath + "': " + exception.getMessage(), exception);
+        }
+
+        try (InputStream inputStream = scaleLocation.openCommonResource(resourceLoader, relativePath, label)) {
+            return objectMapper.readValue(inputStream, targetType);
+        } catch (IOException | RuntimeException exception) {
+            throw fail("Failed to load " + label + " from " + description + ": " + exception.getMessage(), exception);
+        }
     }
 
     private ScaleRegistryFile readRegistry(ScaleLocation scaleLocation) {
@@ -170,6 +178,18 @@ public class ScaleResourceLoader {
         return new IllegalStateException(message, exception);
     }
 
+    private ScaleLocation resolveScaleLocation() {
+        try {
+            return ScaleLocation.from(scaleProperties.getResourcePath());
+        } catch (InvalidPathException exception) {
+            String configuredResourcePath = scaleProperties.getResourcePath();
+            String configuredPath = configuredResourcePath == null || configuredResourcePath.isBlank()
+                    ? ScaleProperties.DEFAULT_RESOURCE_PATH
+                    : configuredResourcePath.trim();
+            throw fail("Invalid configured scale resource path: " + configuredPath, exception);
+        }
+    }
+
     public record LoadedScaleResources(
             Map<String, ScaleRegistryItem> registryItems,
             Map<String, ScaleDefinition> definitions
@@ -212,6 +232,12 @@ public class ScaleResourceLoader {
                     : filesystemBase.resolve(REGISTRY_RELATIVE_PATH).toString();
         }
 
+        String commonResourceDescription(String relativePath) {
+            return classpathBase != null
+                    ? resolveClasspathCommonLocation(relativePath)
+                    : resolveFilesystemCommonPath(relativePath).toString();
+        }
+
         String definitionDescription(String definitionFile) {
             return classpathBase != null
                     ? resolveClasspathDefinitionLocation(definitionFile)
@@ -224,6 +250,13 @@ public class ScaleResourceLoader {
             }
             Path registryPath = filesystemBase.resolve(REGISTRY_RELATIVE_PATH).normalize();
             return openFileResource(registryPath, "scale registry");
+        }
+
+        InputStream openCommonResource(ResourceLoader resourceLoader, String relativePath, String label) throws IOException {
+            if (classpathBase != null) {
+                return openClasspathResource(resourceLoader, resolveClasspathCommonLocation(relativePath));
+            }
+            return openFileResource(resolveFilesystemCommonPath(relativePath), label);
         }
 
         InputStream openDefinition(ResourceLoader resourceLoader, String definitionFile) throws IOException {
@@ -266,6 +299,11 @@ public class ScaleResourceLoader {
             return classpathBase + "/" + normalized;
         }
 
+        private String resolveClasspathCommonLocation(String relativePath) {
+            String normalized = normalizeCommonRelativePath(relativePath);
+            return classpathBase + "/" + normalized;
+        }
+
         private Path resolveFilesystemDefinitionPath(String definitionFile) {
             if (definitionFile == null || definitionFile.isBlank()) {
                 throw new IllegalStateException("Scale definitionFile is blank for configured path '" + configuredPath + "'");
@@ -290,6 +328,36 @@ public class ScaleResourceLoader {
                 );
             }
             return resolved;
+        }
+
+        private Path resolveFilesystemCommonPath(String relativePath) {
+            String normalized = normalizeCommonRelativePath(relativePath);
+            Path resolved = filesystemBase.resolve(normalized).toAbsolutePath().normalize();
+            if (!resolved.startsWith(filesystemBase)) {
+                throw new IllegalStateException(
+                        "Common resource path escapes configured filesystem resource path. configured='"
+                                + filesystemBase + "', relativePath='" + relativePath + "'"
+                );
+            }
+            return resolved;
+        }
+
+        private String normalizeCommonRelativePath(String relativePath) {
+            if (relativePath == null || relativePath.isBlank()) {
+                throw new IllegalStateException("Common resource relativePath is blank for configured path '" + configuredPath + "'");
+            }
+            String normalized = Objects.requireNonNull(relativePath, "relativePath").trim().replace('\\', '/');
+            if (normalized.startsWith(CLASSPATH_PREFIX)) {
+                normalized = normalized.substring(CLASSPATH_PREFIX.length());
+            }
+            normalized = trimLeadingSlashes(normalized);
+            if (normalized.startsWith(DEFAULT_SCALE_ROOT + "/")) {
+                normalized = normalized.substring((DEFAULT_SCALE_ROOT + "/").length());
+            }
+            if (normalized.isBlank()) {
+                throw new IllegalStateException("Common resource relativePath resolved to an empty path for configured path '" + configuredPath + "'");
+            }
+            return normalized;
         }
 
         private static String trimLeadingSlashes(String value) {

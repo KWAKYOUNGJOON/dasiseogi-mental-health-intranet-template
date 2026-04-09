@@ -54,6 +54,20 @@ export interface StatisticsAlertPage {
   totalPages: number
 }
 
+export interface StatisticsAlertTypeMetadataItem {
+  code: string
+  label: string
+}
+
+export interface StatisticsMetadata {
+  alertTypes: StatisticsAlertTypeMetadataItem[]
+}
+
+export async function fetchStatisticsMetadata() {
+  const response = await http.get<ApiResponse<StatisticsMetadata>>('/statistics/metadata')
+  return response.data.data
+}
+
 export async function fetchStatisticsSummary(params: { dateFrom?: string; dateTo?: string }) {
   const response = await http.get<ApiResponse<StatisticsSummary>>('/statistics/summary', { params })
   return response.data.data

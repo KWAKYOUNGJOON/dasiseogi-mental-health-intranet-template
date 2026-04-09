@@ -5,9 +5,11 @@ import com.dasisuhgi.mentalhealth.common.api.ApiResponse;
 import com.dasisuhgi.mentalhealth.common.api.PageResponse;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
 import com.dasisuhgi.mentalhealth.statistics.dto.StatisticsAlertItemResponse;
+import com.dasisuhgi.mentalhealth.statistics.dto.StatisticsMetadataResponse;
 import com.dasisuhgi.mentalhealth.statistics.dto.StatisticsScaleResponse;
 import com.dasisuhgi.mentalhealth.statistics.dto.StatisticsSummaryResponse;
 import com.dasisuhgi.mentalhealth.statistics.service.StatisticsExportService;
+import com.dasisuhgi.mentalhealth.statistics.service.StatisticsMetadataService;
 import com.dasisuhgi.mentalhealth.statistics.service.StatisticsService;
 import jakarta.servlet.http.HttpSession;
 import java.time.LocalDate;
@@ -24,13 +26,26 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/statistics")
 public class StatisticsController {
     private final StatisticsService statisticsService;
+    private final StatisticsMetadataService statisticsMetadataService;
     private final StatisticsExportService statisticsExportService;
     private final AuthService authService;
 
-    public StatisticsController(StatisticsService statisticsService, StatisticsExportService statisticsExportService, AuthService authService) {
+    public StatisticsController(
+            StatisticsService statisticsService,
+            StatisticsMetadataService statisticsMetadataService,
+            StatisticsExportService statisticsExportService,
+            AuthService authService
+    ) {
         this.statisticsService = statisticsService;
+        this.statisticsMetadataService = statisticsMetadataService;
         this.statisticsExportService = statisticsExportService;
         this.authService = authService;
+    }
+
+    @GetMapping("/metadata")
+    public ApiResponse<StatisticsMetadataResponse> getMetadata(HttpSession session) {
+        SessionUser currentUser = authService.getRequiredSessionUser(session);
+        return ApiResponse.success(statisticsMetadataService.getMetadata(currentUser));
     }
 
     @GetMapping("/summary")

@@ -1,5 +1,6 @@
 import type {
   StatisticsAlertItem,
+  StatisticsAlertTypeMetadataItem,
   StatisticsScaleDisplayMetadata,
   StatisticsScaleItem,
 } from '../../features/statistics/api/statisticsApi'
@@ -15,19 +16,21 @@ type StatisticsScaleDisplaySource = StatisticsScaleDisplayMetadata
 
 export const DEFAULT_STATISTICS_ALERT_PAGE_SIZE = 10
 
-export const STATISTICS_ALERT_TYPE_OPTIONS = ['HIGH_RISK', 'CAUTION', 'CRITICAL_ITEM', 'COMPOSITE_RULE'] as const
+export type StatisticsAlertTypeLabelMap = Record<string, string>
 
-export type StatisticsAlertTypeOption = (typeof STATISTICS_ALERT_TYPE_OPTIONS)[number]
-
-export const STATISTICS_ALERT_TYPE_LABELS: Record<StatisticsAlertTypeOption, string> = {
-  HIGH_RISK: '고위험',
-  CAUTION: '주의',
-  CRITICAL_ITEM: '개별 위험 항목',
-  COMPOSITE_RULE: '복합 위험',
+export function getStatisticsAlertTypeOptions(alertTypes: StatisticsAlertTypeMetadataItem[]) {
+  return alertTypes.map((item) => item.code)
 }
 
-export function formatStatisticsAlertTypeLabel(alertType: string) {
-  return STATISTICS_ALERT_TYPE_LABELS[alertType as StatisticsAlertTypeOption] ?? alertType
+export function getStatisticsAlertTypeLabels(alertTypes: StatisticsAlertTypeMetadataItem[]) {
+  return alertTypes.reduce<StatisticsAlertTypeLabelMap>((labels, item) => {
+    labels[item.code] = item.label
+    return labels
+  }, {})
+}
+
+export function formatStatisticsAlertTypeLabel(alertType: string, alertTypeLabels: StatisticsAlertTypeLabelMap) {
+  return alertTypeLabels[alertType] ?? alertType
 }
 
 export function formatStatisticsScaleLabel(scale: StatisticsScaleDisplaySource | string, scaleName?: string) {

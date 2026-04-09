@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_STATISTICS_ALERT_PAGE_SIZE,
-  STATISTICS_ALERT_TYPE_LABELS,
-  STATISTICS_ALERT_TYPE_OPTIONS,
   formatStatisticsAlertScaleLabel,
   formatStatisticsAlertTypeLabel,
+  getStatisticsAlertTypeLabels,
+  getStatisticsAlertTypeOptions,
   formatStatisticsScaleDropdownLabel,
   formatStatisticsScaleLabel,
   formatStatisticsScaleListLabel,
@@ -12,18 +12,26 @@ import {
 } from '../src/pages/statistics/statisticsMetadata'
 
 describe('statistics metadata', () => {
-  it('keeps alert type labels, known scale labels, CRI handling, and the default page size stable', () => {
+  it('keeps alert type metadata formatting, known scale labels, CRI handling, and the default page size stable', () => {
+    const alertTypes = [
+      { code: 'HIGH_RISK', label: '고위험' },
+      { code: 'CAUTION', label: '주의' },
+      { code: 'CRITICAL_ITEM', label: '개별 위험 항목' },
+      { code: 'COMPOSITE_RULE', label: '복합 위험' },
+    ]
+    const alertTypeLabels = getStatisticsAlertTypeLabels(alertTypes)
+
     expect(DEFAULT_STATISTICS_ALERT_PAGE_SIZE).toBe(10)
-    expect(STATISTICS_ALERT_TYPE_OPTIONS).toEqual(['HIGH_RISK', 'CAUTION', 'CRITICAL_ITEM', 'COMPOSITE_RULE'])
-    expect(STATISTICS_ALERT_TYPE_LABELS).toEqual({
+    expect(getStatisticsAlertTypeOptions(alertTypes)).toEqual(['HIGH_RISK', 'CAUTION', 'CRITICAL_ITEM', 'COMPOSITE_RULE'])
+    expect(alertTypeLabels).toEqual({
       HIGH_RISK: '고위험',
       CAUTION: '주의',
       CRITICAL_ITEM: '개별 위험 항목',
       COMPOSITE_RULE: '복합 위험',
     })
 
-    expect(formatStatisticsAlertTypeLabel('CAUTION')).toBe('주의')
-    expect(formatStatisticsAlertTypeLabel('UNKNOWN')).toBe('UNKNOWN')
+    expect(formatStatisticsAlertTypeLabel('CAUTION', alertTypeLabels)).toBe('주의')
+    expect(formatStatisticsAlertTypeLabel('UNKNOWN', alertTypeLabels)).toBe('UNKNOWN')
 
     expect(
       formatStatisticsScaleLabel({

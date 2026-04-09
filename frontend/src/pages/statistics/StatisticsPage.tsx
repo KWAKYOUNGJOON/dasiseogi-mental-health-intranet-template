@@ -5,9 +5,11 @@ import { useAuth } from '../../app/providers/AuthProvider'
 import {
   downloadStatisticsExport,
   fetchStatisticsAlerts,
+  fetchStatisticsMetadata,
   fetchStatisticsScales,
   fetchStatisticsSummary,
   type StatisticsAlertPage,
+  type StatisticsMetadata,
   type StatisticsScaleResponse,
   type StatisticsSummary,
 } from '../../features/statistics/api/statisticsApi'
@@ -18,9 +20,10 @@ import { hasAdminAccess } from '../../shared/user/userMetadata'
 import { getDefaultStatisticsSeoulDateRange, toValidDateText } from '../../shared/utils/dateText'
 import {
   DEFAULT_STATISTICS_ALERT_PAGE_SIZE,
-  STATISTICS_ALERT_TYPE_OPTIONS,
   formatStatisticsAlertScaleLabel,
   formatStatisticsAlertTypeLabel,
+  getStatisticsAlertTypeLabels,
+  getStatisticsAlertTypeOptions,
   formatStatisticsScaleLabel,
   formatStatisticsScaleListLabel,
   formatStatisticsScaleOptionLabel,
@@ -42,6 +45,7 @@ export function StatisticsPage() {
   const [dateTo, setDateTo] = useState(defaultDateRange.dateTo)
   const [alertScaleCode, setAlertScaleCode] = useState('')
   const [alertType, setAlertType] = useState('')
+  const [metadata, setMetadata] = useState<StatisticsMetadata | null>(null)
   const [summary, setSummary] = useState<StatisticsSummary | null>(null)
   const [scales, setScales] = useState<StatisticsScaleResponse | null>(null)
   const [alerts, setAlerts] = useState<StatisticsAlertPage | null>(null)
@@ -61,7 +65,8 @@ export function StatisticsPage() {
         dateFrom: toValidDateText(dateFrom) || undefined,
         dateTo: toValidDateText(dateTo) || undefined,
       }
-      const [summaryData, scaleData, alertData] = await Promise.all([
+      const [metadataData, summaryData, scaleData, alertData] = await Promise.all([
+        fetchStatisticsMetadata(),
         fetchStatisticsSummary(params),
         fetchStatisticsScales(params),
         fetchStatisticsAlerts({
@@ -72,6 +77,7 @@ export function StatisticsPage() {
           size: DEFAULT_STATISTICS_ALERT_PAGE_SIZE,
         }),
       ])
+      setMetadata(metadataData)
       setSummary(summaryData)
       setScales(scaleData)
       setAlerts(alertData)
@@ -87,6 +93,8 @@ export function StatisticsPage() {
   const currentScaleItems = (scales?.items ?? []).filter((item) => item.isActive)
   const legacyScaleItems = (scales?.items ?? []).filter((item) => !item.isActive && item.totalCount > 0)
   const alertScaleOptions = [...currentScaleItems, ...legacyScaleItems]
+  const alertTypeOptions = getStatisticsAlertTypeOptions(metadata?.alertTypes ?? [])
+  const alertTypeLabels = getStatisticsAlertTypeLabels(metadata?.alertTypes ?? [])
   const exportDateFrom = toValidDateText(dateFrom) || undefined
   const exportDateTo = toValidDateText(dateTo) || undefined
   const selectedAlertScale = alertScaleOptions.find((item) => item.scaleCode === alertScaleCode)
@@ -137,9 +145,9 @@ export function StatisticsPage() {
           </select>
           <select aria-label="경고 유형" onChange={(event) => setAlertType(event.target.value)} value={alertType}>
             <option value="">전체 경고유형</option>
-            {STATISTICS_ALERT_TYPE_OPTIONS.map((option) => (
+            {alertTypeOptions.map((option) => (
               <option key={option} value={option}>
-                {formatStatisticsAlertTypeLabel(option)}
+                {formatStatisticsAlertTypeLabel(option, alertTypeLabels)}
               </option>
             ))}
           </select>
@@ -250,7 +258,7 @@ export function StatisticsPage() {
               <div className="actions" style={{ justifyContent: 'space-between' }}>
                 <h3 style={{ margin: 0 }}>경고 기록</h3>
                 <span className="muted">
-                  필터: {selectedAlertScaleLabel} / {alertType ? formatStatisticsAlertTypeLabel(alertType) : '전체 유형'}
+                  필터: {selectedAlertScaleLabel} / {alertType ? formatStatisticsAlertTypeLabel(alertType, alertTypeLabels) : '전체 유형'}
                 </span>
               </div>
               {alerts && alerts.items.length > 0 ? (
@@ -277,7 +285,7 @@ export function StatisticsPage() {
                           <td>{alert.clientName}</td>
                           <td>{alert.performedByName}</td>
                           <td>{formatStatisticsAlertScaleLabel(alert)}</td>
-                          <td>{formatStatisticsAlertTypeLabel(alert.alertType)}</td>
+                          <td>{formatStatisticsAlertTypeLabel(alert.alertType, alertTypeLabels)}</td>
                           <td>{alert.alertMessage}</td>
                         </tr>
                       ))}
