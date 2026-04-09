@@ -8,6 +8,16 @@
 - 실제 값 입력은 저장소 원본이 아니라 [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 복사본 또는 내부 운영 문서에서만 진행한다.
 - 실제 값이 아직 확보되지 않았으면 추측해서 채우지 않고 `미정` 으로 남긴다.
 
+### 1.1 문서 진행 순서
+
+이 문서는 [docs/15-go-live-checklist.md](./15-go-live-checklist.md) 2장 선행 조건이 닫힌 뒤에 본다.
+
+1. [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 복사본에서 실제 입력값과 담당자, 검증 수단, 중단 지점을 먼저 닫는다.
+2. 이 문서 5장 공통 메타데이터와 운영 설정 사전 확인 체크를 닫는다.
+3. 6장 `schema.sql` / `.env` / `docker compose config` / health 선행 조건을 닫는다.
+4. 7장 초기 관리자 bootstrap 관련 체크로 bootstrap 시작 금지 조건을 다시 닫는다.
+5. 이후 실제 반영은 [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md) 로 넘어가고, health 정상 후 [docs/19-production-bootstrap.md](./19-production-bootstrap.md) 를 본다.
+
 ---
 
 ## 2. 비밀값 기록 금지 원칙
@@ -78,6 +88,10 @@
 - 현재 backend Docker entrypoint 는 DB Docker 환경값이 비어 있거나 placeholder 상태면 local H2 profile 로 fallback 할 수 있다.
 - 따라서 DB 환경값 대조와 `docker compose config` 확인 전에 `docker compose up -d` 를 먼저 실행하지 않는다.
 
+다음 단계:
+- 6장의 항목이 모두 닫히면 [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md) 2.1, 3.4, 4장, 6장 순서로 실제 반영 전 점검을 진행한다.
+- 6장의 항목이 비어 있으면 `docker compose up -d` 와 bootstrap 으로 넘어가지 않는다.
+
 ---
 
 ## 7. 초기 관리자 bootstrap 관련 체크
@@ -89,6 +103,10 @@
 - [ ] `scripts/sql/initial-admin-promote.template.sql` 원본은 직접 수정하지 않고, 복사한 로컬 작업본에서만 실제 `loginId` 와 메모를 치환한다.
 - [ ] DB 수동 승격 전 `users.role = USER`, `users.status = PENDING`, 최신 `user_approval_requests.request_status = PENDING` 확인 기준을 먼저 알고 있다.
 - [ ] DB 수동 승격 후 `/login` 로그인 성공, 관리자 메뉴 노출, 승인 상태 정합성 확인이 끝나기 전에는 bootstrap 완료로 보지 않는다.
+
+다음 단계:
+- 7장의 항목이 닫힌 뒤 실제 bootstrap 실행은 [docs/19-production-bootstrap.md](./19-production-bootstrap.md) 4장~8장 순서로 진행한다.
+- 7장이 비어 있으면 bootstrap 단계로 넘어가지 않는다.
 
 ---
 

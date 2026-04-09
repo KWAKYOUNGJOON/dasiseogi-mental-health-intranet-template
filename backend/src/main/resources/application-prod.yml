@@ -7,6 +7,8 @@ server:
 
 spring:
   datasource:
+    # Direct runtime reads APP_DB_URL directly.
+    # Docker startup maps APP_DB_URL_DOCKER to APP_DB_URL in backend/docker-entrypoint.sh before boot.
     url: ${APP_DB_URL:jdbc:mariadb://DB_HOST_PLACEHOLDER:3306/DB_NAME_PLACEHOLDER}
     username: ${APP_DB_USERNAME:DB_USERNAME_PLACEHOLDER}
     password: ${APP_DB_PASSWORD:DB_PASSWORD_PLACEHOLDER}
@@ -40,6 +42,8 @@ app:
     # writable directory used for temporary export file materialization
     temp-path: ${APP_EXPORT_TEMP_PATH:./tmp/exports}
   backup:
+    # Docker Compose typically binds /data/backups via BACKEND_BACKUPS_HOST_PATH.
+    # Direct runtime sets APP_BACKUP_ROOT_PATH explicitly.
     root-path: ${APP_BACKUP_ROOT_PATH:BACKUP_ROOT_PATH_PLACEHOLDER}
     db-dump-command: ${APP_DB_DUMP_COMMAND:${APP_BACKUP_DB_DUMP_COMMAND:mariadb-dump}}
   security:

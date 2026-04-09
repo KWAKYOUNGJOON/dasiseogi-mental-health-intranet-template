@@ -2,6 +2,8 @@
 setlocal EnableExtensions DisableDelayedExpansion
 
 rem Operator-only helper for authenticated admin smoke verification against a running server.
+rem This script also calls POST /api/v1/admin/backups/run.
+rem Do not use it before backup path and dump-command policy are confirmed.
 set "INPUT_ERROR=10"
 set "TOOL_ERROR=11"
 set "PAYLOAD_ERROR=12"
@@ -14,12 +16,15 @@ set "MANUAL_BACKUP_REASON=Operational trace smoke check via admin-smoke-check.ba
 
 set "BASE_URL_INPUT=%~1"
 if not defined BASE_URL_INPUT set "BASE_URL_INPUT=%DEFAULT_BASE_URL%"
+if "%~1"=="" set "USED_DEFAULT_BASE_URL=1"
 
 set "LOGIN_ID=%~2"
 if not defined LOGIN_ID set "LOGIN_ID=%DEFAULT_LOGIN_ID%"
+if "%~2"=="" set "USED_DEFAULT_LOGIN_ID=1"
 
 set "LOGIN_PASSWORD=%~3"
 if not defined LOGIN_PASSWORD set "LOGIN_PASSWORD=%DEFAULT_PASSWORD%"
+if "%~3"=="" set "USED_DEFAULT_PASSWORD=1"
 
 call :resolve_curl
 if errorlevel 1 exit /b %ERRORLEVEL%
@@ -50,6 +55,10 @@ if errorlevel 1 (
 echo [admin-smoke-check] base URL: %BASE_URL%
 echo [admin-smoke-check] api base URL: %API_BASE_URL%
 echo [admin-smoke-check] loginId: %LOGIN_ID%
+if defined USED_DEFAULT_BASE_URL echo [admin-smoke-check] Warning: default base URL is being used. Confirm it matches the production backend URL before continuing.
+if defined USED_DEFAULT_LOGIN_ID echo [admin-smoke-check] Warning: default loginId admina is a local seed default, not a production credential.
+if defined USED_DEFAULT_PASSWORD echo [admin-smoke-check] Warning: default password Test1234! is a local seed default, not a production credential.
+echo [admin-smoke-check] Warning: this script will call POST /api/v1/admin/backups/run.
 echo.
 
 set /a TOTAL_FAILURES=0

@@ -15,6 +15,17 @@
   - [docs/20-production-input-sheet.md](./20-production-input-sheet.md)
   - [docs/14-deploy-result-template.md](./14-deploy-result-template.md)
 
+### 1.1 문서 진행 순서
+
+실제 운영 준비는 아래 순서로 따라간다.
+
+1. [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 복사본을 먼저 채운다.
+2. 이 문서 2장 선행 조건을 닫는다.
+3. [docs/16-prod-config-checklist.md](./16-prod-config-checklist.md) 5장~9장 운영 설정 게이트를 닫는다.
+4. [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md) 2.1, 3.4, 4장, 6장 순서로 `schema.sql`, `.env`, `docker compose config`, health 게이트를 닫는다.
+5. health 가 정상인 상태에서 [docs/19-production-bootstrap.md](./19-production-bootstrap.md) 4장~8장 초기 관리자 bootstrap 을 닫는다.
+6. 이후 다시 이 문서 5장~8장과 [docs/14-deploy-result-template.md](./14-deploy-result-template.md) 로 돌아와 실제 운영 직전 최종 게이트와 결과 기록을 닫는다.
+
 ---
 
 ## 2. go-live 시작 전 선행 조건
@@ -33,6 +44,10 @@
 중요:
 - 위 항목 중 하나라도 비어 있거나 미확인이면 실제 운영 시작 단계로 넘어가지 않는다.
 - `schema.sql` 선적용, 운영용 `.env` 필수값 점검, `docker compose config` 대조, health 정상 확인이 끝나기 전에는 bootstrap 과 운영 스모크 테스트로 넘어가지 않는다.
+
+다음 단계:
+- 2장이 모두 닫히면 [docs/16-prod-config-checklist.md](./16-prod-config-checklist.md) 5장~9장으로 이동한다.
+- 2장이 비어 있으면 [docs/16-prod-config-checklist.md](./16-prod-config-checklist.md) 로 넘어가지 않는다.
 
 ---
 
@@ -62,6 +77,10 @@
 - 위 항목 중 하나라도 비어 있거나 미확인이면 초기 관리자 bootstrap 완료로 보지 않는다.
 - seed 관리자 계정이 없다는 이유만으로 이상 상태로 판단하지 않고, 반드시 [docs/19-production-bootstrap.md](./19-production-bootstrap.md) 절차를 따른다.
 
+다음 단계:
+- 4장 항목을 확인한 뒤 실제 bootstrap 실행은 [docs/19-production-bootstrap.md](./19-production-bootstrap.md) 4장~8장 순서로 닫는다.
+- 4장 항목이 비어 있으면 bootstrap 단계로 넘어가지 않는다.
+
 ---
 
 ## 5. go-live 직전 최종 점검 체크
@@ -81,6 +100,9 @@
 중요:
 - 위 항목 중 하나라도 비어 있거나 미확인이면 실제 운영 시작 단계로 넘어가지 않는다.
 - 실제 운영 미실행 상태를 성공처럼 적지 않는다.
+
+다음 단계:
+- 5장과 6장을 닫은 뒤 실제 운영 결과는 [docs/14-deploy-result-template.md](./14-deploy-result-template.md) 또는 내부 운영 결과 문서에 기록한다.
 
 ---
 

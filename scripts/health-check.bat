@@ -1,7 +1,8 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
 
-rem Operator-only helper for /api/v1/health verification.
+rem Operator-only helper for read-only /api/v1/health verification.
+rem Use the backend direct-check URL recorded in docs/20-production-input-sheet.md.
 set "INPUT_ERROR=10"
 set "TOOL_ERROR=11"
 set "REQUEST_ERROR=20"

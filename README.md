@@ -52,8 +52,9 @@
 
 운영 Docker 첫 설치 전제:
 1. 외부 MariaDB 에 `backend/src/main/resources/schema.sql` 을 먼저 적용한다.
-2. 초기 관리자 계정 1건 이상을 준비한다.
+2. 초기 관리자 bootstrap 담당자, 승격 SQL 작업본 위치, 검수 방법을 [docs/20-production-input-sheet.md](./docs/20-production-input-sheet.md) 복사본에 먼저 정리한다.
 3. 루트 `.env` 를 만든 뒤 `docker compose config` 로 값이 실제로 풀렸는지 확인한다.
+4. 실제 초기 관리자 계정 준비는 앱 health 정상 후 [docs/19-production-bootstrap.md](./docs/19-production-bootstrap.md) 절차로 진행한다.
 
 ```powershell
 Copy-Item .env.docker.example .env
@@ -275,14 +276,17 @@ npm run build
 - 프론트 배포 초안: `scripts/deploy-frontend.bat`
 - 수동 백업 실행 초안: `scripts/run-backup.bat`
 - 기본 헬스체크 초안: `scripts/health-check.bat`
+- 관리자 스모크 체크 초안: `scripts/admin-smoke-check.bat`
 
 권장 순서:
-1. `application-prod.yml` 또는 동등한 외부 설정 파일에 운영 값을 채웁니다.
+1. [docs/20-production-input-sheet.md](./docs/20-production-input-sheet.md) 복사본에 운영 입력값, 담당자, 반영 위치, 검증 수단, 중단 지점을 먼저 채웁니다.
+2. `application-prod.yml` 또는 동등한 외부 설정 파일에 운영 값을 채웁니다.
    - `APP_TRUST_PROXY_HEADERS=true` 는 신뢰 가능한 리버스 프록시 뒤에서만 켭니다.
-2. `scripts/deploy-backend.bat` 로 배포 대상 backend jar 를 운영 경로에 배치합니다.
-3. `scripts/deploy-frontend.bat` 로 빌드된 frontend `dist` 를 운영 경로에 배치합니다.
-4. 배포 직전 `scripts/run-backup.bat` 로 수동 백업을 실행합니다.
-5. 배포 직후 `scripts/health-check.bat` 또는 `GET /api/v1/health` 로 앱/DB/scale registry 상태를 확인합니다.
+3. `scripts/deploy-backend.bat` 로 배포 대상 backend jar 를 운영 경로에 배치합니다.
+4. `scripts/deploy-frontend.bat` 로 빌드된 frontend `dist` 를 운영 경로에 배치합니다.
+5. 배포 직전 `scripts/run-backup.bat` 로 수동 백업을 실행합니다.
+6. 배포 직후 `scripts/health-check.bat` 또는 `GET /api/v1/health` 로 앱/DB/scale registry 상태를 확인합니다.
+7. `scripts/admin-smoke-check.bat` 를 운영에서 쓸 때는 base URL, 관리자 login ID, 비밀번호를 명시적으로 넘기고, 이 스크립트가 `/api/v1/admin/backups/run` 을 호출한다는 점을 먼저 확인합니다.
 
 ## 운영 하드닝 메모
 
@@ -352,4 +356,7 @@ npm run build
 - 배포 직전 실행 문서: [`docs/13-pre-deploy-runbook.md`](./docs/13-pre-deploy-runbook.md)
 - 배포 결과 기록 양식: [`docs/14-deploy-result-template.md`](./docs/14-deploy-result-template.md)
 - Go-live 체크리스트: [`docs/15-go-live-checklist.md`](./docs/15-go-live-checklist.md)
+- Prod Config 체크리스트: [`docs/16-prod-config-checklist.md`](./docs/16-prod-config-checklist.md)
 - Docker Compose 운영 배포 마무리 체크: [`docs/18-docker-compose-deployment.md`](./docs/18-docker-compose-deployment.md)
+- 운영 초기 관리자 부트스트랩 절차: [`docs/19-production-bootstrap.md`](./docs/19-production-bootstrap.md)
+- 운영 입력 시트: [`docs/20-production-input-sheet.md`](./docs/20-production-input-sheet.md)

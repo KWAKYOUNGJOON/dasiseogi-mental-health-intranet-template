@@ -20,6 +20,16 @@
 - 도메인 모델 변경
 - DB 스키마 구조 변경
 
+### 1.1 문서 진행 순서
+
+이 문서는 [docs/15-go-live-checklist.md](./15-go-live-checklist.md) 2장과 [docs/16-prod-config-checklist.md](./16-prod-config-checklist.md) 5장~7장이 닫힌 뒤에 본다.
+
+1. [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 복사본으로 실제 입력값과 담당자, 검증 수단, 중단 지점을 먼저 확인한다.
+2. 2.1 preflight 게이트와 3.4 `.env` 실제 반영값 확인을 닫는다.
+3. 4장 외부 MariaDB 와 `schema.sql` 선적용을 닫는다.
+4. 6장 Docker Compose 기동과 health 확인을 닫는다.
+5. health 가 정상인 뒤에만 [docs/19-production-bootstrap.md](./19-production-bootstrap.md) 4장~8장 초기 관리자 bootstrap 으로 넘어간다.
+
 ---
 
 ## 2. 현재 Docker 운영 전제
@@ -47,6 +57,9 @@
 - 현재 backend Docker entrypoint 는 Docker DB 환경값이 비어 있거나 placeholder 상태면 local H2 profile 로 fallback 할 수 있다.
 - 따라서 `APP_DB_URL_DOCKER` 를 포함한 DB 환경값 검증 전에 `docker compose up -d` 를 먼저 실행하지 않는다.
 - 위 preflight 항목 중 하나라도 실패하면 실제 운영 반영 단계로 넘어가지 않는다.
+
+다음 단계:
+- 2.1 과 3.4 가 닫히지 않으면 4장 외부 MariaDB 준비와 6장 Docker Compose 기동으로 넘어가지 않는다.
 
 ---
 
@@ -264,6 +277,17 @@ Invoke-RestMethod -Uri http://127.0.0.1:4173/api/v1/health | ConvertTo-Json -Dep
 - `frontend` 가 `Up`
 - 두 health 응답 모두 `status=UP`, `dbStatus=UP`, `scaleRegistryStatus=UP`, `loadedScaleCount=9`
 
+운영자 배치 스크립트 대안:
+
+```powershell
+scripts\health-check.bat "http://127.0.0.1:8080/api/v1"
+scripts\health-check.bat "http://127.0.0.1:4173/api/v1"
+```
+
+다음 단계:
+- health 가 정상으로 확인되면 [docs/19-production-bootstrap.md](./19-production-bootstrap.md) 4장~8장 초기 관리자 bootstrap 으로 넘어간다.
+- health 가 비정상이면 bootstrap 으로 넘어가지 않고 이 문서 2.1, 3.4, 4장으로 되돌아간다.
+
 ---
 
 ## 7. 로그 / 임시파일 / 백업 경로 설명
@@ -338,6 +362,8 @@ docker compose ps
 주의:
 - `docker compose restart` 는 backend / frontend 를 동시에 다시 시작하므로, backend 가 아직 `healthy` 가 아니면 `http://127.0.0.1:4173/api/v1/health` 가 잠깐 `502 Bad Gateway` 를 반환할 수 있다.
 - 이 경우 frontend 자체 장애로 바로 판단하지 말고 backend 가 `healthy` 로 바뀐 뒤 같은 URL 을 다시 확인한다.
+- `scripts/admin-smoke-check.bat` 는 읽기 전용 점검이 아니라 `/api/v1/admin/backups/run` 까지 호출한다.
+- 따라서 이 스크립트는 [docs/19-production-bootstrap.md](./19-production-bootstrap.md) 8장까지 닫힌 뒤, 실제 관리자 계정과 백업 정책이 준비된 상태에서만 실행한다.
 
 배포 후 smoke test 최소 범위:
 1. `health` endpoint 확인

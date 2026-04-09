@@ -28,6 +28,15 @@
 위 항목은 계속 [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md) 와
 [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 를 기준으로 본다.
 
+### 1.1 문서 진행 순서
+
+이 문서는 [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md) 6장 health 확인이 정상으로 닫힌 뒤에 본다.
+
+1. [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 복사본에서 초기 관리자 login ID 보관 위치, 비밀번호 보관 위치, 승격 SQL 작업본 위치, 검수자를 다시 확인한다.
+2. 4장 선행 조건과 5장 작업 순서를 확인한다.
+3. 6장 회원가입 신청 -> 7장 수동 승격 -> 8장 로그인/권한 확인 순서로만 진행한다.
+4. bootstrap 확인이 닫히면 다시 [docs/15-go-live-checklist.md](./15-go-live-checklist.md) 5장~8장과 [docs/14-deploy-result-template.md](./14-deploy-result-template.md) 로 돌아가 최종 게이트와 결과 기록을 닫는다.
+
 ---
 
 ## 2. 운영 원칙
@@ -251,6 +260,16 @@ mysql -h <PRODUCTION_DB_HOST> -P <PRODUCTION_DB_PORT> -u <PRODUCTION_DB_ADMIN_US
 추가 확인:
 - 별도로 준비된 일반 사용자 계정 또는 기존 승인된 일반 사용자 계정으로 로그인해, 위 관리자 메뉴 4종이 노출되지 않는지 확인한다.
 - 일반 사용자 계정 검증이 불가능하면 부트스트랩 확인을 닫지 말고 보류 상태로 남긴다.
+
+선택형 보조 스크립트:
+
+```powershell
+scripts\admin-smoke-check.bat "http://127.0.0.1:8080" "<INITIAL_ADMIN_LOGIN_ID>" "<INITIAL_ADMIN_PASSWORD>"
+```
+
+주의:
+- 이 스크립트는 운영에서 base URL, 관리자 login ID, 비밀번호를 명시적으로 넘겨야 한다. 내장 기본값 `admina / Test1234!` 는 로컬 seed 데이터 전용이다.
+- 이 스크립트는 `/api/v1/admin/backups/run` 을 호출하므로, 백업 경로와 dump 정책 또는 운영 대체 수단이 이미 정리된 뒤에만 실행한다.
 
 DB 정합성 최종 확인:
 - 대상 `users.role = ADMIN`

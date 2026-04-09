@@ -5,6 +5,8 @@
 -- 3. Do not commit the edited file with real values.
 -- 4. Run only after a signup request has created users.status='PENDING'
 --    and user_approval_requests.request_status='PENDING'.
+-- 5. Run only after docs/20-production-input-sheet.md working copy and
+--    docs/19-production-bootstrap.md section 6 pre-checks are closed.
 
 START TRANSACTION;
 
