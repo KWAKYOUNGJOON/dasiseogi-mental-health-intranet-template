@@ -16,10 +16,11 @@ export const CLIENT_GENDER_OPTIONS = CLIENT_GENDER_METADATA
 export type ClientGenderValue = (typeof CLIENT_GENDER_METADATA)[number]['value']
 export const CLIENT_GENDER_VALUES = Object.freeze(CLIENT_GENDER_METADATA.map((option) => option.value)) as ReadonlyArray<ClientGenderValue>
 
-export const CLIENT_GENDER_LABELS: Readonly<Record<string, string>> = {
-  MALE: CLIENT_GENDER_OPTION_LABELS.MALE,
-  FEMALE: CLIENT_GENDER_OPTION_LABELS.FEMALE,
-}
+export const CLIENT_GENDER_LABELS = Object.freeze(
+  Object.fromEntries(
+    CLIENT_GENDER_METADATA.map((option) => [option.value, option.label]),
+  ),
+) as Readonly<Record<ClientGenderValue, string>>
 
 export const CLIENT_STATUS_LABELS: Readonly<Record<string, string>> = {
   ACTIVE: '활성',

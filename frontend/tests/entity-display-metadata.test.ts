@@ -23,6 +23,8 @@ describe('entity display metadata', () => {
     expect(CLIENT_GENDER_LABELS).toEqual({
       MALE: '남성',
       FEMALE: '여성',
+      OTHER: '기타',
+      UNKNOWN: '미상',
     })
     expect(CLIENT_STATUS_LABELS).toEqual({
       ACTIVE: '활성',
@@ -61,6 +63,8 @@ describe('entity display metadata', () => {
   it('returns the shared Korean labels for known client and session values', () => {
     expect(getClientGenderLabel('MALE')).toBe('남성')
     expect(getClientGenderLabel('FEMALE')).toBe('여성')
+    expect(getClientGenderLabel('OTHER')).toBe('기타')
+    expect(getClientGenderLabel('UNKNOWN')).toBe('미상')
     expect(getClientStatusLabel('ACTIVE')).toBe('활성')
     expect(getClientStatusLabel('INACTIVE')).toBe('비활성')
     expect(getClientStatusLabel('MISREGISTERED')).toBe('오등록')

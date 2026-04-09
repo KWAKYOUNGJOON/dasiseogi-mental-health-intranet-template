@@ -6,61 +6,21 @@ import {
   hasKmdqUiRules,
 } from './kmdq'
 
-const IESR_SCALE_CODE = 'IESR'
-
 type AssessmentScaleAnswers = Record<number, string>
 type AssessmentScaleQuestion = ScaleDetail['questions'][number]
-type AssessmentScaleFormNotice = Readonly<{
-  title: string
-  description: string
-}>
 type AssessmentScalePreviewUi = Readonly<{
   showResultLevel?: boolean
   showAlertMessages?: boolean
 }>
 
-const FALLBACK_IESR_FORM_NOTICE: AssessmentScaleFormNotice = {
-  title: '기간 안내',
-  description:
-    'IES-R는 "지난 일주일 동안" 어떠셨는지를 기준으로 응답합니다.',
-}
-
-const FALLBACK_IESR_PREVIEW_UI: AssessmentScalePreviewUi = {
-  showResultLevel: true,
-  showAlertMessages: true,
-}
-
 function getAssessmentScaleFormNoticeFromMetadata(scale?: ScaleDetail) {
   return scale?.metadata?.ui?.formNotice ?? null
 }
 
-function getFallbackAssessmentScaleFormNotice(scale?: ScaleDetail) {
-  if (scale?.scaleCode !== IESR_SCALE_CODE) {
-    return null
-  }
-
-  return FALLBACK_IESR_FORM_NOTICE
-}
-
-function getResolvedAssessmentScaleFormNotice(scale?: ScaleDetail) {
-  return (
-    getAssessmentScaleFormNoticeFromMetadata(scale) ??
-    getFallbackAssessmentScaleFormNotice(scale)
-  )
-}
-
-function getResolvedAssessmentScalePreviewUi(
+function getAssessmentScalePreviewUiFromMetadata(
   scale?: ScaleDetail,
 ): AssessmentScalePreviewUi | null {
-  if (scale?.metadata?.ui?.preview) {
-    return scale.metadata.ui.preview
-  }
-
-  if (scale?.scaleCode === IESR_SCALE_CODE) {
-    return FALLBACK_IESR_PREVIEW_UI
-  }
-
-  return null
+  return scale?.metadata?.ui?.preview ?? null
 }
 
 function hasAnsweredValue(value: string | undefined) {
@@ -188,11 +148,11 @@ export function calculateAssessmentScalePreviewTotalScore(
 }
 
 export function canPreviewAssessmentScaleResult(scale: ScaleDetail | undefined) {
-  return Boolean(getResolvedAssessmentScalePreviewUi(scale)?.showResultLevel)
+  return Boolean(getAssessmentScalePreviewUiFromMetadata(scale)?.showResultLevel)
 }
 
 export function canPreviewAssessmentScaleAlert(scale: ScaleDetail | undefined) {
-  return Boolean(getResolvedAssessmentScalePreviewUi(scale)?.showAlertMessages)
+  return Boolean(getAssessmentScalePreviewUiFromMetadata(scale)?.showAlertMessages)
 }
 
 export function getAssessmentPreviewResultLevel(
@@ -222,5 +182,5 @@ export function getAssessmentScaleFormNotice(scale: ScaleDetail | undefined) {
     return null
   }
 
-  return getResolvedAssessmentScaleFormNotice(scale)
+  return getAssessmentScaleFormNoticeFromMetadata(scale)
 }

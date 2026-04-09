@@ -1,22 +1,9 @@
 import type { ScaleDetail } from '../api/assessmentApi'
 
-export const KMDQ_SCALE_CODE = 'KMDQ'
-const FALLBACK_KMDQ_IMPAIRMENT_QUESTION_NO = 15
-
 type ScaleQuestion = ScaleDetail['questions'][number]
 
 function getKmdqUiMetadata(scale: ScaleDetail) {
-  if (scale.metadata?.ui?.kmdq) {
-    return scale.metadata.ui.kmdq
-  }
-
-  if (scale.scaleCode !== KMDQ_SCALE_CODE) {
-    return null
-  }
-
-  return {
-    impairmentQuestionNo: FALLBACK_KMDQ_IMPAIRMENT_QUESTION_NO,
-  }
+  return scale.metadata?.ui?.kmdq ?? null
 }
 
 export function hasKmdqUiRules(scale: ScaleDetail) {
@@ -28,10 +15,7 @@ function isKmdq(scale: ScaleDetail) {
 }
 
 function getKmdqImpairmentQuestionNo(scale: ScaleDetail) {
-  return (
-    getKmdqUiMetadata(scale)?.impairmentQuestionNo ??
-    FALLBACK_KMDQ_IMPAIRMENT_QUESTION_NO
-  )
+  return getKmdqUiMetadata(scale)?.impairmentQuestionNo
 }
 
 function calculateQuestionAnswerScore(

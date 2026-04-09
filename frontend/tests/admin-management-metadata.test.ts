@@ -23,11 +23,19 @@ import {
   parseSignupRequestPageSize,
   parseUserManagementPageSize,
 } from '../src/features/admin/adminManagementMetadata'
+import {
+  USER_ROLE_LABELS,
+  USER_ROLE_OPTIONS,
+  USER_STATUS_LABELS,
+  USER_STATUS_OPTIONS,
+} from '../src/shared/user/userMetadata'
 
 describe('admin management metadata', () => {
   it('keeps the shared options, labels, chip styles, and helper fallbacks stable', () => {
     expect(USER_MANAGEMENT_ROLE_OPTIONS).toEqual(['ADMIN', 'USER'])
     expect(USER_MANAGEMENT_STATUS_OPTIONS).toEqual(['ACTIVE', 'PENDING', 'INACTIVE', 'REJECTED'])
+    expect(USER_MANAGEMENT_ROLE_OPTIONS).toBe(USER_ROLE_OPTIONS)
+    expect(USER_MANAGEMENT_STATUS_OPTIONS).toBe(USER_STATUS_OPTIONS)
     expect(USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS).toEqual(['ACTIVE', 'INACTIVE'])
     expect(USER_MANAGEMENT_POSITION_NAME_OPTIONS).toEqual(['팀장', '대리', '실무자'])
     expect(USER_MANAGEMENT_PAGE_SIZE_OPTIONS).toEqual([20, 50])
@@ -39,12 +47,14 @@ describe('admin management metadata', () => {
       ADMIN: '관리자',
       USER: '일반 사용자',
     })
+    expect(USER_MANAGEMENT_ROLE_LABELS).toBe(USER_ROLE_LABELS)
     expect(USER_MANAGEMENT_STATUS_LABELS).toEqual({
       ACTIVE: '활성',
       PENDING: '승인 대기',
       INACTIVE: '비활성',
       REJECTED: '반려',
     })
+    expect(USER_MANAGEMENT_STATUS_LABELS).toBe(USER_STATUS_LABELS)
     expect(SIGNUP_REQUEST_STATUS_LABELS).toEqual({
       PENDING: '승인 대기',
       APPROVED: '승인 완료',

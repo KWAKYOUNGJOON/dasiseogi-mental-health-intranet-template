@@ -332,6 +332,24 @@ describe('K-MDQ UI rules', () => {
     expect(calculateKmdqPreviewTotalScore(scale, answers)).toBe(2)
     expect(calculateAssessmentScalePreviewTotalScore(scale, answers)).toBe(2)
   })
+
+  it('stops applying K-MDQ conditional UI rules when the server omits the K-MDQ ui metadata block', () => {
+    const scale = {
+      ...createKmdqScaleDetail(),
+      metadata: undefined,
+    }
+
+    expect(
+      getAssessmentRenderableQuestions(scale, {
+        1: 'Y',
+      }).map((question) => question.questionNo),
+    ).toContain(14)
+    expect(
+      getAssessmentRenderableQuestions(scale, {
+        1: 'Y',
+      }).map((question) => question.questionNo),
+    ).toContain(15)
+  })
 })
 
 describe('IES-R preview metadata handling', () => {
@@ -355,6 +373,19 @@ describe('IES-R preview metadata handling', () => {
     expect(canPreviewAssessmentScaleResult(criScale)).toBe(false)
     expect(canPreviewAssessmentScaleAlert(criScale)).toBe(false)
     expect(getAssessmentScaleFormNotice(criScale)).toBeNull()
+  })
+
+  it('stops exposing IES-R preview helpers when the server omits the preview metadata block', () => {
+    const scale = {
+      ...createIesrScaleDetail(),
+      metadata: undefined,
+    }
+
+    expect(canPreviewAssessmentScaleResult(scale)).toBe(false)
+    expect(canPreviewAssessmentScaleAlert(scale)).toBe(false)
+    expect(getAssessmentScaleFormNotice(scale)).toBeNull()
+    expect(getAssessmentPreviewResultLevel(25, scale)).toBeNull()
+    expect(getAssessmentPreviewAlertMessages(25, scale)).toBeNull()
   })
 
   it('shows the metadata-based result level and caution message at total score 18', () => {

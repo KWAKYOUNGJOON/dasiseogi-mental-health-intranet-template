@@ -1,7 +1,15 @@
 import type { CSSProperties } from 'react'
+import {
+  USER_ROLE_LABELS,
+  USER_ROLE_OPTIONS,
+  USER_STATUS_LABELS,
+  USER_STATUS_OPTIONS,
+  type UserRole,
+  type UserStatus,
+} from '../../shared/user/userMetadata'
 
-export const USER_MANAGEMENT_ROLE_OPTIONS = ['ADMIN', 'USER'] as const
-export const USER_MANAGEMENT_STATUS_OPTIONS = ['ACTIVE', 'PENDING', 'INACTIVE', 'REJECTED'] as const
+export const USER_MANAGEMENT_ROLE_OPTIONS = USER_ROLE_OPTIONS
+export const USER_MANAGEMENT_STATUS_OPTIONS = USER_STATUS_OPTIONS
 export const USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS = ['ACTIVE', 'INACTIVE'] as const
 export const USER_MANAGEMENT_POSITION_NAME_OPTIONS = ['팀장', '대리', '실무자'] as const
 export const USER_MANAGEMENT_PAGE_SIZE_OPTIONS = [20, 50] as const
@@ -9,8 +17,8 @@ export const USER_MANAGEMENT_PAGE_SIZE_OPTIONS = [20, 50] as const
 export const SIGNUP_REQUEST_STATUS_OPTIONS = ['PENDING', 'APPROVED', 'REJECTED'] as const
 export const SIGNUP_REQUEST_PAGE_SIZE_OPTIONS = [20, 50, 100] as const
 
-export type UserManagementRole = (typeof USER_MANAGEMENT_ROLE_OPTIONS)[number]
-export type UserManagementStatus = (typeof USER_MANAGEMENT_STATUS_OPTIONS)[number]
+export type UserManagementRole = UserRole
+export type UserManagementStatus = UserStatus
 export type UserManagementEditableStatus = (typeof USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS)[number]
 export type UserManagementPositionName = (typeof USER_MANAGEMENT_POSITION_NAME_OPTIONS)[number]
 export type UserManagementPageSize = (typeof USER_MANAGEMENT_PAGE_SIZE_OPTIONS)[number]
@@ -22,17 +30,9 @@ export const DEFAULT_USER_MANAGEMENT_PAGE_SIZE: UserManagementPageSize = 20
 export const DEFAULT_SIGNUP_REQUEST_PAGE_SIZE: SignupRequestManagementPageSize = 20
 export const SIGNUP_REQUEST_PROCESSABLE_STATUS: SignupRequestManagementStatus = 'PENDING'
 
-export const USER_MANAGEMENT_ROLE_LABELS: Record<UserManagementRole, string> = {
-  ADMIN: '관리자',
-  USER: '일반 사용자',
-}
+export const USER_MANAGEMENT_ROLE_LABELS: Readonly<Record<UserManagementRole, string>> = USER_ROLE_LABELS
 
-export const USER_MANAGEMENT_STATUS_LABELS: Record<UserManagementStatus, string> = {
-  ACTIVE: '활성',
-  PENDING: '승인 대기',
-  INACTIVE: '비활성',
-  REJECTED: '반려',
-}
+export const USER_MANAGEMENT_STATUS_LABELS: Readonly<Record<UserManagementStatus, string>> = USER_STATUS_LABELS
 
 export const SIGNUP_REQUEST_STATUS_LABELS: Record<SignupRequestManagementStatus, string> = {
   PENDING: '승인 대기',
