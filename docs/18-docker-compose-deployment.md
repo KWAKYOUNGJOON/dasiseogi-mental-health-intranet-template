@@ -434,3 +434,4 @@ Docker 운영 배포 결과는 [docs/14-deploy-result-template.md](./14-deploy-r
 비밀값 기록 원칙:
 - 실제 DB 비밀번호는 문서에 쓰지 않는다.
 - DB host, DB 명, 담당자, 확인 시각, 결과만 남긴다.
+

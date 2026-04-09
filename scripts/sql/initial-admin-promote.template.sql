@@ -71,3 +71,4 @@ WHERE requested_login_id = @target_login_id
 ORDER BY requested_at DESC, id DESC;
 
 COMMIT;
+

@@ -239,3 +239,4 @@ echo [health-check] response body:
 type "%BODY_FILE%"
 echo.
 exit /b 0
+

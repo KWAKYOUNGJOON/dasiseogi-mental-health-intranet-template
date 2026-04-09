@@ -185,3 +185,4 @@
 - [ ] `scripts/admin-smoke-check.bat` 를 쓸 계획이면 base URL, login ID 출처, 비밀번호 보관 위치를 적었고, 내장 기본값을 운영에서 쓰지 않는다는 점을 확인했다.
 - [ ] 실제 운영값은 저장소 원본이 아니라 이 시트 복사본, 대상 서버 작업본, 비밀 저장소, 내부 운영 문서에만 남긴다.
 - [ ] 이 시트 복사본만 열어도 [docs/15-go-live-checklist.md](./15-go-live-checklist.md) -> [docs/16-prod-config-checklist.md](./16-prod-config-checklist.md) -> [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md) -> [docs/19-production-bootstrap.md](./19-production-bootstrap.md) 순서로 다음 작업을 바로 시작할 수 있다.
+
