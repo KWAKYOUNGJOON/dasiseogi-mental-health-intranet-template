@@ -246,6 +246,62 @@
       "C": "고위험",
       "D": "주의",
       "E": "위기상황 아님"
+    },
+    "evaluation": {
+      "cri": {
+        "selfOther": {
+          "resultDetailKey": "selfOtherTotal",
+          "resultDetailLabel": "자타해 위험 합계",
+          "questionNos": [1, 2, 3, 4, 5, 6, 7, 8]
+        },
+        "mental": {
+          "resultDetailKey": "mentalTotal",
+          "resultDetailLabel": "정신상태 합계",
+          "questionNos": [9, 10, 11, 12, 13, 14]
+        },
+        "function": {
+          "resultDetailKey": "functionTotal",
+          "resultDetailLabel": "기능수준 합계",
+          "questionNos": [15, 16, 17, 18, 19, 20, 21]
+        },
+        "support": {
+          "resultDetailKey": "supportTotal",
+          "resultDetailLabel": "지지체계 합계",
+          "questionNos": [22, 23]
+        },
+        "selfOtherRiskPresentQuestionNo": 1,
+        "selfOtherRiskEightQuestionNo": 8,
+        "riskEightPlusMentalDetailKey": "risk8PlusMental",
+        "riskEightPlusMentalDetailLabel": "자타해 위험 8번 + 정신상태 합계",
+        "resultLevelRules": [
+          {
+            "code": "A",
+            "selfOtherRiskPresentScoreEquals": 1,
+            "minSelfOtherTotal": 2,
+            "minRiskEightPlusMental": 1
+          },
+          {
+            "code": "B",
+            "selfOtherRiskPresentScoreEquals": 1,
+            "minSelfOtherTotal": 2,
+            "maxRiskEightPlusMental": 0
+          },
+          {
+            "code": "C",
+            "minSelfOtherTotal": 1,
+            "minRiskEightPlusMental": 1
+          },
+          {
+            "code": "D",
+            "minSelfOtherTotal": 1,
+            "maxRiskEightPlusMental": 0
+          },
+          {
+            "code": "E",
+            "maxSelfOtherTotal": 0
+          }
+        ]
+      }
     }
   },
   "interpretationRules": [],

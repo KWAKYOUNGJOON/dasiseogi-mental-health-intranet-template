@@ -157,6 +157,24 @@ class ScaleResourceLoaderTest {
                         java.util.List.of("C"),
                         java.util.List.of("D")
                 );
+        assertThat(cri.metadata()).isNotNull();
+        assertThat(cri.metadata().evaluation()).isNotNull();
+        assertThat(cri.metadata().evaluation().cri()).isNotNull();
+        assertThat(cri.metadata().evaluation().cri().selfOther().questionNos())
+                .containsExactly(1, 2, 3, 4, 5, 6, 7, 8);
+        assertThat(cri.metadata().evaluation().cri().mental().questionNos())
+                .containsExactly(9, 10, 11, 12, 13, 14);
+        assertThat(cri.metadata().evaluation().cri().function().questionNos())
+                .containsExactly(15, 16, 17, 18, 19, 20, 21);
+        assertThat(cri.metadata().evaluation().cri().support().questionNos())
+                .containsExactly(22, 23);
+        assertThat(cri.metadata().evaluation().cri().selfOtherRiskPresentQuestionNo()).isEqualTo(1);
+        assertThat(cri.metadata().evaluation().cri().selfOtherRiskEightQuestionNo()).isEqualTo(8);
+        assertThat(cri.metadata().evaluation().cri().riskEightPlusMentalDetailKey()).isEqualTo("risk8PlusMental");
+        assertThat(cri.metadata().evaluation().cri().riskEightPlusMentalDetailLabel()).isEqualTo("자타해 위험 8번 + 정신상태 합계");
+        assertThat(cri.metadata().evaluation().cri().resultLevelRules())
+                .extracting(rule -> rule.code())
+                .containsExactly("A", "B", "C", "D", "E");
     }
 
     @Test

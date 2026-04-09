@@ -19,7 +19,43 @@ public record ScaleDefinition(
 ) {
     public record Metadata(
             Map<String, String> resultLevelLabels,
-            UiMetadata ui
+            UiMetadata ui,
+            EvaluationMetadata evaluation
+    ) {
+    }
+
+    public record EvaluationMetadata(
+            CriEvaluationMetadata cri
+    ) {
+    }
+
+    public record CriEvaluationMetadata(
+            CriQuestionGroup selfOther,
+            CriQuestionGroup mental,
+            CriQuestionGroup function,
+            CriQuestionGroup support,
+            Integer selfOtherRiskPresentQuestionNo,
+            Integer selfOtherRiskEightQuestionNo,
+            String riskEightPlusMentalDetailKey,
+            String riskEightPlusMentalDetailLabel,
+            List<CriResultLevelRule> resultLevelRules
+    ) {
+    }
+
+    public record CriQuestionGroup(
+            String resultDetailKey,
+            String resultDetailLabel,
+            List<Integer> questionNos
+    ) {
+    }
+
+    public record CriResultLevelRule(
+            String code,
+            Integer selfOtherRiskPresentScoreEquals,
+            Integer minSelfOtherTotal,
+            Integer maxSelfOtherTotal,
+            Integer minRiskEightPlusMental,
+            Integer maxRiskEightPlusMental
     ) {
     }
 

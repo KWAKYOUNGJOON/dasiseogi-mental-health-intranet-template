@@ -51,14 +51,14 @@ class AssessmentServiceTest {
     }
 
     @Test
-    void resolveCriResultLevelCodeAndDisplayLabelSeparately() throws Exception {
-        ScaleDefinition definition = loadScaleDefinition("cri.json");
+    void evaluateCriPreservesResultLevelCodesLabelsAndResultDetailsAcrossAtoE() throws Exception {
+        when(scaleService.getActiveDefinition("CRI")).thenReturn(loadScaleDefinition("cri.json"));
 
-        assertCriResultLevelPair(definition, 1, 1, 2, 0, "A", "A - 극도의 위기");
-        assertCriResultLevelPair(definition, 1, 0, 2, 0, "B", "B - 위기");
-        assertCriResultLevelPair(definition, 0, 1, 1, 0, "C", "C - 고위험");
-        assertCriResultLevelPair(definition, 0, 0, 1, 0, "D", "D - 주의");
-        assertCriResultLevelPair(definition, 0, 0, 0, 0, "E", "E - 위기상황 아님");
+        assertCriEvaluation(criAnswersForExtremeCrisis(), "A", "A - 극도의 위기", 2, 2, 0, 0, 0, 1);
+        assertCriEvaluation(criAnswersForCrisis(), "B", "B - 위기", 2, 2, 0, 0, 0, 0);
+        assertCriEvaluation(criAnswersForHighRisk(), "C", "C - 고위험", 2, 2, 0, 0, 0, 1);
+        assertCriEvaluation(criAnswersForCaution(), "D", "D - 주의", 1, 1, 0, 0, 0, 0);
+        assertCriEvaluation(criAnswersForNoCrisis(), "E", "E - 위기상황 아님", 0, 0, 0, 0, 0, 0);
     }
 
     @Test
@@ -69,12 +69,12 @@ class AssessmentServiceTest {
                 "C", "고위험",
                 "D", "주의"
         ));
+        when(scaleService.getActiveDefinition("CRI")).thenReturn(definition);
 
         assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
                 assessmentService,
-                "formatCriResultLevel",
-                definition,
-                "E"
+                "evaluateScale",
+                new SelectedScaleRequest("CRI", toCriAnswerRequests(criAnswersForNoCrisis()))
         ))
                 .isInstanceOf(AppException.class)
                 .satisfies(exception -> {
@@ -182,32 +182,64 @@ class AssessmentServiceTest {
         assertThat(((List<?>) ReflectionTestUtils.invokeMethod(evaluation, "answers"))).hasSize(13);
     }
 
-    private void assertCriResultLevelPair(
-            ScaleDefinition definition,
-            int selfOtherQuestionOneScore,
-            int selfOtherQuestionEightScore,
-            int selfOtherTotal,
-            int mentalTotal,
-            String expectedCode,
-            String expectedDisplayLabel
-    ) {
-        String resultLevelCode = ReflectionTestUtils.invokeMethod(
-                assessmentService,
-                "resolveCriResultLevelCode",
-                selfOtherQuestionOneScore,
-                selfOtherQuestionEightScore,
-                selfOtherTotal,
-                mentalTotal
-        );
-        assertThat(resultLevelCode).isEqualTo(expectedCode);
+    @Test
+    void evaluateKmdqKeepsModifiedPositiveScreenBehaviorWithoutRequiringImpairmentAnswer() throws Exception {
+        when(scaleService.getActiveDefinition("KMDQ")).thenReturn(loadScaleDefinition("kmdq.json"));
 
-        String resultLevel = ReflectionTestUtils.invokeMethod(
-                assessmentService,
-                "formatCriResultLevel",
-                definition,
-                resultLevelCode
+        SelectedScaleRequest request = new SelectedScaleRequest(
+                "KMDQ",
+                List.of(
+                        answer(1, "Y"),
+                        answer(2, "Y"),
+                        answer(3, "Y"),
+                        answer(4, "Y"),
+                        answer(5, "Y"),
+                        answer(6, "Y"),
+                        answer(7, "Y"),
+                        answer(8, "N"),
+                        answer(9, "N"),
+                        answer(10, "N"),
+                        answer(11, "N"),
+                        answer(12, "N"),
+                        answer(13, "N"),
+                        answer(14, "Y")
+                )
         );
-        assertThat(resultLevel).isEqualTo(expectedDisplayLabel);
+
+        Object evaluation = ReflectionTestUtils.invokeMethod(assessmentService, "evaluateScale", request);
+
+        assertThat(((Number) ReflectionTestUtils.invokeMethod(evaluation, "totalScore")).intValue()).isEqualTo(7);
+        assertThat((String) ReflectionTestUtils.invokeMethod(evaluation, "resultLevelCode")).isEqualTo("POSITIVE_SCREEN");
+        assertThat((String) ReflectionTestUtils.invokeMethod(evaluation, "resultLevel")).isEqualTo("양성 의심");
+        assertThat(((List<?>) ReflectionTestUtils.invokeMethod(evaluation, "answers"))).hasSize(14);
+    }
+
+    private void assertCriEvaluation(
+            int[] rawAnswers,
+            String expectedCode,
+            String expectedDisplayLabel,
+            int expectedTotalScore,
+            int expectedSelfOtherTotal,
+            int expectedMentalTotal,
+            int expectedFunctionTotal,
+            int expectedSupportTotal,
+            int expectedRisk8PlusMental
+    ) {
+        Object evaluation = ReflectionTestUtils.invokeMethod(
+                assessmentService,
+                "evaluateScale",
+                new SelectedScaleRequest("CRI", toCriAnswerRequests(rawAnswers))
+        );
+
+        assertThat(evaluation).isNotNull();
+        assertThat(((Number) ReflectionTestUtils.invokeMethod(evaluation, "totalScore")).intValue()).isEqualTo(expectedTotalScore);
+        assertThat((String) ReflectionTestUtils.invokeMethod(evaluation, "resultLevelCode")).isEqualTo(expectedCode);
+        assertThat((String) ReflectionTestUtils.invokeMethod(evaluation, "resultLevel")).isEqualTo(expectedDisplayLabel);
+        assertThat(readResultDetailValue(evaluation, "selfOtherTotal")).isEqualTo(Integer.toString(expectedSelfOtherTotal));
+        assertThat(readResultDetailValue(evaluation, "mentalTotal")).isEqualTo(Integer.toString(expectedMentalTotal));
+        assertThat(readResultDetailValue(evaluation, "functionTotal")).isEqualTo(Integer.toString(expectedFunctionTotal));
+        assertThat(readResultDetailValue(evaluation, "supportTotal")).isEqualTo(Integer.toString(expectedSupportTotal));
+        assertThat(readResultDetailValue(evaluation, "risk8PlusMental")).isEqualTo(Integer.toString(expectedRisk8PlusMental));
     }
 
     private List<?> invokeBuildAlertData(ScaleDefinition definition, String resultLevelCode, String resultLevel) {
@@ -222,6 +254,15 @@ class AssessmentServiceTest {
         );
     }
 
+    private String readResultDetailValue(Object evaluation, String key) {
+        List<?> resultDetails = (List<?>) ReflectionTestUtils.invokeMethod(evaluation, "resultDetails");
+        return resultDetails.stream()
+                .filter(detail -> key.equals(ReflectionTestUtils.invokeMethod(detail, "key")))
+                .map(detail -> (String) ReflectionTestUtils.invokeMethod(detail, "value"))
+                .findFirst()
+                .orElseThrow();
+    }
+
     private ScaleDefinition loadScaleDefinition(String filename) throws Exception {
         try (InputStream inputStream = AssessmentServiceTest.class.getResourceAsStream("/scales/" + filename)) {
             assertThat(inputStream).isNotNull();
@@ -230,23 +271,72 @@ class AssessmentServiceTest {
     }
 
     private ScaleDefinition createCriDefinitionWithResultLevelLabels(Map<String, String> resultLevelLabels) {
+        ScaleDefinition source = loadCriDefinition("cri.json");
         return new ScaleDefinition(
-                "CRI",
-                "정신과적 위기 분류 평정척도 (CRI)",
-                "1.0.0",
-                9,
-                true,
-                23,
-                null,
-                null,
-                List.of(),
-                List.of(),
-                List.of(),
-                new ScaleDefinition.Metadata(resultLevelLabels, null)
+                source.scaleCode(),
+                source.scaleName(),
+                source.version(),
+                source.displayOrder(),
+                source.isActive(),
+                source.questionCount(),
+                source.screeningThreshold(),
+                source.screeningLabel(),
+                source.items(),
+                source.interpretationRules(),
+                source.alertRules(),
+                new ScaleDefinition.Metadata(resultLevelLabels, source.metadata().ui(), source.metadata().evaluation())
         );
     }
 
     private AnswerRequest answer(int questionNo, String answerValue) {
         return new AnswerRequest(questionNo, answerValue);
+    }
+
+    private ScaleDefinition loadCriDefinition(String filename) {
+        try {
+            return loadScaleDefinition(filename);
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    private List<AnswerRequest> toCriAnswerRequests(int[] rawAnswers) {
+        return java.util.stream.IntStream.range(0, rawAnswers.length)
+                .mapToObj(index -> new AnswerRequest(index + 1, Integer.toString(rawAnswers[index])))
+                .toList();
+    }
+
+    private int[] criAnswersForExtremeCrisis() {
+        int[] answers = criAnswersForNoCrisis();
+        answers[0] = 1;
+        answers[7] = 1;
+        return answers;
+    }
+
+    private int[] criAnswersForCrisis() {
+        int[] answers = criAnswersForNoCrisis();
+        answers[0] = 1;
+        answers[1] = 1;
+        return answers;
+    }
+
+    private int[] criAnswersForHighRisk() {
+        int[] answers = criAnswersForNoCrisis();
+        answers[1] = 1;
+        answers[7] = 1;
+        return answers;
+    }
+
+    private int[] criAnswersForCaution() {
+        int[] answers = criAnswersForNoCrisis();
+        answers[1] = 1;
+        return answers;
+    }
+
+    private int[] criAnswersForNoCrisis() {
+        int[] answers = new int[23];
+        answers[21] = 0;
+        answers[22] = 0;
+        return answers;
     }
 }
