@@ -1,5 +1,5 @@
 import { isAxiosError } from 'axios'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../app/providers/AuthProvider'
 import {
@@ -52,36 +52,71 @@ export function StatisticsPage() {
   const [alertPage, setAlertPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const metadataRequestRef = useRef<Promise<StatisticsMetadata> | null>(null)
 
   useEffect(() => {
-    void loadAll(1)
+    void loadStatistics(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function loadAll(nextAlertPage = alertPage) {
+  async function loadMetadata() {
+    if (metadata) {
+      return metadata
+    }
+
+    if (!metadataRequestRef.current) {
+      // Alert-type metadata is stable for the page lifecycle, so reuse the first successful request.
+      metadataRequestRef.current = fetchStatisticsMetadata()
+        .then((metadataData) => {
+          setMetadata(metadataData)
+          return metadataData
+        })
+        .catch((requestError: unknown) => {
+          metadataRequestRef.current = null
+          throw requestError
+        })
+    }
+
+    return metadataRequestRef.current
+  }
+
+  async function fetchStatisticsData(nextAlertPage = alertPage) {
+    const params = {
+      dateFrom: toValidDateText(dateFrom) || undefined,
+      dateTo: toValidDateText(dateTo) || undefined,
+    }
+    const [summaryData, scaleData, alertData] = await Promise.all([
+      fetchStatisticsSummary(params),
+      fetchStatisticsScales(params),
+      fetchStatisticsAlerts({
+        ...params,
+        scaleCode: alertScaleCode || undefined,
+        alertType: alertType || undefined,
+        page: nextAlertPage,
+        size: DEFAULT_STATISTICS_ALERT_PAGE_SIZE,
+      }),
+    ])
+
+    return {
+      alertData,
+      nextAlertPage,
+      scaleData,
+      summaryData,
+    }
+  }
+
+  async function loadStatistics(nextAlertPage = alertPage) {
     setLoading(true)
     try {
-      const params = {
-        dateFrom: toValidDateText(dateFrom) || undefined,
-        dateTo: toValidDateText(dateTo) || undefined,
-      }
-      const [metadataData, summaryData, scaleData, alertData] = await Promise.all([
-        fetchStatisticsMetadata(),
-        fetchStatisticsSummary(params),
-        fetchStatisticsScales(params),
-        fetchStatisticsAlerts({
-          ...params,
-          scaleCode: alertScaleCode || undefined,
-          alertType: alertType || undefined,
-          page: nextAlertPage,
-          size: DEFAULT_STATISTICS_ALERT_PAGE_SIZE,
-        }),
+      const [statisticsData] = await Promise.all([
+        fetchStatisticsData(nextAlertPage),
+        metadata ? Promise.resolve(metadata) : loadMetadata(),
       ])
-      setMetadata(metadataData)
-      setSummary(summaryData)
-      setScales(scaleData)
-      setAlerts(alertData)
-      setAlertPage(nextAlertPage)
+
+      setSummary(statisticsData.summaryData)
+      setScales(statisticsData.scaleData)
+      setAlerts(statisticsData.alertData)
+      setAlertPage(statisticsData.nextAlertPage)
       setError(null)
     } catch (requestError: unknown) {
       setError(getStatisticsErrorMessage(requestError, '통계 정보를 불러오지 못했습니다.'))
@@ -151,7 +186,7 @@ export function StatisticsPage() {
               </option>
             ))}
           </select>
-          <button className="secondary-button" onClick={() => void loadAll(1)}>
+          <button className="secondary-button" onClick={() => void loadStatistics(1)}>
             조회
           </button>
         </div>
@@ -296,13 +331,13 @@ export function StatisticsPage() {
                       {alerts.totalItems}건 / {alerts.page}페이지
                     </span>
                     <div className="actions">
-                      <button className="secondary-button" disabled={alertPage <= 1} onClick={() => void loadAll(alertPage - 1)}>
+                      <button className="secondary-button" disabled={alertPage <= 1} onClick={() => void loadStatistics(alertPage - 1)}>
                         이전
                       </button>
                       <button
                         className="secondary-button"
                         disabled={alerts.totalPages === 0 || alertPage >= alerts.totalPages}
-                        onClick={() => void loadAll(alertPage + 1)}
+                        onClick={() => void loadStatistics(alertPage + 1)}
                       >
                         다음
                       </button>

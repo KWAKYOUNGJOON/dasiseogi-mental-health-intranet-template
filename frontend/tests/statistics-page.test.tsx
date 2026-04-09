@@ -466,6 +466,7 @@ describe('statistics page', () => {
         size: 10,
       })
     })
+    expect(mockedFetchStatisticsMetadata).toHaveBeenCalledTimes(1)
 
     const secondPageAlertRow = (await screen.findByText('불안 주의')).closest('tr')
 
@@ -480,7 +481,7 @@ describe('statistics page', () => {
     fireEvent.click(screen.getByRole('button', { name: '조회' }))
 
     await waitFor(() => {
-      expect(mockedFetchStatisticsMetadata).toHaveBeenCalledTimes(3)
+      expect(mockedFetchStatisticsMetadata).toHaveBeenCalledTimes(1)
       expect(mockedFetchStatisticsSummary).toHaveBeenCalledTimes(3)
       expect(mockedFetchStatisticsScales).toHaveBeenCalledTimes(3)
       expect(mockedFetchStatisticsAlerts).toHaveBeenCalledTimes(3)
