@@ -372,6 +372,7 @@ describe('client detail page', () => {
 
     expect((scaleSelect as HTMLSelectElement).value).toBe('GAD7')
     expect(mockedFetchClientScaleTrend).toHaveBeenCalledTimes(1)
+    expect(mockedFetchSessionDetail).not.toHaveBeenCalled()
   })
 
   it('shows 기록 없음 when the selected scale has no trend points', async () => {
@@ -428,6 +429,55 @@ describe('client detail page', () => {
     expect(screen.getByTestId('client-scale-trend-line')).toBeTruthy()
     expect(screen.getByText('5 경도')).toBeTruthy()
     expect(screen.getByText('10 중등도')).toBeTruthy()
+  })
+
+  it('renders the scale trend chart without cutoff labels when the selected scale has no cutoffs', async () => {
+    mockedFetchClientScaleTrend.mockResolvedValue(createClientScaleTrend({
+      scaleCode: 'CRI',
+      scaleName: '정신과적 위기 분류 평정척도 (CRI)',
+      maxScore: 23,
+      cutoffs: [],
+      points: [
+        createTrendPoint({
+          resultLevel: 'A - 극도의 위기',
+          totalScore: 15,
+        }),
+      ],
+    }))
+
+    renderClientDetailRoute()
+
+    expect(await screen.findByTestId('client-scale-trend-chart')).toBeTruthy()
+    expect(screen.getByText(/총 1건 · 최대 23점/)).toBeTruthy()
+    expect(screen.queryByText('5 경도')).toBeNull()
+  })
+
+  it('uses the last ordered point for the latest summary when assessedAt and createdAt are tied', async () => {
+    mockedFetchClientScaleTrend.mockResolvedValue(createClientScaleTrend({
+      points: [
+        createTrendPoint({
+          sessionId: 400,
+          sessionScaleId: 500,
+          assessedAt: '2026-04-08 10:30:00',
+          createdAt: '2026-04-08 10:40:00',
+          totalScore: 7,
+          resultLevel: '경도',
+        }),
+        createTrendPoint({
+          sessionId: 401,
+          sessionScaleId: 501,
+          assessedAt: '2026-04-08 10:30:00',
+          createdAt: '2026-04-08 10:40:00',
+          totalScore: 14,
+          resultLevel: '중등도-중증',
+        }),
+      ],
+    }))
+
+    renderClientDetailRoute()
+
+    expect(await screen.findByTestId('client-scale-trend-chart')).toBeTruthy()
+    expect(screen.getByText(/최근 판정 중등도-중증/)).toBeTruthy()
   })
 
   it('renders a single point without a line when there is only one trend point', async () => {

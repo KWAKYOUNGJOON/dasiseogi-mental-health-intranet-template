@@ -138,7 +138,7 @@ async function markCurrentClientMisregistered(page: Page, reason: string) {
   await dialog.getByRole('button', { name: '오등록 처리' }).click()
 
   await expect(page.getByText('오등록 처리되었습니다.')).toBeVisible()
-  await expect(page.getByText('MISREGISTERED')).toBeVisible()
+  await expect(page.getByText('오등록', { exact: true })).toBeVisible()
   await expect(page.getByText(reason)).toBeVisible()
 }
 
@@ -161,7 +161,7 @@ async function submitSignupRequest(page: Page, applicantName: string, loginId: s
   await page.locator('#signup-request-password').fill(password)
   await page.locator('#signup-request-passwordConfirm').fill(password)
   await page.getByLabel('연락처').fill('01012345678')
-  await page.getByLabel('직책 또는 역할').fill('테스트 상담사')
+  await page.getByLabel('직책 또는 역할').selectOption('실무자')
   await page.getByLabel('소속 팀').fill('E2E 검증팀')
   await page.getByLabel('가입 신청 메모').fill(memo)
   await page.getByRole('button', { name: '가입 신청' }).click()
@@ -261,10 +261,12 @@ test('admin can create a client and load the statistics page', async ({ page }) 
   await expect(page.getByRole('heading', { name: '담당자별 세션 수' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '경고 기록' })).toBeVisible()
 
-  await page.getByLabel('경고 유형').selectOption('CAUTION')
+  const alertTypeSelect = page.getByLabel('경고 유형')
+  await alertTypeSelect.selectOption('CAUTION')
+  const selectedAlertTypeLabel = ((await alertTypeSelect.locator('option:checked').textContent()) ?? '').trim()
   await page.getByRole('button', { name: '조회' }).click()
 
-  await expect(page.getByText('필터: 전체 척도 / CAUTION')).toBeVisible()
+  await expect(page.getByText(`필터: 전체 척도 / ${selectedAlertTypeLabel}`)).toBeVisible()
 
   await page.goto(clientDetailUrl)
   await expect(page.getByRole('heading', { name: `${clientName} 상세` })).toBeVisible()
@@ -299,8 +301,8 @@ test('admin can create an assessment session and mark it as misentered', async (
   await page.getByRole('button', { name: '세션 저장' }).click()
 
   await expect(page).toHaveURL(/\/assessments\/sessions\/\d+/)
-  await expect(page.getByRole('heading', { name: '세션 상세' })).toBeVisible()
-  await expect(page.getByText('세션이 저장되었습니다.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '세션 상세', exact: true })).toBeVisible()
+  await expect(page.getByText('Playwright assessment session flow')).toBeVisible()
   await expect(page.getByText('PHQ-9')).toBeVisible()
   await expect(page.getByRole('button', { name: '오입력 처리' })).toBeVisible()
 

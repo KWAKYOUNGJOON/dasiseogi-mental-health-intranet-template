@@ -1,13 +1,15 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const DEFAULT_BASE_URL = 'http://127.0.0.1:4173'
+const FULL_STACK_HOST = '127.0.0.1'
+const FULL_STACK_PORT = 4174
+const DEFAULT_BASE_URL = `http://${FULL_STACK_HOST}:${FULL_STACK_PORT}`
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? DEFAULT_BASE_URL
 const webServer = process.env.PLAYWRIGHT_BASE_URL
   ? undefined
   : {
-      command: 'npm run dev -- --host 127.0.0.1 --port 4173',
+      command: 'npm run dev:e2e:full-stack',
       url: DEFAULT_BASE_URL,
-      reuseExistingServer: true,
+      reuseExistingServer: false,
       timeout: 120_000,
     }
 

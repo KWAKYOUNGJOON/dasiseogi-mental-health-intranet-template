@@ -2,6 +2,8 @@ import { expect, test, type Page } from '@playwright/test'
 
 const LOGIN_ID = 'usera'
 const PASSWORD = 'Test1234!'
+const DEFAULT_SCALE_CODE = 'GAD7'
+const RECORDED_SCALE_CODE = 'PHQ9'
 
 type ApiEnvelope<T> = {
   success: boolean
@@ -23,6 +25,10 @@ type AuthUser = {
 type ClientCreateResponse = {
   id: number
   clientNo: string
+}
+
+type ClientDetailSummary = {
+  latestRecordedScaleCode: string | null
 }
 
 type SessionCreateResponse = {
@@ -47,9 +53,17 @@ type ClientFixture = {
   clientName: string
 }
 
-type TrendFixture = ClientFixture & {
-  olderSessionId: number
-  newerSessionId: number
+type ScaleListItem = {
+  scaleCode: string
+  displayOrder: number
+  isActive: boolean
+  implemented: boolean
+}
+
+type ScaleTrendFlowFixture = ClientFixture & {
+  emptyScaleCode: string
+  newerRecordedSessionId: number
+  newerRecordedAssessedAtText: string
 }
 
 function createUniqueToken() {
@@ -61,6 +75,12 @@ function buildAnswers(answerValues: number[]) {
     questionNo: index + 1,
     answerValue: String(answerValue),
   }))
+}
+
+function getOperatingScaleItems(scaleItems: ScaleListItem[]) {
+  return scaleItems
+    .filter((item) => item.isActive && item.implemented)
+    .sort((left, right) => left.displayOrder - right.displayOrder)
 }
 
 async function callApi<T>(
@@ -171,155 +191,123 @@ async function openClientDetail(page: Page, fixture: ClientFixture) {
 
   await expect(page).toHaveURL(new RegExp(`/clients/${fixture.clientId}$`))
   await expect(page.getByRole('heading', { name: `${fixture.clientName} 상세` })).toBeVisible()
-  await expect(page.getByRole('heading', { name: '척도 추세' })).toBeVisible()
 }
 
-async function createClientWithTrendSessions(page: Page): Promise<TrendFixture> {
-  const client = await createClient(page, 'PW 척도추세')
-  const olderSession = await callApi<SessionCreateResponse>(page, '/assessment-sessions', {
-    method: 'POST',
-    body: {
-      clientId: client.clientId,
-      sessionStartedAt: '2026-04-08T09:00:00',
-      sessionCompletedAt: '2026-04-08T09:20:00',
-      memo: `Playwright scale trend older ${client.clientName}`,
-      selectedScales: [
-        {
-          scaleCode: 'PHQ9',
-          answers: buildAnswers([0, 0, 0, 0, 0, 0, 0, 0, 1]),
-        },
-      ],
-    },
-  })
-  const newerSession = await callApi<SessionCreateResponse>(page, '/assessment-sessions', {
-    method: 'POST',
-    body: {
-      clientId: client.clientId,
-      sessionStartedAt: '2026-04-09T10:00:00',
-      sessionCompletedAt: '2026-04-09T10:25:00',
-      memo: `Playwright scale trend latest ${client.clientName}`,
-      selectedScales: [
-        {
-          scaleCode: 'PHQ9',
-          answers: buildAnswers([1, 1, 1, 1, 1, 1, 1, 1, 1]),
-        },
-      ],
-    },
-  })
-
-  return {
-    ...client,
-    olderSessionId: olderSession.sessionId,
-    newerSessionId: newerSession.sessionId,
-  }
-}
-
-async function createClientWithLatestRecordedOperatingScale(page: Page): Promise<ClientFixture> {
-  const client = await createClient(page, 'PW 최신척도기본값')
+async function createScaleTrendFlowFixture(page: Page): Promise<ScaleTrendFlowFixture> {
+  const client = await createClient(page, 'PW 척도추세실사용')
 
   await createAssessmentSession(page, {
     clientId: client.clientId,
-    sessionStartedAt: '2026-04-07T09:00:00',
-    sessionCompletedAt: '2026-04-07T09:20:00',
-    memo: `Playwright latest scale older ${client.clientName}`,
+    sessionStartedAt: '2026-04-08T09:00:00',
+    sessionCompletedAt: '2026-04-08T09:20:00',
+    memo: `Playwright scale trend recorded older ${client.clientName}`,
     selectedScales: [
       {
-        scaleCode: 'PHQ9',
-        answers: buildAnswers([1, 1, 1, 1, 0, 0, 0, 0, 0]),
+        scaleCode: RECORDED_SCALE_CODE,
+        answers: buildAnswers([0, 0, 0, 0, 0, 0, 0, 0, 1]),
+      },
+    ],
+  })
+
+  const newerRecordedSession = await createAssessmentSession(page, {
+    clientId: client.clientId,
+    sessionStartedAt: '2026-04-09T10:00:00',
+    sessionCompletedAt: '2026-04-09T10:25:00',
+    memo: `Playwright scale trend recorded latest ${client.clientName}`,
+    selectedScales: [
+      {
+        scaleCode: RECORDED_SCALE_CODE,
+        answers: buildAnswers([1, 1, 1, 1, 1, 1, 1, 1, 1]),
       },
     ],
   })
 
   await createAssessmentSession(page, {
     clientId: client.clientId,
-    sessionStartedAt: '2026-04-09T14:00:00',
-    sessionCompletedAt: '2026-04-09T14:15:00',
-    memo: `Playwright latest scale newer ${client.clientName}`,
+    sessionStartedAt: '2026-04-10T14:00:00',
+    sessionCompletedAt: '2026-04-10T14:15:00',
+    memo: `Playwright scale trend default latest ${client.clientName}`,
     selectedScales: [
       {
-        scaleCode: 'GAD7',
+        scaleCode: DEFAULT_SCALE_CODE,
         answers: buildAnswers([1, 1, 1, 1, 1, 1, 1]),
       },
     ],
   })
 
-  return client
+  const clientDetail = await callApi<ClientDetailSummary>(page, `/clients/${client.clientId}`)
+  const operatingScaleItems = getOperatingScaleItems(await callApi<ScaleListItem[]>(page, '/scales'))
+  const emptyScaleCode =
+    operatingScaleItems.find((item) => ![DEFAULT_SCALE_CODE, RECORDED_SCALE_CODE].includes(item.scaleCode))?.scaleCode ??
+    ''
+
+  expect(clientDetail.latestRecordedScaleCode).toBe(DEFAULT_SCALE_CODE)
+  expect(emptyScaleCode).toBeTruthy()
+
+  return {
+    ...client,
+    emptyScaleCode,
+    newerRecordedSessionId: newerRecordedSession.sessionId,
+    newerRecordedAssessedAtText: '2026-04-09 10:25',
+  }
 }
 
-test('척도 추세 사용 흐름이 대상자 상세에서 세션 강조까지 이어진다', async ({ page }) => {
+test('척도 추세 최종 실사용 흐름이 대상자 상세에서 세션 상세 이동까지 유지된다', async ({ page }) => {
   await login(page)
 
-  const trendFixture = await createClientWithTrendSessions(page)
+  const fixture = await createScaleTrendFlowFixture(page)
 
-  await openClientDetail(page, trendFixture)
+  await openClientDetail(page, fixture)
+
+  await expect(page.getByRole('heading', { name: '척도 추세' })).toBeVisible()
 
   const scaleSelect = page.getByLabel('척도 선택')
   await expect(scaleSelect).toBeVisible()
-  await expect(scaleSelect).toHaveValue('PHQ9')
+  await expect(scaleSelect).toHaveValue(DEFAULT_SCALE_CODE)
 
-  await expect(page.getByTestId('client-scale-trend-chart')).toBeVisible()
-  await expect(page.getByTestId('client-scale-trend-line')).toBeVisible()
-  await expect(page.getByText('총 2건')).toBeVisible()
-
-  const trendPoints = page.getByTestId('client-scale-trend-point')
-  await expect(trendPoints).toHaveCount(2)
-  await expect(trendPoints.nth(1)).toBeVisible()
-
-  await trendPoints.nth(1).click()
-
-  await expect(page).toHaveURL(
-    new RegExp(`/assessments/sessions/${trendFixture.newerSessionId}\\?highlightScaleCode=PHQ9$`),
-  )
-  await expect(page.getByRole('heading', { name: '세션 상세' })).toBeVisible()
-  await expect(page.getByText('현재 강조된 척도')).toBeVisible()
-  await expect(page.getByTestId('session-scale-PHQ9')).toHaveAttribute('data-highlighted', 'true')
-})
-
-test('운영 중 척도 기록이 없는 대상자는 척도 추세에 기록 없음이 표시된다', async ({ page }) => {
-  await login(page)
-
-  const clientFixture = await createClient(page, 'PW 척도추세빈상태')
-
-  await openClientDetail(page, clientFixture)
-
-  await expect(page.getByLabel('척도 선택')).toHaveValue('PHQ9')
-  await expect(page.getByText('기록 없음')).toBeVisible()
-  await expect(page.getByTestId('client-scale-trend-chart')).toHaveCount(0)
-  await expect(page.getByTestId('client-scale-trend-point')).toHaveCount(0)
-})
-
-test('최신 기록 운영 척도가 척도 추세의 기본 선택값으로 표시된다', async ({ page }) => {
-  await login(page)
-
-  const clientFixture = await createClientWithLatestRecordedOperatingScale(page)
-
-  await openClientDetail(page, clientFixture)
-
-  const scaleSelect = page.getByLabel('척도 선택')
-  await expect(scaleSelect).toHaveValue('GAD7')
   await expect(page.getByTestId('client-scale-trend-chart')).toBeVisible()
   await expect(page.getByTestId('client-scale-trend-point')).toHaveCount(1)
   await expect(page.getByText('총 1건')).toBeVisible()
-})
 
-test('차트 point를 키보드 Space로 선택하면 세션 상세로 이동하며 강조 척도를 유지한다', async ({ page }) => {
-  await login(page)
+  await scaleSelect.selectOption(RECORDED_SCALE_CODE)
+  await expect(scaleSelect).toHaveValue(RECORDED_SCALE_CODE)
+  await expect(page.getByTestId('client-scale-trend-chart')).toBeVisible()
+  await expect(page.getByTestId('client-scale-trend-line')).toBeVisible()
+  await expect(page.getByTestId('client-scale-trend-point')).toHaveCount(2)
+  await expect(page.getByText('총 2건')).toBeVisible()
 
-  const trendFixture = await createClientWithTrendSessions(page)
+  await scaleSelect.selectOption(fixture.emptyScaleCode)
+  await expect(scaleSelect).toHaveValue(fixture.emptyScaleCode)
+  await expect(page.getByText('기록 없음')).toBeVisible()
+  await expect(page.getByTestId('client-scale-trend-chart')).toHaveCount(0)
+  await expect(page.getByTestId('client-scale-trend-point')).toHaveCount(0)
 
-  await openClientDetail(page, trendFixture)
+  await scaleSelect.selectOption(RECORDED_SCALE_CODE)
+  await expect(scaleSelect).toHaveValue(RECORDED_SCALE_CODE)
 
   const trendPoints = page.getByTestId('client-scale-trend-point')
   await expect(trendPoints).toHaveCount(2)
-  await trendPoints.nth(1).focus()
-  await expect(trendPoints.nth(1)).toBeFocused()
 
-  await page.keyboard.press('Space')
+  const targetPoint = trendPoints.nth(1)
+
+  await targetPoint.focus()
+  await expect(targetPoint).toBeFocused()
+  await expect(page.getByRole('tooltip')).toBeVisible()
+  await expect(page.getByRole('tooltip')).toContainText(fixture.newerRecordedAssessedAtText)
+
+  await targetPoint.blur()
+  await expect(page.getByRole('tooltip')).toHaveCount(0)
+
+  await targetPoint.hover()
+  await expect(page.getByRole('tooltip')).toBeVisible()
+  await expect(page.getByRole('tooltip')).toContainText(fixture.newerRecordedAssessedAtText)
+
+  await targetPoint.click()
 
   await expect(page).toHaveURL(
-    new RegExp(`/assessments/sessions/${trendFixture.newerSessionId}\\?highlightScaleCode=PHQ9$`),
+    new RegExp(`/assessments/sessions/${fixture.newerRecordedSessionId}\\?highlightScaleCode=${RECORDED_SCALE_CODE}$`),
   )
   await expect(page.getByRole('heading', { name: '세션 상세' })).toBeVisible()
   await expect(page.getByText('현재 강조된 척도')).toBeVisible()
-  await expect(page.getByTestId('session-scale-PHQ9')).toHaveAttribute('data-highlighted', 'true')
+  await expect(page.getByTestId(`session-scale-${RECORDED_SCALE_CODE}`)).toHaveAttribute('data-highlighted', 'true')
 })

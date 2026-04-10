@@ -1,5 +1,5 @@
-import './dom-matchers.ts'
-import { parseHTML } from 'linkedom/worker'
+import '@testing-library/jest-dom/vitest'
+import { parseHTML } from 'linkedom'
 
 const { window } = parseHTML('<!doctype html><html><body></body></html>')
 const locationUrl = new URL('http://localhost/')
@@ -489,6 +489,7 @@ function defineGlobalProperty(property: string, value: unknown) {
   })
 }
 
+console.log("debug:window-location");
 Object.defineProperty(window, 'location', {
   configurable: true,
   value: location,
@@ -521,6 +522,7 @@ Object.defineProperty(window.document, 'hasFocus', {
   configurable: true,
   value: () => true,
 })
+console.log("debug:document-events");
 for (const eventName of ['onchange', 'onfocusin', 'onfocusout', 'oninput', 'onkeydown', 'onkeyup', 'onselectionchange'] as const) {
   defineWindowProperty(window.document, eventName, {
     value: null,
@@ -528,6 +530,7 @@ for (const eventName of ['onchange', 'onfocusin', 'onfocusout', 'oninput', 'onke
   })
 }
 
+console.log("debug:input-type");
 defineWindowProperty(window.HTMLInputElement.prototype, 'type', {
   get(this: HTMLInputElement) {
     return this.getAttribute('type')?.toLowerCase() ?? 'text'
@@ -644,6 +647,7 @@ for (const constructor of [
   })
 }
 
+console.log("debug:text-selection-loop");
 for (const constructor of [window.HTMLInputElement, window.HTMLTextAreaElement] as const) {
   defineWindowProperty(constructor.prototype, 'selectionStart', {
     get(this: HTMLInputElement | HTMLTextAreaElement) {
@@ -685,6 +689,7 @@ for (const constructor of [window.HTMLInputElement, window.HTMLTextAreaElement] 
     },
   })
 }
+console.log("debug:input-checked");
 defineWindowProperty(window.HTMLInputElement.prototype, 'checked', {
   get(this: HTMLInputElement) {
     return getCheckedValue(this)
@@ -718,6 +723,7 @@ defineWindowProperty(window.HTMLFormElement.prototype, 'submit', {
     dispatchFormSubmit(this)
   },
 })
+console.log("debug:dispatch-event-patch");
 const originalDispatchEvent = window.EventTarget.prototype.dispatchEvent
 defineWindowProperty(window.EventTarget.prototype, 'dispatchEvent', {
   value(this: EventTarget, event: Event) {
@@ -735,6 +741,7 @@ defineWindowProperty(window.EventTarget.prototype, 'dispatchEvent', {
   },
 })
 
+console.log("debug:create-range");
 Object.defineProperty(window.document, 'createRange', {
   configurable: true,
   value: () => createRange(),
@@ -763,6 +770,7 @@ defineWindowProperty(window.HTMLElement.prototype, 'blur', {
     }
   },
 })
+console.log("debug:add-click-listener-capture");
 window.document.addEventListener(
   'click',
   (event) => {
@@ -778,6 +786,7 @@ window.document.addEventListener(
   },
   true,
 )
+console.log("debug:add-click-listener-bubble");
 window.document.addEventListener('click', (event) => {
   if (event.defaultPrevented) {
     return
@@ -813,6 +822,7 @@ window.document.addEventListener('click', (event) => {
   }
 })
 
+console.log("debug:raf");
 window.requestAnimationFrame = (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0)
 window.cancelAnimationFrame = (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle)
 window.open = typeof window.open === 'function' ? window.open.bind(window) : (() => null)
@@ -844,6 +854,7 @@ window.getComputedStyle =
         setProperty: () => undefined,
       }))
 
+console.log("debug:globals");
 defineGlobalProperty('window', window)
 defineGlobalProperty('self', window)
 defineGlobalProperty('document', window.document)

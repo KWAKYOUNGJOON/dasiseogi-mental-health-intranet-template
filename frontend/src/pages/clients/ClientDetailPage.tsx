@@ -1,7 +1,7 @@
 import { isAxiosError } from 'axios'
 import { useEffect, useId, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { fetchScales, fetchSessionDetail, type ScaleListItem } from '../../features/assessment/api/assessmentApi'
+import { fetchScales, type ScaleListItem } from '../../features/assessment/api/assessmentApi'
 import {
   fetchClientDetail,
   fetchClientScaleTrend,
@@ -56,15 +56,7 @@ function getDefaultSelectedScaleCode(
 }
 
 function getLatestTrendPoint(points: ClientScaleTrend['points']) {
-  return [...points].sort((left, right) => {
-    const assessedAtComparison = right.assessedAt.localeCompare(left.assessedAt)
-
-    if (assessedAtComparison !== 0) {
-      return assessedAtComparison
-    }
-
-    return right.createdAt.localeCompare(left.createdAt)
-  })[0] ?? null
+  return points[points.length - 1] ?? null
 }
 
 type TrendPoint = ClientScaleTrend['points'][number]
@@ -437,7 +429,6 @@ export function ClientDetailPage() {
   const [scaleError, setScaleError] = useState<string | null>(null)
   const [selectedScaleCode, setSelectedScaleCode] = useState('')
   const [hasUserSelectedScale, setHasUserSelectedScale] = useState(false)
-  const [fallbackLatestRecordedScaleCode, setFallbackLatestRecordedScaleCode] = useState<string | null>(null)
   const [trend, setTrend] = useState<ClientScaleTrend | null>(null)
   const [trendLoading, setTrendLoading] = useState(false)
   const [trendError, setTrendError] = useState<string | null>(null)
@@ -499,7 +490,6 @@ export function ClientDetailPage() {
   useEffect(() => {
     setSelectedScaleCode('')
     setHasUserSelectedScale(false)
-    setFallbackLatestRecordedScaleCode(null)
   }, [parsedClientId])
 
   useEffect(() => {
@@ -507,55 +497,7 @@ export function ClientDetailPage() {
       return
     }
 
-    const normalizedLatestRecordedScaleCode = client.latestRecordedScaleCode?.trim() ?? ''
-
-    if (normalizedLatestRecordedScaleCode) {
-      setFallbackLatestRecordedScaleCode(null)
-      return
-    }
-
-    const latestSession = client.recentSessions[0]
-
-    if (!latestSession || latestSession.scaleCount !== 1) {
-      setFallbackLatestRecordedScaleCode(null)
-      return
-    }
-
-    let cancelled = false
-
-    async function resolveLatestRecordedScaleCode() {
-      try {
-        const sessionDetail = await fetchSessionDetail(latestSession.id)
-
-        if (cancelled) {
-          return
-        }
-
-        const latestSessionScaleCode = sessionDetail.scales[0]?.scaleCode?.trim() ?? ''
-
-        setFallbackLatestRecordedScaleCode(
-          scaleItems.some((item) => item.scaleCode === latestSessionScaleCode) ? latestSessionScaleCode : null,
-        )
-      } catch {
-        if (!cancelled) {
-          setFallbackLatestRecordedScaleCode(null)
-        }
-      }
-    }
-
-    void resolveLatestRecordedScaleCode()
-
-    return () => {
-      cancelled = true
-    }
-  }, [client, hasValidClientId, parsedClientId, scaleItems, scaleLoading])
-
-  useEffect(() => {
-    if (!hasValidClientId || scaleLoading || !client || client.id !== parsedClientId) {
-      return
-    }
-
-    const latestRecordedScaleCode = client.latestRecordedScaleCode?.trim() || fallbackLatestRecordedScaleCode
+    const latestRecordedScaleCode = client.latestRecordedScaleCode?.trim() ?? ''
 
     setSelectedScaleCode((current) => {
       const hasCurrentScale = scaleItems.some((item) => item.scaleCode === current)
@@ -578,7 +520,7 @@ export function ClientDetailPage() {
 
       return getDefaultSelectedScaleCode(scaleItems, latestRecordedScaleCode)
     })
-  }, [client, fallbackLatestRecordedScaleCode, hasUserSelectedScale, hasValidClientId, parsedClientId, scaleItems, scaleLoading])
+  }, [client, hasUserSelectedScale, hasValidClientId, parsedClientId, scaleItems, scaleLoading])
 
   useEffect(() => {
     if (!hasValidClientId || !selectedScaleCode) {

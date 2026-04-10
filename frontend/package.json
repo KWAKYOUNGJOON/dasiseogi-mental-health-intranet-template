@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:e2e:full-stack": "vite --host 127.0.0.1 --port 4174 --strictPort",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -20,7 +21,8 @@
     "test:statistics-page": "npm run test:dom -- --run tests/statistics-page.test.tsx",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:full-stack": "playwright test --config playwright.full-stack.config.ts"
+    "test:e2e:full-stack": "playwright test --config playwright.full-stack.config.ts --project=chromium",
+    "test:e2e:full-stack:headed": "playwright test --config playwright.full-stack.config.ts --project=chromium --headed"
   },
   "dependencies": {
     "axios": "^1.13.2",

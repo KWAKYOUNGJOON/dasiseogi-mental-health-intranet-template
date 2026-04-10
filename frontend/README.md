@@ -114,3 +114,29 @@ Recommended DOM test locations:
 
 - Move the repository into the WSL Ubuntu home directory, then run `npm run test:dom`, `npm run test:dom:watch`, or `npm run test:statistics-page`
 - Or run the same DOM test commands from a native Windows path / terminal
+
+## Playwright full-stack tests
+
+Use the full-stack Playwright commands when you need the real frontend talking to the already-available backend and database stack.
+
+Preconditions:
+
+- The backend full-stack target must already be running and reachable through the frontend `/api` proxy path.
+- The database and seed data required by the scenario under test must already be prepared.
+
+How stale frontend reuse is avoided:
+
+- `playwright.full-stack.config.ts` now starts its own dedicated Vite frontend server on `http://127.0.0.1:4174`.
+- `reuseExistingServer` is disabled for that full-stack config, so Playwright does not silently attach to an older frontend process.
+- The dedicated port keeps full-stack runs separate from the default Vite dev port and from any older server left on `4173`.
+
+Default commands:
+
+- `npm run test:e2e:full-stack`
+- `npm run test:e2e:full-stack:headed`
+
+Specific spec example:
+
+- `npm run test:e2e:full-stack -- e2e/full-stack/client-scale-trend.full-stack.spec.ts`
+
+If port `4174` is already in use, stop that stray process first. The command is expected to fail fast instead of reusing an unknown older frontend build.
