@@ -1,13 +1,19 @@
 package com.dasisuhgi.mentalhealth.client.service;
 
 import com.dasisuhgi.mentalhealth.assessment.entity.AssessmentSessionStatus;
+import com.dasisuhgi.mentalhealth.assessment.entity.SessionAlert;
+import com.dasisuhgi.mentalhealth.assessment.repository.AssessmentQueryRepository;
 import com.dasisuhgi.mentalhealth.assessment.repository.AssessmentSessionRepository;
+import com.dasisuhgi.mentalhealth.assessment.repository.ClientScaleTrendPointRow;
+import com.dasisuhgi.mentalhealth.assessment.repository.SessionAlertRepository;
+import com.dasisuhgi.mentalhealth.assessment.dto.SessionAlertResponse;
 import com.dasisuhgi.mentalhealth.audit.entity.ActivityActionType;
 import com.dasisuhgi.mentalhealth.audit.entity.ActivityTargetType;
 import com.dasisuhgi.mentalhealth.audit.service.ActivityLogService;
 import com.dasisuhgi.mentalhealth.client.dto.ClientCreateResponse;
 import com.dasisuhgi.mentalhealth.client.dto.ClientDetailResponse;
 import com.dasisuhgi.mentalhealth.client.dto.ClientListItemResponse;
+import com.dasisuhgi.mentalhealth.client.dto.ClientScaleTrendResponse;
 import com.dasisuhgi.mentalhealth.client.dto.ClientStatusChangeResponse;
 import com.dasisuhgi.mentalhealth.client.dto.CreateClientRequest;
 import com.dasisuhgi.mentalhealth.client.dto.DuplicateCandidateResponse;
@@ -28,14 +34,19 @@ import com.dasisuhgi.mentalhealth.common.security.AccessPolicyService;
 import com.dasisuhgi.mentalhealth.common.sequence.IdentifierGeneratorService;
 import com.dasisuhgi.mentalhealth.common.session.SessionUser;
 import com.dasisuhgi.mentalhealth.common.time.SeoulDateTimeSupport;
+import com.dasisuhgi.mentalhealth.scale.service.ScaleService;
+import com.dasisuhgi.mentalhealth.scale.service.ScaleService.ScaleTrendMetadata;
 import com.dasisuhgi.mentalhealth.user.entity.User;
 import com.dasisuhgi.mentalhealth.user.entity.UserStatus;
 import com.dasisuhgi.mentalhealth.user.repository.UserRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -49,26 +60,35 @@ public class ClientService {
     private final ClientQueryRepository clientQueryRepository;
     private final UserRepository userRepository;
     private final AssessmentSessionRepository assessmentSessionRepository;
+    private final AssessmentQueryRepository assessmentQueryRepository;
+    private final SessionAlertRepository sessionAlertRepository;
     private final AccessPolicyService accessPolicyService;
     private final IdentifierGeneratorService identifierGeneratorService;
     private final ActivityLogService activityLogService;
+    private final ScaleService scaleService;
 
     public ClientService(
             ClientRepository clientRepository,
             ClientQueryRepository clientQueryRepository,
             UserRepository userRepository,
             AssessmentSessionRepository assessmentSessionRepository,
+            AssessmentQueryRepository assessmentQueryRepository,
+            SessionAlertRepository sessionAlertRepository,
             AccessPolicyService accessPolicyService,
             IdentifierGeneratorService identifierGeneratorService,
-            ActivityLogService activityLogService
+            ActivityLogService activityLogService,
+            ScaleService scaleService
     ) {
         this.clientRepository = clientRepository;
         this.clientQueryRepository = clientQueryRepository;
         this.userRepository = userRepository;
         this.assessmentSessionRepository = assessmentSessionRepository;
+        this.assessmentQueryRepository = assessmentQueryRepository;
+        this.sessionAlertRepository = sessionAlertRepository;
         this.accessPolicyService = accessPolicyService;
         this.identifierGeneratorService = identifierGeneratorService;
         this.activityLogService = activityLogService;
+        this.scaleService = scaleService;
     }
 
     @Transactional(readOnly = true)
@@ -156,6 +176,10 @@ public class ClientService {
                 .stream()
                 .map(this::toRecentSession)
                 .toList();
+        String latestRecordedScaleCode = assessmentQueryRepository.findLatestRecordedScaleCode(
+                clientId,
+                scaleService.getOperatingScaleCodes()
+        );
 
         return new ClientDetailResponse(
                 client.getId(),
@@ -174,7 +198,46 @@ public class ClientService {
                 client.getMisregisteredBy() == null ? null : client.getMisregisteredBy().getId(),
                 client.getMisregisteredBy() == null ? null : client.getMisregisteredBy().getName(),
                 client.getMisregisteredReason(),
+                latestRecordedScaleCode,
                 recentSessions
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public ClientScaleTrendResponse getClientScaleTrend(Long clientId, String scaleCode, SessionUser sessionUser) {
+        User currentUser = accessPolicyService.getCurrentUser(sessionUser);
+        Client client = clientRepository.findById(Objects.requireNonNull(clientId, "clientId must not be null"))
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "CLIENT_NOT_FOUND", "대상자를 찾을 수 없습니다."));
+        accessPolicyService.assertCanViewClient(currentUser, client);
+
+        String normalizedScaleCode = normalizeScaleCode(scaleCode);
+        ScaleTrendMetadata trendMetadata = scaleService.getScaleTrendMetadata(normalizedScaleCode);
+        List<ClientScaleTrendPointRow> pointRows = assessmentQueryRepository.findClientScaleTrendPoints(clientId, normalizedScaleCode);
+
+        Map<Long, List<SessionAlertResponse>> alertsBySessionScaleId = loadAlertsBySessionScaleId(pointRows);
+        List<ClientScaleTrendResponse.PointResponse> points = pointRows.stream()
+                .map(point -> new ClientScaleTrendResponse.PointResponse(
+                        point.sessionId(),
+                        point.sessionScaleId(),
+                        formatDateTime(point.assessedAt()),
+                        formatDateTime(point.createdAt()),
+                        point.totalScore().intValue(),
+                        point.resultLevel(),
+                        alertsBySessionScaleId.getOrDefault(point.sessionScaleId(), List.of())
+                ))
+                .toList();
+
+        return new ClientScaleTrendResponse(
+                trendMetadata.scaleCode(),
+                trendMetadata.scaleName(),
+                trendMetadata.maxScore(),
+                trendMetadata.cutoffs().stream()
+                        .map(cutoff -> new ClientScaleTrendResponse.CutoffResponse(
+                                cutoff.score(),
+                                cutoff.label()
+                        ))
+                        .toList(),
+                points
         );
     }
 
@@ -251,6 +314,34 @@ public class ClientService {
         );
     }
 
+    private Map<Long, List<SessionAlertResponse>> loadAlertsBySessionScaleId(List<ClientScaleTrendPointRow> pointRows) {
+        List<Long> sessionScaleIds = pointRows.stream()
+                .map(ClientScaleTrendPointRow::sessionScaleId)
+                .toList();
+        if (sessionScaleIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return sessionAlertRepository.findBySessionScaleIdInOrderBySessionScaleIdAscIdAsc(sessionScaleIds).stream()
+                .collect(Collectors.groupingBy(
+                        alert -> alert.getSessionScale().getId(),
+                        LinkedHashMap::new,
+                        Collectors.mapping(this::toAlertResponse, Collectors.toList())
+                ));
+    }
+
+    private SessionAlertResponse toAlertResponse(SessionAlert alert) {
+        return new SessionAlertResponse(
+                alert.getId(),
+                alert.getScaleCode(),
+                alert.getAlertType().name(),
+                alert.getAlertCode(),
+                alert.getAlertMessage(),
+                alert.getQuestionNo(),
+                alert.getTriggerValue()
+        );
+    }
+
     private Gender parseGender(String rawGender) {
         try {
             return Gender.valueOf(rawGender.trim().toUpperCase(Locale.ROOT));
@@ -261,6 +352,10 @@ public class ClientService {
 
     private String formatDateTime(LocalDateTime value) {
         return SeoulDateTimeSupport.formatDateTime(value);
+    }
+
+    private String normalizeScaleCode(String scaleCode) {
+        return Objects.requireNonNull(scaleCode, "scaleCode must not be null").trim().toUpperCase(Locale.ROOT);
     }
 
     private String blankToNull(String value) {

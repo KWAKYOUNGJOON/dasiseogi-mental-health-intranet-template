@@ -23,6 +23,7 @@ vi.mock('../src/features/assessment/api/assessmentApi', () => ({
 
 const mockedFetchSessionDetail = vi.mocked(fetchSessionDetail)
 const mockedMarkSessionMisentered = vi.mocked(markSessionMisentered)
+let scrollIntoViewMock: ReturnType<typeof vi.fn>
 
 function createUser(overrides?: Partial<AuthUser>): AuthUser {
   return {
@@ -173,6 +174,11 @@ function renderAssessmentSessionDetailPage(initialEntry = '/assessments/sessions
 }
 
 beforeEach(() => {
+  scrollIntoViewMock = vi.fn()
+  Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: scrollIntoViewMock,
+  })
   mockedFetchSessionDetail.mockReset()
   mockedMarkSessionMisentered.mockReset()
   mockedFetchSessionDetail.mockResolvedValue(createSessionDetail())
@@ -214,8 +220,75 @@ describe('assessment session detail page', () => {
     const highlightedCard = await screen.findByTestId('session-scale-GAD7')
     const normalCard = screen.getByTestId('session-scale-PHQ9')
 
+    expect(mockedFetchSessionDetail).toHaveBeenCalledWith(501, { highlightScaleCode: 'GAD7' })
     expect(highlightedCard.getAttribute('data-highlighted')).toBe('true')
     expect(normalCard.getAttribute('data-highlighted')).toBe('false')
+    expect(within(highlightedCard).getByText('현재 강조된 척도')).toBeTruthy()
+    expect(within(normalCard).queryByText('현재 강조된 척도')).toBeNull()
+  })
+
+  it('scrolls the matching highlighted scale card into view after the session detail loads', async () => {
+    renderAssessmentSessionDetailPage('/assessments/sessions/501?highlightScaleCode=GAD7')
+
+    await screen.findByTestId('session-scale-GAD7')
+
+    await waitFor(() => {
+      expect(scrollIntoViewMock).toHaveBeenCalledWith({ block: 'center' })
+    })
+  })
+
+  it('keeps the existing rendering when highlightScaleCode is not provided', async () => {
+    renderAssessmentSessionDetailPage()
+
+    const phq9Card = await screen.findByTestId('session-scale-PHQ9')
+    const gad7Card = screen.getByTestId('session-scale-GAD7')
+
+    expect(mockedFetchSessionDetail).toHaveBeenCalledWith(501, undefined)
+    expect(phq9Card.getAttribute('data-highlighted')).toBe('false')
+    expect(gad7Card.getAttribute('data-highlighted')).toBe('false')
+    expect(screen.queryByText('현재 강조된 척도')).toBeNull()
+  })
+
+  it('does not scroll when highlightScaleCode is not provided', async () => {
+    renderAssessmentSessionDetailPage()
+
+    await screen.findByTestId('session-scale-GAD7')
+
+    expect(scrollIntoViewMock).not.toHaveBeenCalled()
+  })
+
+  it('does not scroll when the requested highlightScaleCode is not present in the session', async () => {
+    mockedFetchSessionDetail.mockResolvedValueOnce(
+      createSessionDetail({
+        scales: [
+          {
+            sessionScaleId: 9001,
+            scaleCode: 'PHQ9',
+            scaleName: 'PHQ-9',
+            displayOrder: 1,
+            totalScore: 8,
+            resultLevel: '중등도',
+            hasAlert: false,
+            answers: [
+              {
+                questionNo: 1,
+                questionKey: 'q1',
+                questionText: '기분이 가라앉거나 우울했다.',
+                answerValue: '2',
+                answerLabel: '절반 이상',
+                scoreValue: 2,
+              },
+            ],
+            alerts: [],
+          },
+        ],
+      }),
+    )
+
+    renderAssessmentSessionDetailPage('/assessments/sessions/501?highlightScaleCode=GAD7')
+
+    expect(await screen.findByText('강조할 척도를 찾지 못해 세션 전체를 표시합니다.')).toBeTruthy()
+    expect(scrollIntoViewMock).not.toHaveBeenCalled()
   })
 
   it('renders server-provided result details when a scale includes them', async () => {

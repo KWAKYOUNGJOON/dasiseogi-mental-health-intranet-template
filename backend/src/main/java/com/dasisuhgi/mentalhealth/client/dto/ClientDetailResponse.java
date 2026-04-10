@@ -19,6 +19,7 @@ public record ClientDetailResponse(
         Long misregisteredById,
         String misregisteredByName,
         String misregisteredReason,
+        String latestRecordedScaleCode,
         List<RecentSessionSummaryResponse> recentSessions
 ) {
 }

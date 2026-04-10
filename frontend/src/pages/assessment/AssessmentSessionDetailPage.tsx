@@ -1,5 +1,5 @@
 import { isAxiosError } from 'axios'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../app/providers/AuthProvider'
 import {
@@ -153,6 +153,9 @@ export function AssessmentSessionDetailPage() {
   const [processing, setProcessing] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [reason, setReason] = useState('')
+  const highlightedScaleCardRef = useRef<HTMLDivElement | null>(null)
+  const lastLoadedSessionRequestKeyRef = useRef<string | null>(null)
+  const lastScrolledHighlightKeyRef = useRef<string | null>(null)
   const requestedHighlightScaleCode = searchParams.get('highlightScaleCode')?.trim() || null
   const returnTo = getAssessmentRecordReturnTo(searchParams)
 
@@ -220,6 +223,7 @@ export function AssessmentSessionDetailPage() {
   }
 
   function applySessionData(data: SessionDetail) {
+    lastLoadedSessionRequestKeyRef.current = `${data.id}:${requestedHighlightScaleCode ?? ''}`
     setSession(data)
     setHighlightNotice(
       requestedHighlightScaleCode && !data.scales.some((scale) => scale.scaleCode === requestedHighlightScaleCode)
@@ -365,6 +369,36 @@ export function AssessmentSessionDetailPage() {
     requestedHighlightScaleCode && session?.scales.some((scale) => scale.scaleCode === requestedHighlightScaleCode)
       ? requestedHighlightScaleCode
       : null
+  const currentSessionRequestKey = sessionId ? `${sessionId}:${requestedHighlightScaleCode ?? ''}` : null
+
+  useEffect(() => {
+    if (loading || !session || !highlightedScaleCode) {
+      if (!highlightedScaleCode) {
+        lastScrolledHighlightKeyRef.current = null
+      }
+
+      return
+    }
+
+    if (!currentSessionRequestKey || lastLoadedSessionRequestKeyRef.current !== currentSessionRequestKey) {
+      return
+    }
+
+    const highlightedCard = highlightedScaleCardRef.current
+
+    if (!highlightedCard) {
+      return
+    }
+
+    const nextHighlightKey = `${session.id}:${highlightedScaleCode}`
+
+    if (lastScrolledHighlightKeyRef.current === nextHighlightKey) {
+      return
+    }
+
+    highlightedCard.scrollIntoView({ block: 'center' })
+    lastScrolledHighlightKeyRef.current = nextHighlightKey
+  }, [currentSessionRequestKey, highlightedScaleCode, loading, session])
 
   return (
     <div className="stack">
@@ -514,6 +548,7 @@ export function AssessmentSessionDetailPage() {
                 data-highlighted={highlighted ? 'true' : 'false'}
                 data-testid={`session-scale-${scale.scaleCode}`}
                 key={scale.sessionScaleId}
+                ref={highlighted ? highlightedScaleCardRef : undefined}
                 style={
                   highlighted
                     ? { borderColor: '#1d6a7d', boxShadow: '0 0 0 2px rgba(29,106,125,0.15)' }
@@ -522,9 +557,23 @@ export function AssessmentSessionDetailPage() {
               >
                 <div className="actions" style={{ justifyContent: 'space-between' }}>
                   <h3 style={{ margin: 0 }}>{scale.scaleName}</h3>
-                  <span className="status-chip">
-                    총점 {scale.totalScore} / {scale.resultLevel}
-                  </span>
+                  <div className="actions">
+                    {highlighted ? (
+                      <span
+                        className="status-chip"
+                        style={{
+                          background: '#e6f4f7',
+                          border: '1px solid #b8d9e0',
+                          color: '#134f5e',
+                        }}
+                      >
+                        현재 강조된 척도
+                      </span>
+                    ) : null}
+                    <span className="status-chip">
+                      총점 {scale.totalScore} / {scale.resultLevel}
+                    </span>
+                  </div>
                 </div>
                 {scale.alerts.length > 0 ? (
                   <div className="stack">

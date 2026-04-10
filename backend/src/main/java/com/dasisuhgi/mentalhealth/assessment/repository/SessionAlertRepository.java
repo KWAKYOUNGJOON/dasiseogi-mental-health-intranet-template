@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SessionAlertRepository extends JpaRepository<SessionAlert, Long> {
     List<SessionAlert> findBySessionIdOrderByIdAsc(Long sessionId);
+
+    List<SessionAlert> findBySessionScaleIdInOrderBySessionScaleIdAscIdAsc(List<Long> sessionScaleIds);
 }

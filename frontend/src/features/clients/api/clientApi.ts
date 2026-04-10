@@ -38,6 +38,7 @@ export interface ClientDetail {
   misregisteredById: number | null
   misregisteredByName: string | null
   misregisteredReason: string | null
+  latestRecordedScaleCode: string | null
   recentSessions: Array<{
     id: number
     sessionNo: string
@@ -46,6 +47,33 @@ export interface ClientDetail {
     scaleCount: number
     hasAlert: boolean
     status: string
+  }>
+}
+
+export interface ClientScaleTrend {
+  scaleCode: string
+  scaleName: string
+  maxScore: number
+  cutoffs: Array<{
+    score: number
+    label: string
+  }>
+  points: Array<{
+    sessionId: number
+    sessionScaleId: number
+    assessedAt: string
+    createdAt: string
+    totalScore: number
+    resultLevel: string
+    alerts: Array<{
+      id: number
+      scaleCode: string
+      alertType: string
+      alertCode: string
+      alertMessage: string
+      questionNo: number | null
+      triggerValue: string | null
+    }>
   }>
 }
 
@@ -72,6 +100,22 @@ export async function fetchClientDetail(clientId: number) {
     recentSessions: client.recentSessions.map((session) => ({
       ...session,
       sessionCompletedAt: formatSeoulDateTimeText(session.sessionCompletedAt),
+    })),
+  }
+}
+
+export async function fetchClientScaleTrend(clientId: number, scaleCode: string) {
+  const response = await http.get<ApiResponse<ClientScaleTrend>>(
+    `/clients/${clientId}/scale-trends/${encodeURIComponent(scaleCode)}`,
+  )
+  const trend = response.data.data
+
+  return {
+    ...trend,
+    points: trend.points.map((point) => ({
+      ...point,
+      assessedAt: formatSeoulDateTimeText(point.assessedAt),
+      createdAt: formatSeoulDateTimeText(point.createdAt),
     })),
   }
 }

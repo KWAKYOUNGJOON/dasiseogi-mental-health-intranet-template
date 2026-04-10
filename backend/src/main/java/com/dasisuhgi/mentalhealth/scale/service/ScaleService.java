@@ -7,9 +7,11 @@ import com.dasisuhgi.mentalhealth.scale.dto.ScaleOptionResponse;
 import com.dasisuhgi.mentalhealth.scale.dto.ScaleQuestionResponse;
 import com.dasisuhgi.mentalhealth.scale.registry.ScaleDefinition;
 import com.dasisuhgi.mentalhealth.scale.registry.ScaleRegistryItem;
+import com.dasisuhgi.mentalhealth.scale.registry.ScaleOption;
 import jakarta.annotation.PostConstruct;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,15 @@ public class ScaleService {
                         item.isActive(),
                         item.implemented()
                 ))
+                .toList();
+    }
+
+    public List<String> getOperatingScaleCodes() {
+        return getScales().stream()
+                .filter(ScaleListItemResponse::isActive)
+                .filter(ScaleListItemResponse::implemented)
+                .map(ScaleListItemResponse::scaleCode)
+                .map(scaleCode -> scaleCode.trim().toUpperCase(Locale.ROOT))
                 .toList();
     }
 
@@ -100,6 +111,19 @@ public class ScaleService {
                         ))
                         .toList(),
                 toMetadataResponse(definition.metadata())
+        );
+    }
+
+    public ScaleTrendMetadata getScaleTrendMetadata(String scaleCode) {
+        ScaleDefinition definition = getActiveDefinition(scaleCode);
+        return new ScaleTrendMetadata(
+                definition.scaleCode(),
+                definition.scaleName(),
+                calculateMaxScore(definition),
+                definition.interpretationRules().stream()
+                        .filter(rule -> rule.min() > 0)
+                        .map(rule -> new ScaleTrendCutoff(rule.min(), rule.label()))
+                        .toList()
         );
     }
 
@@ -162,5 +186,28 @@ public class ScaleService {
 
     public int loadedDefinitionCount() {
         return definitions.size();
+    }
+
+    private int calculateMaxScore(ScaleDefinition definition) {
+        return definition.items().stream()
+                .mapToInt(question -> question.options().stream()
+                        .mapToInt(ScaleOption::score)
+                        .max()
+                        .orElse(0))
+                .sum();
+    }
+
+    public record ScaleTrendMetadata(
+            String scaleCode,
+            String scaleName,
+            int maxScore,
+            List<ScaleTrendCutoff> cutoffs
+    ) {
+    }
+
+    public record ScaleTrendCutoff(
+            int score,
+            String label
+    ) {
     }
 }

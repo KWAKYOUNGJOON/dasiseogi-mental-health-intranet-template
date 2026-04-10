@@ -266,6 +266,50 @@ public class AssessmentQueryRepository {
         return new PageResponse<>(items, page, size, totalItems, totalPages);
     }
 
+    public List<ClientScaleTrendPointRow> findClientScaleTrendPoints(Long clientId, String scaleCode) {
+        TypedQuery<ClientScaleTrendPointRow> query = entityManager.createQuery("""
+                select new com.dasisuhgi.mentalhealth.assessment.repository.ClientScaleTrendPointRow(
+                    s.id,
+                    sc.id,
+                    s.sessionCompletedAt,
+                    sc.createdAt,
+                    sc.totalScore,
+                    sc.resultLevel
+                )
+                from SessionScale sc
+                join sc.session s
+                where s.client.id = :clientId
+                  and upper(sc.scaleCode) = :scaleCode
+                  and s.status <> :misenteredStatus
+                order by s.sessionCompletedAt asc, sc.createdAt asc, sc.id asc
+                """, ClientScaleTrendPointRow.class);
+        query.setParameter("clientId", clientId);
+        query.setParameter("scaleCode", scaleCode);
+        query.setParameter("misenteredStatus", AssessmentSessionStatus.MISENTERED);
+        return query.getResultList();
+    }
+
+    public String findLatestRecordedScaleCode(Long clientId, List<String> scaleCodes) {
+        if (scaleCodes.isEmpty()) {
+            return null;
+        }
+
+        TypedQuery<String> query = entityManager.createQuery("""
+                select upper(sc.scaleCode)
+                from SessionScale sc
+                join sc.session s
+                where s.client.id = :clientId
+                  and upper(sc.scaleCode) in :scaleCodes
+                  and s.status <> :misenteredStatus
+                order by s.sessionCompletedAt desc, sc.createdAt desc, sc.id desc
+                """, String.class);
+        query.setParameter("clientId", clientId);
+        query.setParameter("scaleCodes", scaleCodes);
+        query.setParameter("misenteredStatus", AssessmentSessionStatus.MISENTERED);
+        query.setMaxResults(1);
+        return query.getResultStream().findFirst().orElse(null);
+    }
+
     private long getSingleCount(String jpql, Map<String, Object> parameters) {
         TypedQuery<Long> query = entityManager.createQuery(jpql, Long.class);
         applyParameters(query, parameters);

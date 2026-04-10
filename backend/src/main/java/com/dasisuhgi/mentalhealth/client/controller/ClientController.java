@@ -4,6 +4,7 @@ import com.dasisuhgi.mentalhealth.auth.service.AuthService;
 import com.dasisuhgi.mentalhealth.client.dto.ClientCreateResponse;
 import com.dasisuhgi.mentalhealth.client.dto.ClientDetailResponse;
 import com.dasisuhgi.mentalhealth.client.dto.ClientListItemResponse;
+import com.dasisuhgi.mentalhealth.client.dto.ClientScaleTrendResponse;
 import com.dasisuhgi.mentalhealth.client.dto.ClientStatusChangeResponse;
 import com.dasisuhgi.mentalhealth.client.dto.CreateClientRequest;
 import com.dasisuhgi.mentalhealth.client.dto.DuplicateCheckRequest;
@@ -74,6 +75,16 @@ public class ClientController {
     public ApiResponse<ClientDetailResponse> getClient(@PathVariable Long clientId, HttpSession session) {
         SessionUser currentUser = authService.getRequiredSessionUser(session);
         return ApiResponse.success(clientService.getClientDetail(clientId, currentUser));
+    }
+
+    @GetMapping("/{clientId}/scale-trends/{scaleCode}")
+    public ApiResponse<ClientScaleTrendResponse> getClientScaleTrend(
+            @PathVariable Long clientId,
+            @PathVariable String scaleCode,
+            HttpSession session
+    ) {
+        SessionUser currentUser = authService.getRequiredSessionUser(session);
+        return ApiResponse.success(clientService.getClientScaleTrend(clientId, scaleCode, currentUser));
     }
 
     @PatchMapping("/{clientId}")
