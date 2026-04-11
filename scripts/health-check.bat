@@ -9,9 +9,8 @@ set "REQUEST_ERROR=20"
 set "JSON_ERROR=30"
 set "STATUS_ERROR=31"
 
-set "DEFAULT_TARGET_URL=http://127.0.0.1:8080/api/v1/health"
 set "TARGET_INPUT=%~1"
-if not defined TARGET_INPUT set "TARGET_INPUT=%DEFAULT_TARGET_URL%"
+if not defined TARGET_INPUT set "TARGET_INPUT=%HEALTH_CHECK_URL%"
 
 call :resolve_curl
 if errorlevel 1 exit /b %ERRORLEVEL%
@@ -102,7 +101,7 @@ exit /b 0
 :normalize_target_url
 set "RAW_URL=%~1"
 if not defined RAW_URL (
-  echo [health-check] Input error: target URL is empty.
+  echo [health-check] Input error: target URL is required. Pass argument 1 or set HEALTH_CHECK_URL.
   exit /b %INPUT_ERROR%
 )
 

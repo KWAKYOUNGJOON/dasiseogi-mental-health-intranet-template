@@ -9,10 +9,10 @@ spring:
   datasource:
     # Direct runtime reads APP_DB_URL directly.
     # Docker startup maps APP_DB_URL_DOCKER to APP_DB_URL in backend/docker-entrypoint.sh before boot.
-    url: ${APP_DB_URL:jdbc:mariadb://DB_HOST_PLACEHOLDER:3306/DB_NAME_PLACEHOLDER}
-    username: ${APP_DB_USERNAME:DB_USERNAME_PLACEHOLDER}
-    password: ${APP_DB_PASSWORD:DB_PASSWORD_PLACEHOLDER}
-    driver-class-name: ${APP_DB_DRIVER:org.mariadb.jdbc.Driver}
+    url: ${APP_DB_URL}
+    username: ${APP_DB_USERNAME}
+    password: ${APP_DB_PASSWORD}
+    driver-class-name: ${APP_DB_DRIVER}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -50,4 +50,3 @@ app:
     trust-proxy-headers: ${APP_TRUST_PROXY_HEADERS:false}
   seed:
     enabled: false
-

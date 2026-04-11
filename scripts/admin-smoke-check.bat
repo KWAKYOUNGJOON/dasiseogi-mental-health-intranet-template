@@ -9,22 +9,16 @@ set "TOOL_ERROR=11"
 set "PAYLOAD_ERROR=12"
 set "REQUEST_ERROR=20"
 
-set "DEFAULT_BASE_URL=http://127.0.0.1:8080"
-set "DEFAULT_LOGIN_ID=admina"
-set "DEFAULT_PASSWORD=Test1234!"
 set "MANUAL_BACKUP_REASON=Operational trace smoke check via admin-smoke-check.bat"
 
 set "BASE_URL_INPUT=%~1"
-if not defined BASE_URL_INPUT set "BASE_URL_INPUT=%DEFAULT_BASE_URL%"
-if "%~1"=="" set "USED_DEFAULT_BASE_URL=1"
+if not defined BASE_URL_INPUT set "BASE_URL_INPUT=%ADMIN_SMOKE_BASE_URL%"
 
 set "LOGIN_ID=%~2"
-if not defined LOGIN_ID set "LOGIN_ID=%DEFAULT_LOGIN_ID%"
-if "%~2"=="" set "USED_DEFAULT_LOGIN_ID=1"
+if not defined LOGIN_ID set "LOGIN_ID=%ADMIN_SMOKE_LOGIN_ID%"
 
 set "LOGIN_PASSWORD=%~3"
-if not defined LOGIN_PASSWORD set "LOGIN_PASSWORD=%DEFAULT_PASSWORD%"
-if "%~3"=="" set "USED_DEFAULT_PASSWORD=1"
+if not defined LOGIN_PASSWORD set "LOGIN_PASSWORD=%ADMIN_SMOKE_PASSWORD%"
 
 call :resolve_curl
 if errorlevel 1 exit /b %ERRORLEVEL%
@@ -33,6 +27,12 @@ call :resolve_powershell
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 call :normalize_api_base_url "%BASE_URL_INPUT%"
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+call :require_login_id
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+call :require_login_password
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 call :prepare_temp_files
@@ -55,9 +55,6 @@ if errorlevel 1 (
 echo [admin-smoke-check] base URL: %BASE_URL%
 echo [admin-smoke-check] api base URL: %API_BASE_URL%
 echo [admin-smoke-check] loginId: %LOGIN_ID%
-if defined USED_DEFAULT_BASE_URL echo [admin-smoke-check] Warning: default base URL is being used. Confirm it matches the production backend URL before continuing.
-if defined USED_DEFAULT_LOGIN_ID echo [admin-smoke-check] Warning: default loginId admina is a local seed default, not a production credential.
-if defined USED_DEFAULT_PASSWORD echo [admin-smoke-check] Warning: default password Test1234! is a local seed default, not a production credential.
 echo [admin-smoke-check] Warning: this script will call POST /api/v1/admin/backups/run.
 echo.
 
@@ -104,7 +101,7 @@ exit /b 0
 :normalize_api_base_url
 set "RAW_URL=%~1"
 if not defined RAW_URL (
-  echo [admin-smoke-check] Input error: base URL is empty.
+  echo [admin-smoke-check] Input error: base URL is required. Pass argument 1 or set ADMIN_SMOKE_BASE_URL.
   exit /b %INPUT_ERROR%
 )
 
@@ -119,6 +116,16 @@ if "%BASE_URL:~-1%"=="/" set "BASE_URL=%BASE_URL:~0,-1%"
 set "API_BASE_URL=%BASE_URL%"
 if /i not "%API_BASE_URL:~-7%"=="/api/v1" set "API_BASE_URL=%BASE_URL%/api/v1"
 exit /b 0
+
+:require_login_id
+if defined LOGIN_ID exit /b 0
+echo [admin-smoke-check] Input error: loginId is required. Pass argument 2 or set ADMIN_SMOKE_LOGIN_ID.
+exit /b %INPUT_ERROR%
+
+:require_login_password
+if defined LOGIN_PASSWORD exit /b 0
+echo [admin-smoke-check] Input error: password is required. Pass argument 3 or set ADMIN_SMOKE_PASSWORD.
+exit /b %INPUT_ERROR%
 
 :prepare_temp_files
 set "TEMP_PREFIX=%TEMP%\admin-smoke-check-%RANDOM%%RANDOM%%RANDOM%"

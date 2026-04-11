@@ -42,7 +42,8 @@
 
 주의:
 - Docker Compose 운영 경로에서는 `APP_DB_URL_DOCKER` 가 우선 기준이고, 직접 실행 경로에서는 `APP_DB_URL` 이 우선 기준이다.
-- 운영에서 `scripts/admin-smoke-check.bat` 를 쓸 때는 base URL, 관리자 login ID, 비밀번호를 항상 명시적으로 넘긴다. 스크립트 내장 기본값은 로컬 seed 데이터 전용이다.
+- 운영에서 `scripts/admin-smoke-check.bat` 를 쓸 때는 base URL, 관리자 login ID, 비밀번호를 항상 명시적으로 넘기거나 `ADMIN_SMOKE_BASE_URL`, `ADMIN_SMOKE_LOGIN_ID`, `ADMIN_SMOKE_PASSWORD` 환경변수로 먼저 넣는다.
+- 운영에서 `scripts/health-check.bat` 를 쓸 때는 health URL 을 항상 명시적으로 넘기거나 `HEALTH_CHECK_URL` 환경변수로 먼저 넣는다.
 - `scripts/admin-smoke-check.bat` 는 `/api/v1/admin/backups/run` 을 호출하므로, 백업 경로와 dump 정책이 닫히기 전에는 실행하지 않는다.
 
 ---
@@ -182,7 +183,6 @@
 - [ ] direct runtime 경로를 사용할 계획이면 6.2 항목도 닫혔고, 아니면 `직접 실행 안 함` 으로 명시했다.
 - [ ] 7장 `schema.sql` 적용 수단, 실행 위치, 담당자, 검수자, health 기대 기준이 닫혔다.
 - [ ] 8장 초기 관리자 신청/승격/로그인 검수 담당자와 작업본 위치가 닫혔다.
-- [ ] `scripts/admin-smoke-check.bat` 를 쓸 계획이면 base URL, login ID 출처, 비밀번호 보관 위치를 적었고, 내장 기본값을 운영에서 쓰지 않는다는 점을 확인했다.
+- [ ] `scripts/admin-smoke-check.bat` 를 쓸 계획이면 base URL, login ID 출처, 비밀번호 보관 위치를 적었고, 명시적 인자 또는 환경변수 없이 실행하지 않는다는 점을 확인했다.
 - [ ] 실제 운영값은 저장소 원본이 아니라 이 시트 복사본, 대상 서버 작업본, 비밀 저장소, 내부 운영 문서에만 남긴다.
 - [ ] 이 시트 복사본만 열어도 [docs/15-go-live-checklist.md](./15-go-live-checklist.md) -> [docs/16-prod-config-checklist.md](./16-prod-config-checklist.md) -> [docs/18-docker-compose-deployment.md](./18-docker-compose-deployment.md) -> [docs/19-production-bootstrap.md](./19-production-bootstrap.md) 순서로 다음 작업을 바로 시작할 수 있다.
-

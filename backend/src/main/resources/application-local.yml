@@ -18,4 +18,4 @@ app:
     root-path: ${APP_BACKUP_ROOT_PATH:./local-backups}
     db-dump-command: ${APP_DB_DUMP_COMMAND:${APP_BACKUP_DB_DUMP_COMMAND:}}
   seed:
-    enabled: true
+    enabled: ${APP_SEED_ENABLED:true}

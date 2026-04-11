@@ -16,10 +16,12 @@ import java.time.LocalDateTime;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile({"local", "test"})
 @ConditionalOnProperty(prefix = "app.seed", name = "enabled", havingValue = "true")
 public class LocalDataInitializer implements ApplicationRunner {
     private final UserRepository userRepository;

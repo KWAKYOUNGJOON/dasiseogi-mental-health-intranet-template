@@ -268,7 +268,7 @@ scripts\admin-smoke-check.bat "http://127.0.0.1:8080" "<INITIAL_ADMIN_LOGIN_ID>"
 ```
 
 주의:
-- 이 스크립트는 운영에서 base URL, 관리자 login ID, 비밀번호를 명시적으로 넘겨야 한다. 내장 기본값 `admina / Test1234!` 는 로컬 seed 데이터 전용이다.
+- 이 스크립트는 운영에서 base URL, 관리자 login ID, 비밀번호를 명시적으로 넘기거나 같은 값을 `ADMIN_SMOKE_BASE_URL`, `ADMIN_SMOKE_LOGIN_ID`, `ADMIN_SMOKE_PASSWORD` 환경변수로 먼저 넣어야 한다.
 - 이 스크립트는 `/api/v1/admin/backups/run` 을 호출하므로, 백업 경로와 dump 정책 또는 운영 대체 수단이 이미 정리된 뒤에만 실행한다.
 
 DB 정합성 최종 확인:
@@ -372,4 +372,3 @@ DB 정합성 최종 확인:
 - 실제 비밀번호
 - 실제 운영 계정명
 - 실제 운영 서버 주소
-

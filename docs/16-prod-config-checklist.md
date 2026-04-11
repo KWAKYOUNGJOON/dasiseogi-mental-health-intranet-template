@@ -85,7 +85,7 @@
 - [ ] backend health 가 `status=UP`, `appStatus=UP`, `dbStatus=UP`, `scaleRegistryStatus=UP` 또는 동등 기준으로 정상 확인되기 전에는 bootstrap 과 운영 스모크 테스트로 넘어가지 않는다.
 
 주의:
-- 현재 backend Docker entrypoint 는 DB Docker 환경값이 비어 있거나 placeholder 상태면 local H2 profile 로 fallback 할 수 있다.
+- 현재 backend Docker entrypoint 와 `application-prod.yml` / prod runtime guard 는 DB Docker 환경값이 비어 있거나 placeholder 이거나 `jdbc:h2:` 면 즉시 실패한다.
 - 따라서 DB 환경값 대조와 `docker compose config` 확인 전에 `docker compose up -d` 를 먼저 실행하지 않는다.
 
 다음 단계:
@@ -157,4 +157,3 @@
 - [.env.docker.example](../.env.docker.example)
 - [docs/examples/production-runtime.env.example](./examples/production-runtime.env.example)
 - [scripts/sql/initial-admin-promote.template.sql](../scripts/sql/initial-admin-promote.template.sql)
-

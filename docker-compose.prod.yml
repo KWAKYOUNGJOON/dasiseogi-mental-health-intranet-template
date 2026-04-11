@@ -7,10 +7,10 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      APP_DB_URL_DOCKER: jdbc:mariadb://db:3306/${PROD_DB_NAME:-mental_health}?useUnicode=true&characterEncoding=utf8
-      APP_DB_USERNAME: ${PROD_DB_USERNAME:-mental_user}
-      APP_DB_PASSWORD: ${PROD_DB_PASSWORD}
-      APP_DB_DRIVER: ${APP_DB_DRIVER:-org.mariadb.jdbc.Driver}
+      APP_DB_URL_DOCKER: jdbc:mariadb://db:3306/${PROD_DB_NAME:?PROD_DB_NAME is required}?useUnicode=true&characterEncoding=utf8
+      APP_DB_USERNAME: ${PROD_DB_USERNAME:?PROD_DB_USERNAME is required}
+      APP_DB_PASSWORD: ${PROD_DB_PASSWORD:?PROD_DB_PASSWORD is required}
+      APP_DB_DRIVER: ${APP_DB_DRIVER:?APP_DB_DRIVER is required}
       APP_SESSION_TIMEOUT: ${APP_SESSION_TIMEOUT:-120m}
       APP_FORWARD_HEADERS_STRATEGY: ${APP_FORWARD_HEADERS_STRATEGY:-none}
       APP_TRUST_PROXY_HEADERS: ${APP_TRUST_PROXY_HEADERS:-false}
@@ -47,10 +47,10 @@ services:
     image: dasiseogi-db:local
     restart: always
     environment:
-      MARIADB_DATABASE: ${PROD_DB_NAME:-mental_health}
-      MARIADB_USER: ${PROD_DB_USERNAME:-mental_user}
-      MARIADB_PASSWORD: ${PROD_DB_PASSWORD}
-      MARIADB_ROOT_PASSWORD: ${PROD_DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${PROD_DB_NAME:?PROD_DB_NAME is required}
+      MARIADB_USER: ${PROD_DB_USERNAME:?PROD_DB_USERNAME is required}
+      MARIADB_PASSWORD: ${PROD_DB_PASSWORD:?PROD_DB_PASSWORD is required}
+      MARIADB_ROOT_PASSWORD: ${PROD_DB_ROOT_PASSWORD:?PROD_DB_ROOT_PASSWORD is required}
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
