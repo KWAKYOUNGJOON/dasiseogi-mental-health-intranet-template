@@ -8,6 +8,6 @@ export default mergeConfig(sharedConfig, {
     include: ['**/*.{test,spec}.tsx'],
     maxWorkers: 1,
     pool: 'forks',
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: ['./tests/app-metadata.setup.ts', './tests/setup.ts'],
   },
 })

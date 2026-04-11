@@ -1,8 +1,10 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useAppMetadata } from '../providers/AppMetadataProvider'
 import { useAuth } from '../providers/AuthProvider'
 import { getUserRoleLabel, hasAdminAccess } from '../../shared/user/userMetadata'
 
 export function AppLayout() {
+  const { organizationName } = useAppMetadata()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const canAccessAdmin = hasAdminAccess(user)
@@ -17,8 +19,7 @@ export function AppLayout() {
     <div className="app-shell">
       <aside className="sidebar">
         <div>
-          <h1>다시서기</h1>
-          <p>정신건강 평가관리</p>
+          <h1>{organizationName || '기관 정보 확인 중'}</h1>
         </div>
         <nav className="sidebar-nav">
           <NavLink to="/clients">대상자</NavLink>

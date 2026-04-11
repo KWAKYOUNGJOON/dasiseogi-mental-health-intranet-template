@@ -31,4 +31,15 @@ class OperationalBatchScriptSourceTest {
         assertThat(script).contains("HEALTH_CHECK_URL");
         assertThat(script).contains("target URL is required. Pass argument 1 or set HEALTH_CHECK_URL.");
     }
+
+    @Test
+    void deployScriptsRequireExplicitAppHomeWithoutScriptRelativeFallback() throws Exception {
+        String backendScript = Files.readString(Path.of("..", "scripts", "deploy-backend.bat"), StandardCharsets.UTF_8);
+        String frontendScript = Files.readString(Path.of("..", "scripts", "deploy-frontend.bat"), StandardCharsets.UTF_8);
+
+        assertThat(backendScript).contains("APP_HOME is required. Set APP_HOME before running this script.");
+        assertThat(frontendScript).contains("APP_HOME is required. Set APP_HOME before running this script.");
+        assertThat(backendScript).doesNotContain("%~dp0..");
+        assertThat(frontendScript).doesNotContain("%~dp0..");
+    }
 }

@@ -4,7 +4,6 @@ import { formatSeoulDateTimeText } from '../../../shared/utils/dateText'
 import {
   type UserManagementEditableStatus,
   type UserManagementPageSize,
-  type UserManagementPositionName,
   type UserManagementRole,
   type UserManagementStatus,
 } from '../adminManagementMetadata'
@@ -13,7 +12,6 @@ export {
   DEFAULT_USER_MANAGEMENT_PAGE_SIZE,
   USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS,
   USER_MANAGEMENT_PAGE_SIZE_OPTIONS,
-  USER_MANAGEMENT_POSITION_NAME_OPTIONS,
   USER_MANAGEMENT_ROLE_OPTIONS,
   USER_MANAGEMENT_STATUS_OPTIONS,
 } from '../adminManagementMetadata'
@@ -61,7 +59,7 @@ export interface UpdateUserManagementStatusResponse {
 }
 
 export interface UpdateUserManagementPositionNameRequest {
-  positionName: UserManagementPositionName
+  positionName: string
 }
 
 export interface UpdateUserManagementPositionNameResponse {
@@ -176,7 +174,7 @@ export async function updateUserManagementStatus(
 
 export async function updateUserManagementPositionName(
   userId: number,
-  positionName: UserManagementPositionName,
+  positionName: string,
 ): Promise<UserManagementChangeResult> {
   const payload: UpdateUserManagementPositionNameRequest = { positionName }
   const response = await http.patch<ApiResponse<UpdateUserManagementPositionNameResponse>>(
@@ -189,7 +187,6 @@ export async function updateUserManagementPositionName(
 export type {
   UserManagementEditableStatus,
   UserManagementPageSize,
-  UserManagementPositionName,
   UserManagementRole,
   UserManagementStatus,
 }

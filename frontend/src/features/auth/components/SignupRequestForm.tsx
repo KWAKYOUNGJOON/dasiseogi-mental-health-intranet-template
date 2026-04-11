@@ -1,10 +1,10 @@
 import { isAxiosError } from 'axios'
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAppMetadata } from '../../../app/providers/AppMetadataProvider'
 import type { ApiResponse } from '../../../shared/types/api'
 import { createSignupRequest, type CreateSignupRequestPayload } from '../api/signupRequestApi'
 
-const POSITION_NAME_OPTIONS = ['팀장', '대리', '실무자'] as const
 const SIGNUP_REQUEST_FIELDS = [
   'name',
   'loginId',
@@ -95,7 +95,8 @@ const DUPLICATED_LOGIN_ID_MESSAGE = '이미 사용 중인 아이디입니다.'
 const GENERIC_SIGNUP_ERROR_MESSAGE = '회원가입 신청에 실패했습니다. 잠시 후 다시 시도해주세요.'
 const LOGIN_ID_PATTERN = /^[a-z0-9_-]+$/
 const PHONE_PATTERN = /^\d{2,3}-?\d{3,4}-?\d{4}$/
-const POSITION_NAME_VALIDATION_MESSAGE = '직책 또는 역할은 팀장, 대리, 실무자 중에서 선택해주세요.'
+const POSITION_NAME_OPTIONS_LOADING_MESSAGE = '직책 목록을 불러오는 중입니다.'
+const POSITION_NAME_OPTIONS_ERROR_MESSAGE = '직책 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
 const SERVER_FIELD_ALIASES: Readonly<Record<string, SignupRequestFieldName>> = {
   contact: 'phone',
   loginId: 'loginId',
@@ -163,8 +164,16 @@ function formatPhoneNumber(value: string) {
   return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
 }
 
-function isAllowedPositionName(value: string) {
-  return POSITION_NAME_OPTIONS.includes(value as (typeof POSITION_NAME_OPTIONS)[number])
+function isAllowedPositionName(value: string, positionNameOptions: readonly string[]) {
+  return positionNameOptions.includes(value)
+}
+
+function getPositionNameValidationMessage(positionNameOptions: readonly string[]) {
+  if (positionNameOptions.length === 0) {
+    return '직책 또는 역할을 선택해주세요.'
+  }
+
+  return `직책 또는 역할은 ${positionNameOptions.join(', ')} 중에서 선택해주세요.`
 }
 
 function isPasswordField(field: SignupRequestFieldName): field is PasswordFieldName {
@@ -187,7 +196,11 @@ function getValidationTargets(field: SignupRequestFieldName) {
   return [field] as const
 }
 
-function validateField(field: SignupRequestFieldName, values: SignupRequestFormValues) {
+function validateField(
+  field: SignupRequestFieldName,
+  values: SignupRequestFormValues,
+  positionNameOptions: readonly string[],
+) {
   const normalized = normalizeFormValues(values)
   const value = normalized[field]
 
@@ -239,8 +252,11 @@ function validateField(field: SignupRequestFieldName, values: SignupRequestFormV
       }
       return undefined
     case 'positionName':
-      if (!isAllowedPositionName(value)) {
-        return POSITION_NAME_VALIDATION_MESSAGE
+      if (positionNameOptions.length === 0) {
+        return undefined
+      }
+      if (!isAllowedPositionName(value, positionNameOptions)) {
+        return getPositionNameValidationMessage(positionNameOptions)
       }
       return undefined
     case 'teamName':
@@ -259,9 +275,9 @@ function validateField(field: SignupRequestFieldName, values: SignupRequestFormV
   }
 }
 
-function validateForm(values: SignupRequestFormValues) {
+function validateForm(values: SignupRequestFormValues, positionNameOptions: readonly string[]) {
   return SIGNUP_REQUEST_FIELDS.reduce<SignupRequestFieldErrors>((errors, field) => {
-    const message = validateField(field, values)
+    const message = validateField(field, values, positionNameOptions)
     if (message) {
       errors[field] = message
     }
@@ -368,6 +384,7 @@ function getFieldDescribedBy(field: SignupRequestFieldName, hasHint: boolean, ha
 }
 
 export function SignupRequestForm() {
+  const { positionNames, status: appMetadataStatus } = useAppMetadata()
   const navigate = useNavigate()
   const [form, setForm] = useState(INITIAL_FORM)
   const [touched, setTouched] = useState<SignupRequestTouched>({})
@@ -378,13 +395,16 @@ export function SignupRequestForm() {
     passwordConfirm: false,
   })
   const [submitting, setSubmitting] = useState(false)
+  const positionMetadataReady = appMetadataStatus === 'ready' && positionNames.length > 0
+  const positionMetadataMessage =
+    appMetadataStatus === 'error' ? POSITION_NAME_OPTIONS_ERROR_MESSAGE : POSITION_NAME_OPTIONS_LOADING_MESSAGE
 
   function updateFieldErrors(fields: ReadonlyArray<SignupRequestFieldName>, nextForm: SignupRequestFormValues) {
     setFieldErrors((current) => {
       const nextErrors = { ...current }
 
       fields.forEach((field) => {
-        const message = validateField(field, nextForm)
+        const message = validateField(field, nextForm, positionNames)
 
         if (message) {
           nextErrors[field] = message
@@ -445,6 +465,7 @@ export function SignupRequestForm() {
       'aria-invalid': 'true' | undefined
       'aria-required': 'true' | undefined
       className: string | undefined
+      disabled?: boolean
       id: string
       name: SignupRequestFieldName
       onBlur: () => void
@@ -459,8 +480,8 @@ export function SignupRequestForm() {
     if (field.control === 'select') {
       return (
         <select {...commonProps} value={form[field.name]}>
-          <option value="">선택해주세요.</option>
-          {POSITION_NAME_OPTIONS.map((option) => (
+          <option value="">{positionMetadataReady ? '선택해주세요.' : positionMetadataMessage}</option>
+          {positionNames.map((option) => (
             <option key={option} value={option}>
               {option}
             </option>
@@ -541,11 +562,16 @@ export function SignupRequestForm() {
       return
     }
 
+    if (!positionMetadataReady) {
+      setFormMessage(positionMetadataMessage)
+      return
+    }
+
     const nextTouched = SIGNUP_REQUEST_FIELDS.reduce<SignupRequestTouched>((current, field) => {
       current[field] = true
       return current
     }, {})
-    const nextErrors = validateForm(form)
+    const nextErrors = validateForm(form, positionNames)
 
     setTouched(nextTouched)
     setFieldErrors(nextErrors)
@@ -584,7 +610,12 @@ export function SignupRequestForm() {
       {FIELD_DEFINITIONS.map((field) => {
         const errorMessage = fieldErrors[field.name]
         const inputId = getFieldInputId(field.name)
-        const hintText = field.name === 'requestMemo' ? memoLengthLabel : field.hint
+        const hintText =
+          field.name === 'positionName' && !positionMetadataReady
+            ? positionMetadataMessage
+            : field.name === 'requestMemo'
+              ? memoLengthLabel
+              : field.hint
         const hintId = hintText ? getFieldHintId(field.name) : undefined
         const errorId = errorMessage ? getFieldErrorId(field.name) : undefined
         const describedBy = getFieldDescribedBy(field.name, Boolean(hintId), Boolean(errorId))
@@ -593,6 +624,7 @@ export function SignupRequestForm() {
           'aria-invalid': errorMessage ? 'true' : undefined,
           'aria-required': field.required ? 'true' : undefined,
           className: getFieldInputClassName(errorMessage),
+          disabled: field.name === 'positionName' ? submitting || !positionMetadataReady : submitting,
           id: inputId,
           name: field.name,
           onBlur: handleBlur(field.name),
@@ -619,7 +651,7 @@ export function SignupRequestForm() {
       })}
 
       <div className="actions">
-        <button className="primary-button" disabled={submitting} type="submit">
+        <button className="primary-button" disabled={submitting || !positionMetadataReady} type="submit">
           {submitting ? '신청 중...' : '가입 신청'}
         </button>
         <Link className="secondary-button" to="/login">

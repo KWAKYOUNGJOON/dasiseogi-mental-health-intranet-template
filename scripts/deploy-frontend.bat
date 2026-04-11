@@ -112,11 +112,12 @@ exit /b 0
 :resolve_app_home
 set "APP_HOME_RESOLVED="
 
-if defined APP_HOME (
-  for %%I in ("%APP_HOME%") do set "APP_HOME_RESOLVED=%%~fI"
-) else (
-  for %%I in ("%~dp0..") do set "APP_HOME_RESOLVED=%%~fI"
+if not defined APP_HOME (
+  echo [deploy-frontend] Path error: APP_HOME is required. Set APP_HOME before running this script.
+  exit /b %PATH_ERROR%
 )
+
+for %%I in ("%APP_HOME%") do set "APP_HOME_RESOLVED=%%~fI"
 
 if not defined APP_HOME_RESOLVED (
   echo [deploy-frontend] Path error: failed to resolve app home.

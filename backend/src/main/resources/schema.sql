@@ -150,6 +150,27 @@ CREATE TABLE IF NOT EXISTS assessment_sessions (
     INDEX idx_assessment_sessions_client_date (client_id, session_completed_at DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS scale_catalog (
+    scale_code VARCHAR(30) NOT NULL,
+    scale_name VARCHAR(100) NOT NULL,
+    display_order INT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_implemented BOOLEAN NOT NULL DEFAULT TRUE,
+    definition_file VARCHAR(255) NULL,
+    synced_at DATETIME NOT NULL,
+    PRIMARY KEY (scale_code),
+    INDEX idx_scale_catalog_display_order (display_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS alert_type_catalog (
+    alert_type VARCHAR(50) NOT NULL,
+    label VARCHAR(100) NOT NULL,
+    display_order INT NOT NULL,
+    synced_at DATETIME NOT NULL,
+    PRIMARY KEY (alert_type),
+    INDEX idx_alert_type_catalog_display_order (display_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS session_scales (
     id BIGINT NOT NULL AUTO_INCREMENT,
     session_id BIGINT NOT NULL,
@@ -165,12 +186,12 @@ CREATE TABLE IF NOT EXISTS session_scales (
     updated_at DATETIME NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT uk_session_scales_session_id_scale_code UNIQUE (session_id, scale_code),
-    CONSTRAINT chk_session_scales_scale_code
-        CHECK (scale_code IN ('PHQ9', 'GAD7', 'MKPQ16', 'KMDQ', 'PSS10', 'ISIK', 'AUDITK', 'IESR', 'CRI')),
     CONSTRAINT chk_session_scales_raw_result_snapshot
         CHECK (JSON_VALID(raw_result_snapshot)),
     CONSTRAINT fk_session_scales_session
         FOREIGN KEY (session_id) REFERENCES assessment_sessions (id),
+    CONSTRAINT fk_session_scales_scale_catalog
+        FOREIGN KEY (scale_code) REFERENCES scale_catalog (scale_code),
     INDEX idx_session_scales_scale_code (scale_code),
     INDEX idx_session_scales_has_alert (has_alert),
     INDEX idx_session_scales_total_score (total_score)
@@ -191,12 +212,12 @@ CREATE TABLE IF NOT EXISTS session_answers (
     created_at DATETIME NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT uk_session_answers_scale_question UNIQUE (session_scale_id, question_no),
-    CONSTRAINT chk_session_answers_scale_code
-        CHECK (scale_code IN ('PHQ9', 'GAD7', 'MKPQ16', 'KMDQ', 'PSS10', 'ISIK', 'AUDITK', 'IESR', 'CRI')),
     CONSTRAINT fk_session_answers_session_scale
         FOREIGN KEY (session_scale_id) REFERENCES session_scales (id),
     CONSTRAINT fk_session_answers_session
         FOREIGN KEY (session_id) REFERENCES assessment_sessions (id),
+    CONSTRAINT fk_session_answers_scale_catalog
+        FOREIGN KEY (scale_code) REFERENCES scale_catalog (scale_code),
     INDEX idx_session_answers_session_id (session_id),
     INDEX idx_session_answers_scale_code (scale_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -214,16 +235,16 @@ CREATE TABLE IF NOT EXISTS session_alerts (
     trigger_value VARCHAR(100) NULL,
     created_at DATETIME NOT NULL,
     PRIMARY KEY (id),
-    CONSTRAINT chk_session_alerts_scale_code
-        CHECK (scale_code IN ('PHQ9', 'GAD7', 'MKPQ16', 'KMDQ', 'PSS10', 'ISIK', 'AUDITK', 'IESR', 'CRI')),
-    CONSTRAINT chk_session_alerts_alert_type
-        CHECK (alert_type IN ('HIGH_RISK', 'CAUTION', 'CRITICAL_ITEM', 'COMPOSITE_RULE')),
     CONSTRAINT fk_session_alerts_session
         FOREIGN KEY (session_id) REFERENCES assessment_sessions (id),
     CONSTRAINT fk_session_alerts_session_scale
         FOREIGN KEY (session_scale_id) REFERENCES session_scales (id),
     CONSTRAINT fk_session_alerts_client
         FOREIGN KEY (client_id) REFERENCES clients (id),
+    CONSTRAINT fk_session_alerts_scale_catalog
+        FOREIGN KEY (scale_code) REFERENCES scale_catalog (scale_code),
+    CONSTRAINT fk_session_alerts_alert_type_catalog
+        FOREIGN KEY (alert_type) REFERENCES alert_type_catalog (alert_type),
     INDEX idx_session_alerts_session_id (session_id),
     INDEX idx_session_alerts_client_id (client_id),
     INDEX idx_session_alerts_scale_code (scale_code),

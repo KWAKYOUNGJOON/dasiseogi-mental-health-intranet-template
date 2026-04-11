@@ -38,6 +38,8 @@ class SchemaValidationMariaDbTest {
         assertThat(tableExists("users")).isTrue();
         assertThat(tableExists("clients")).isTrue();
         assertThat(tableExists("assessment_sessions")).isTrue();
+        assertThat(tableExists("scale_catalog")).isTrue();
+        assertThat(tableExists("alert_type_catalog")).isTrue();
         assertThat(tableExists("session_scales")).isTrue();
         assertThat(tableExists("session_answers")).isTrue();
         assertThat(tableExists("session_alerts")).isTrue();
@@ -47,6 +49,8 @@ class SchemaValidationMariaDbTest {
 
         assertThat(indexExists("clients", "idx_clients_name_birth_date")).isTrue();
         assertThat(indexExists("assessment_sessions", "idx_assessment_sessions_client_date")).isTrue();
+        assertThat(indexExists("scale_catalog", "idx_scale_catalog_display_order")).isTrue();
+        assertThat(indexExists("alert_type_catalog", "idx_alert_type_catalog_display_order")).isTrue();
         assertThat(indexExists("activity_logs", "idx_activity_logs_created_at")).isTrue();
         assertThat(indexExists("backup_histories", "idx_backup_histories_backup_type")).isTrue();
         assertThat(indexExists("backup_histories", "idx_backup_histories_status")).isTrue();
@@ -148,35 +152,18 @@ class SchemaValidationMariaDbTest {
     }
 
     @Test
-    void schemaSqlAllowsAllNineOfficialScaleCodesInSessionTablesOnMariaDb() throws Exception {
+    void schemaSqlUsesReferenceCatalogForeignKeysForScaleAndAlertColumnsOnMariaDb() throws Exception {
         applySchemaSql();
 
-        Set<String> expectedScaleCodes = new LinkedHashSet<>(Arrays.asList(
-                "PHQ9",
-                "GAD7",
-                "MKPQ16",
-                "KMDQ",
-                "PSS10",
-                "ISIK",
-                "AUDITK",
-                "IESR",
-                "CRI"
-        ));
+        assertThat(checkConstraintClause("session_scales", "chk_session_scales_scale_code")).isEmpty();
+        assertThat(checkConstraintClause("session_answers", "chk_session_answers_scale_code")).isEmpty();
+        assertThat(checkConstraintClause("session_alerts", "chk_session_alerts_scale_code")).isEmpty();
+        assertThat(checkConstraintClause("session_alerts", "chk_session_alerts_alert_type")).isEmpty();
 
-        Optional<String> sessionScalesClause = checkConstraintClause("session_scales", "chk_session_scales_scale_code");
-        assertThat(sessionScalesClause).isPresent();
-        assertThat(extractQuotedUppercaseTokens(sessionScalesClause.orElseThrow()))
-                .containsExactlyInAnyOrderElementsOf(expectedScaleCodes);
-
-        Optional<String> sessionAnswersClause = checkConstraintClause("session_answers", "chk_session_answers_scale_code");
-        assertThat(sessionAnswersClause).isPresent();
-        assertThat(extractQuotedUppercaseTokens(sessionAnswersClause.orElseThrow()))
-                .containsExactlyInAnyOrderElementsOf(expectedScaleCodes);
-
-        Optional<String> sessionAlertsClause = checkConstraintClause("session_alerts", "chk_session_alerts_scale_code");
-        assertThat(sessionAlertsClause).isPresent();
-        assertThat(extractQuotedUppercaseTokens(sessionAlertsClause.orElseThrow()))
-                .containsExactlyInAnyOrderElementsOf(expectedScaleCodes);
+        assertThat(foreignKeyExists("session_scales", "fk_session_scales_scale_catalog", "scale_catalog")).isTrue();
+        assertThat(foreignKeyExists("session_answers", "fk_session_answers_scale_catalog", "scale_catalog")).isTrue();
+        assertThat(foreignKeyExists("session_alerts", "fk_session_alerts_scale_catalog", "scale_catalog")).isTrue();
+        assertThat(foreignKeyExists("session_alerts", "fk_session_alerts_alert_type_catalog", "alert_type_catalog")).isTrue();
     }
 
     @Test
@@ -305,6 +292,32 @@ class SchemaValidationMariaDbTest {
                     return Optional.empty();
                 }
                 return Optional.ofNullable(resultSet.getString("check_clause"));
+            }
+        }
+    }
+
+    private boolean foreignKeyExists(String tableName, String constraintName, String referencedTableName) throws Exception {
+        String sql = """
+                SELECT COUNT(*)
+                FROM information_schema.referential_constraints
+                WHERE constraint_schema = ?
+                  AND table_name = ?
+                  AND constraint_name = ?
+                  AND referenced_table_name = ?
+                """;
+        try (Connection connection = DriverManager.getConnection(
+                MARIADB.getJdbcUrl(),
+                MARIADB.getUsername(),
+                MARIADB.getPassword()
+        );
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, MARIADB.getDatabaseName());
+            statement.setString(2, tableName);
+            statement.setString(3, constraintName);
+            statement.setString(4, referencedTableName);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                resultSet.next();
+                return resultSet.getInt(1) == 1;
             }
         }
     }

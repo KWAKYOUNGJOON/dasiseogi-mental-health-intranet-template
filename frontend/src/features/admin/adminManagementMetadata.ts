@@ -11,7 +11,6 @@ import {
 export const USER_MANAGEMENT_ROLE_OPTIONS = USER_ROLE_OPTIONS
 export const USER_MANAGEMENT_STATUS_OPTIONS = USER_STATUS_OPTIONS
 export const USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS = ['ACTIVE', 'INACTIVE'] as const
-export const USER_MANAGEMENT_POSITION_NAME_OPTIONS = ['팀장', '대리', '실무자'] as const
 export const USER_MANAGEMENT_PAGE_SIZE_OPTIONS = [20, 50] as const
 
 export const SIGNUP_REQUEST_STATUS_OPTIONS = ['PENDING', 'APPROVED', 'REJECTED'] as const
@@ -20,7 +19,7 @@ export const SIGNUP_REQUEST_PAGE_SIZE_OPTIONS = [20, 50, 100] as const
 export type UserManagementRole = UserRole
 export type UserManagementStatus = UserStatus
 export type UserManagementEditableStatus = (typeof USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS)[number]
-export type UserManagementPositionName = (typeof USER_MANAGEMENT_POSITION_NAME_OPTIONS)[number]
+export type UserManagementPositionName = string
 export type UserManagementPageSize = (typeof USER_MANAGEMENT_PAGE_SIZE_OPTIONS)[number]
 export type SignupRequestManagementStatus = (typeof SIGNUP_REQUEST_STATUS_OPTIONS)[number]
 export type SignupRequestManagementPageSize = (typeof SIGNUP_REQUEST_PAGE_SIZE_OPTIONS)[number]

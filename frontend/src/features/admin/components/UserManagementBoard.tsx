@@ -1,5 +1,6 @@
 import { isAxiosError } from 'axios'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useAppMetadata } from '../../../app/providers/AppMetadataProvider'
 import { useAuth } from '../../../app/providers/AuthProvider'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 import { PageHeader } from '../../../shared/components/PageHeader'
@@ -17,7 +18,6 @@ import {
   DEFAULT_USER_MANAGEMENT_PAGE_SIZE,
   USER_MANAGEMENT_EDITABLE_STATUS_OPTIONS,
   USER_MANAGEMENT_PAGE_SIZE_OPTIONS,
-  USER_MANAGEMENT_POSITION_NAME_OPTIONS,
   USER_MANAGEMENT_ROLE_CHIP_STYLES,
   USER_MANAGEMENT_ROLE_LABELS,
   USER_MANAGEMENT_ROLE_OPTIONS,
@@ -71,6 +71,8 @@ const GENERIC_LIST_ERROR_MESSAGE = '사용자 목록을 불러오지 못했습�
 const GENERIC_ROLE_ERROR_MESSAGE = '사용자 역할 변경 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
 const GENERIC_STATUS_ERROR_MESSAGE = '사용자 상태 변경 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
 const GENERIC_POSITION_NAME_ERROR_MESSAGE = '사용자 직책 변경 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+const POSITION_NAME_OPTIONS_LOADING_MESSAGE = '직책 목록을 불러오는 중입니다.'
+const POSITION_NAME_OPTIONS_ERROR_MESSAGE = '직책 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
 
 function createDefaultFilters(): FilterState {
   return {
@@ -246,16 +248,24 @@ function getDialogDescription(dialog: DialogState | null) {
   return '선택한 사용자의 직책을 변경합니다. 변경 내용을 확인한 뒤 적용해주세요.'
 }
 
-function isAllowedPositionName(value: string): value is UserManagementPositionName {
-  return USER_MANAGEMENT_POSITION_NAME_OPTIONS.includes(value as UserManagementPositionName)
+function isAllowedPositionName(value: string, positionNameOptions: readonly string[]): value is UserManagementPositionName {
+  return positionNameOptions.includes(value)
 }
 
-function getSelectablePositionNameOptions(currentPositionName: string) {
-  if (isAllowedPositionName(currentPositionName)) {
-    return USER_MANAGEMENT_POSITION_NAME_OPTIONS
+function getSelectablePositionNameOptions(currentPositionName: string, positionNameOptions: readonly string[]) {
+  if (positionNameOptions.length === 0) {
+    return currentPositionName && currentPositionName !== '-' ? [currentPositionName] : ['']
   }
 
-  return [currentPositionName, ...USER_MANAGEMENT_POSITION_NAME_OPTIONS] as const
+  if (!currentPositionName || currentPositionName === '-') {
+    return [...positionNameOptions]
+  }
+
+  if (isAllowedPositionName(currentPositionName, positionNameOptions)) {
+    return [...positionNameOptions]
+  }
+
+  return [currentPositionName, ...positionNameOptions]
 }
 
 function getPositionNameOptionLabel(positionName: string) {
@@ -276,6 +286,7 @@ function buildQuery(filters: FilterState): UserManagementQuery {
 }
 
 export function UserManagementBoard() {
+  const { positionNames, status: appMetadataStatus } = useAppMetadata()
   const { refresh } = useAuth()
   const [filters, setFilters] = useState<FilterState>(() => createDefaultFilters())
   const [query, setQuery] = useState<FilterState>(() => createDefaultFilters())
@@ -291,6 +302,9 @@ export function UserManagementBoard() {
   const [roleDrafts, setRoleDrafts] = useState<Record<number, UserManagementRole>>({})
   const [statusDrafts, setStatusDrafts] = useState<Record<number, UserManagementEditableStatus | ''>>({})
   const [positionNameDrafts, setPositionNameDrafts] = useState<Record<number, string>>({})
+  const positionMetadataReady = appMetadataStatus === 'ready' && positionNames.length > 0
+  const positionMetadataMessage =
+    appMetadataStatus === 'error' ? POSITION_NAME_OPTIONS_ERROR_MESSAGE : POSITION_NAME_OPTIONS_LOADING_MESSAGE
 
   const loadUsers = useCallback(async () => {
     setLoading(true)
@@ -417,7 +431,7 @@ export function UserManagementBoard() {
 
     const nextPositionName = positionNameDrafts[user.id] ?? user.positionName
 
-    if (!isAllowedPositionName(nextPositionName) || nextPositionName === user.positionName) {
+    if (!isAllowedPositionName(nextPositionName, positionNames) || nextPositionName === user.positionName) {
       return
     }
 
@@ -607,6 +621,8 @@ export function UserManagementBoard() {
           </button>
         </div>
 
+        {!positionMetadataReady ? <div className="muted">{positionMetadataMessage}</div> : null}
+
         {listError ? (
           <div className="stack" role="alert" style={{ gap: 8 }}>
             <div className="error-text">{listError}</div>
@@ -657,9 +673,11 @@ export function UserManagementBoard() {
                 const canEditStatus = isUserManagementEditableStatus(item.status)
                 const statusDraft = statusDrafts[item.id] ?? getDefaultUserManagementStatusDraft(item.status)
                 const positionNameDraft = positionNameDrafts[item.id] ?? item.positionName
-                const selectablePositionNameOptions = getSelectablePositionNameOptions(item.positionName)
+                const selectablePositionNameOptions = getSelectablePositionNameOptions(item.positionName, positionNames)
                 const canSubmitPositionNameChange =
-                  isAllowedPositionName(positionNameDraft) && positionNameDraft !== item.positionName
+                  positionMetadataReady &&
+                  isAllowedPositionName(positionNameDraft, positionNames) &&
+                  positionNameDraft !== item.positionName
 
                 return (
                   <tr key={item.id}>
@@ -685,7 +703,7 @@ export function UserManagementBoard() {
                           <span className="management-action-label">직책 변경</span>
                           <select
                             aria-label={`${item.name} 직책 변경 값`}
-                            disabled={processing}
+                            disabled={processing || !positionMetadataReady}
                             onChange={(event) =>
                               setPositionNameDrafts((prev) => ({
                                 ...prev,
@@ -694,10 +712,13 @@ export function UserManagementBoard() {
                             }
                             value={positionNameDraft}
                           >
+                            {selectablePositionNameOptions.length === 0 ? (
+                              <option value="">{positionMetadataMessage}</option>
+                            ) : null}
                             {selectablePositionNameOptions.map((positionNameOption) => {
                               const isCurrentLegacyOption =
                                 positionNameOption === item.positionName &&
-                                !isAllowedPositionName(positionNameOption)
+                                !isAllowedPositionName(positionNameOption, positionNames)
 
                               return (
                                 <option disabled={isCurrentLegacyOption} key={positionNameOption} value={positionNameOption}>

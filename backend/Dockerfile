@@ -14,6 +14,8 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
+ARG APP_SERVER_PORT=8080
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends mariadb-client \
     && rm -rf /var/lib/apt/lists/*
@@ -25,6 +27,6 @@ COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 
 RUN chmod +x /app/docker-entrypoint.sh
 
-EXPOSE 8080
+EXPOSE ${APP_SERVER_PORT}
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
