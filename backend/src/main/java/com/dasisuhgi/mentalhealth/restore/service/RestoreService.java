@@ -342,7 +342,8 @@ public class RestoreService {
         history = saveRestoreHistory(history);
 
         try {
-            executeDatabaseRestore(Path.of(history.getFilePath()), executionContext.archiveDatasourceType());
+            String restoreFilePath = Objects.requireNonNull(history.getFilePath(), "restoreHistory.filePath");
+            executeDatabaseRestore(Path.of(restoreFilePath), executionContext.archiveDatasourceType());
             history.setStatus(RestoreStatus.SUCCESS);
             history.setFailureReason(null);
             history = saveRestoreHistory(history);
@@ -431,6 +432,7 @@ public class RestoreService {
     }
 
     private void insertRestoreHistory(RestoreHistory history) {
+        RestoreStatus historyStatus = Objects.requireNonNull(history.getStatus(), "restoreHistory.status");
         jdbcTemplate.update("""
                         INSERT INTO restore_histories (
                             id,
@@ -454,7 +456,7 @@ public class RestoreService {
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                 history.getId(),
-                history.getStatus().name(),
+                historyStatus.name(),
                 history.getFileName(),
                 history.getFilePath(),
                 history.getFileSizeBytes(),

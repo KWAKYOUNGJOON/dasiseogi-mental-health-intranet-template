@@ -1,3 +1,4 @@
+// cspell:words dasisuhgi mentalhealth assertj AtoE cri kmdq selfOther risk8
 package com.dasisuhgi.mentalhealth.assessment.service;
 
 import com.dasisuhgi.mentalhealth.assessment.dto.AnswerRequest;
@@ -139,9 +140,9 @@ class AssessmentServiceTest {
         List<?> matchedAlerts = invokeBuildAlertData(definition, "A", "극도의 위기 단계");
         assertThat(matchedAlerts).hasSize(1);
         Object matchedAlert = matchedAlerts.get(0);
-        assertThat(invokeStringMethod(matchedAlert, "code")).isEqualTo("CRI_RESULT_A");
-        assertThat(invokeStringMethod(matchedAlert, "message")).isEqualTo("CRI 결과 A: 극도의 위기");
-        assertThat(invokeStringMethod(matchedAlert, "triggerValue")).isEqualTo("극도의 위기 단계");
+        assertThat(invokeString(matchedAlert, "code")).isEqualTo("CRI_RESULT_A");
+        assertThat(invokeString(matchedAlert, "message")).isEqualTo("CRI 결과 A: 극도의 위기");
+        assertThat(invokeString(matchedAlert, "triggerValue")).isEqualTo("극도의 위기 단계");
 
         List<?> unmatchedAlerts = invokeBuildAlertData(definition, "B", "A - 극도의 위기");
         assertThat(unmatchedAlerts).isEmpty();
@@ -203,8 +204,8 @@ class AssessmentServiceTest {
 
         Object evaluation = invokeEvaluation(request);
 
-        assertThat(invokeIntMethod(evaluation, "totalScore")).isEqualTo(1);
-        assertThat(invokeListMethod(evaluation, "answers")).hasSize(13);
+        assertThat(invokeInt(evaluation, "totalScore")).isEqualTo(1);
+        assertThat(invokeList(evaluation, "answers")).hasSize(13);
     }
 
     @Test
@@ -233,10 +234,10 @@ class AssessmentServiceTest {
 
         Object evaluation = invokeEvaluation(request);
 
-        assertThat(invokeIntMethod(evaluation, "totalScore")).isEqualTo(7);
-        assertThat(invokeStringMethod(evaluation, "resultLevelCode")).isEqualTo("POSITIVE_SCREEN");
-        assertThat(invokeStringMethod(evaluation, "resultLevel")).isEqualTo("양성 의심");
-        assertThat(invokeListMethod(evaluation, "answers")).hasSize(14);
+        assertThat(invokeInt(evaluation, "totalScore")).isEqualTo(7);
+        assertThat(invokeString(evaluation, "resultLevelCode")).isEqualTo("POSITIVE_SCREEN");
+        assertThat(invokeString(evaluation, "resultLevel")).isEqualTo("양성 의심");
+        assertThat(invokeList(evaluation, "answers")).hasSize(14);
     }
 
     private void assertCriEvaluation(
@@ -252,9 +253,9 @@ class AssessmentServiceTest {
     ) {
         Object evaluation = invokeEvaluation(new SelectedScaleRequest("CRI", toCriAnswerRequests(rawAnswers)));
 
-        assertThat(invokeIntMethod(evaluation, "totalScore")).isEqualTo(expectedTotalScore);
-        assertThat(invokeStringMethod(evaluation, "resultLevelCode")).isEqualTo(expectedCode);
-        assertThat(invokeStringMethod(evaluation, "resultLevel")).isEqualTo(expectedDisplayLabel);
+        assertThat(invokeInt(evaluation, "totalScore")).isEqualTo(expectedTotalScore);
+        assertThat(invokeString(evaluation, "resultLevelCode")).isEqualTo(expectedCode);
+        assertThat(invokeString(evaluation, "resultLevel")).isEqualTo(expectedDisplayLabel);
         assertThat(readResultDetailValue(evaluation, "selfOtherTotal")).isEqualTo(Integer.toString(expectedSelfOtherTotal));
         assertThat(readResultDetailValue(evaluation, "mentalTotal")).isEqualTo(Integer.toString(expectedMentalTotal));
         assertThat(readResultDetailValue(evaluation, "functionTotal")).isEqualTo(Integer.toString(expectedFunctionTotal));
@@ -263,7 +264,7 @@ class AssessmentServiceTest {
     }
 
     private List<?> invokeBuildAlertData(ScaleDefinition definition, String resultLevelCode, String resultLevel) {
-        return invokeListMethod(
+        return invokeList(
                 assessmentService,
                 "buildAlertData",
                 definition,
@@ -275,10 +276,10 @@ class AssessmentServiceTest {
     }
 
     private String readResultDetailValue(Object evaluation, String key) {
-        List<?> resultDetails = invokeListMethod(evaluation, "resultDetails");
+        List<?> resultDetails = invokeList(evaluation, "resultDetails");
         return resultDetails.stream()
-                .filter(detail -> key.equals(invokeStringMethod(detail, "key")))
-                .map(detail -> invokeStringMethod(detail, "value"))
+                .filter(detail -> key.equals(invokeString(detail, "key")))
+                .map(detail -> invokeString(detail, "value"))
                 .findFirst()
                 .orElseThrow();
     }
@@ -290,36 +291,43 @@ class AssessmentServiceTest {
     }
 
     private Object invokeEvaluation(SelectedScaleRequest request) {
-        return invokeRequiredMethod(assessmentService, "evaluateScale", request);
+        return invokeNonNull(assessmentService, "evaluateScale", request);
     }
 
-    private Object invokeRequiredMethod(Object target, String methodName, Object... args) {
+    private Object invokeNonNull(Object target, String methodName, Object... args) {
         return Objects.requireNonNull(
                 ReflectionTestUtils.invokeMethod(target, methodName, args),
                 methodName + " should not return null"
         );
     }
 
-    private String invokeStringMethod(Object target, String methodName, Object... args) {
-        Object result = invokeRequiredMethod(target, methodName, args);
-        assertThat(result).isInstanceOf(String.class);
-        return (String) result;
+    private String invokeString(Object target, String methodName, Object... args) {
+        Object result = invokeNonNull(target, methodName, args);
+        if (result instanceof String stringResult) {
+            return stringResult;
+        }
+        throw new AssertionError(methodName + " should return String but was " + result.getClass().getName());
     }
 
-    private int invokeIntMethod(Object target, String methodName, Object... args) {
-        Object result = invokeRequiredMethod(target, methodName, args);
-        assertThat(result).isInstanceOf(Number.class);
-        return ((Number) result).intValue();
+    private int invokeInt(Object target, String methodName, Object... args) {
+        Object result = invokeNonNull(target, methodName, args);
+        if (result instanceof Number numberResult) {
+            return numberResult.intValue();
+        }
+        throw new AssertionError(methodName + " should return Number but was " + result.getClass().getName());
     }
 
-    private List<?> invokeListMethod(Object target, String methodName, Object... args) {
-        Object result = invokeRequiredMethod(target, methodName, args);
-        assertThat(result).isInstanceOf(List.class);
-        return (List<?>) result;
+    private List<?> invokeList(Object target, String methodName, Object... args) {
+        Object result = invokeNonNull(target, methodName, args);
+        if (result instanceof List<?> listResult) {
+            return listResult;
+        }
+        throw new AssertionError(methodName + " should return List but was " + result.getClass().getName());
     }
 
     private ScaleDefinition createCriDefinitionWithResultLevelLabels(Map<String, String> resultLevelLabels) {
         ScaleDefinition source = loadCriDefinition("cri.json");
+        ScaleDefinition.Metadata sourceMetadata = Objects.requireNonNull(source.metadata(), "CRI metadata");
         return new ScaleDefinition(
                 source.scaleCode(),
                 source.scaleName(),
@@ -332,7 +340,7 @@ class AssessmentServiceTest {
                 source.items(),
                 source.interpretationRules(),
                 source.alertRules(),
-                new ScaleDefinition.Metadata(resultLevelLabels, source.metadata().ui(), source.metadata().evaluation())
+                new ScaleDefinition.Metadata(resultLevelLabels, sourceMetadata.ui(), sourceMetadata.evaluation())
         );
     }
 

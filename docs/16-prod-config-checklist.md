@@ -63,7 +63,7 @@
 | 실제 운영값 기록 위치 확정 | 저장소 원본이 아니라 [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 복사본 또는 내부 운영 문서에만 실제 값을 기록하기로 확정했다 | 로컬 작업본, 내부 운영 문서 | [ ] |
 | 실제 운영 접근 정보 확보 | 실제 운영 호스트, 실제 운영 URL, backend 직접 확인 주소 또는 포트, `/api/v1/health` 허용 범위가 정리되었다 | 로컬 작업본, 내부 운영 문서 | [ ] |
 | 실제 운영 DB 정보 확보 | 실제 운영 DB host/port/name, DB 관리자 계정, 앱 계정, 비밀번호 보관 위치가 정리되었다 | 로컬 작업본, 비밀 저장소 참조 문서 | [ ] |
-| 운영용 `.env` 작성 방식 확보 | 루트 `.env` 작성 위치, 관리 방식, 로그/임시/export/백업 경로값 결정 주체가 정리되었다 | 로컬 작업본, 내부 운영 문서 | [ ] |
+| 운영용 `.env` 작성 방식 확보 | 루트 `.env` 작성 위치, 관리 방식, `APP_SERVER_PORT`, `APP_FRONTEND_PORT`, `APP_HEALTHCHECK_PATH`, `APP_BACKEND_UPSTREAM_HOST`, 로그/임시/export/백업 경로값 결정 주체가 정리되었다 | 로컬 작업본, 내부 운영 문서 | [ ] |
 | `schema.sql` 선적용 수단 확보 | `backend/src/main/resources/schema.sql` 적용 도구, 실행 위치, 담당자, 검수자가 정리되었다 | 로컬 작업본, 내부 운영 문서 | [ ] |
 | bootstrap 수행자 확보 | 초기 관리자 회원가입 신청 수행자, DB 수동 승격 SQL 실행자, 최초 로그인 검수자가 정리되었다 | 로컬 작업본, 내부 운영 문서 | [ ] |
 | reverse proxy / health 정책 확정 | `APP_FORWARD_HEADERS_STRATEGY`, `APP_TRUST_PROXY_HEADERS`, health ACL 적용 위치가 정리되었다 | 로컬 작업본, 내부 운영 문서 | [ ] |
@@ -81,7 +81,9 @@
 - [ ] `docker compose up -d` 전에 `docker compose config` 를 먼저 실행하고, backend 환경값의 `APP_DB_URL_DOCKER`, `APP_DB_USERNAME`, `APP_DB_PASSWORD`, `APP_DB_DRIVER` 를 [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 작업본과 대조한다.
 - [ ] `docker compose config` 결과의 backend 환경값이 [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 작업본과 다르면 실제 운영 반영으로 넘어가지 않는다.
 - [ ] `APP_DB_URL_DOCKER` 가 비어 있거나, placeholder 이거나, `jdbc:h2:` 류 값이거나, 테스트/로컬 DB 주소이거나, 실제 운영 외부 MariaDB JDBC URL 로 확정되지 않았으면 진행하지 않는다.
+- [ ] `APP_SERVER_PORT`, `APP_FRONTEND_PORT`, `APP_HEALTHCHECK_PATH`, `APP_BACKEND_UPSTREAM_HOST` 도 `docker compose config` 결과와 운영 작업본 기준으로 먼저 대조한다.
 - [ ] `BACKEND_LOGS_HOST_PATH`, `BACKEND_TMP_HOST_PATH`, `BACKEND_BACKUPS_HOST_PATH` 도 `docker compose config` 결과와 운영 작업본 기준으로 먼저 대조한다.
+- [ ] `APP_SESSION_TIMEOUT`, `APP_FORWARD_HEADERS_STRATEGY`, `APP_TRUST_PROXY_HEADERS`, `APP_DB_DUMP_COMMAND` 도 운영 정책과 현재 compose 기본값 기준으로 확인한다.
 - [ ] backend health 가 `status=UP`, `appStatus=UP`, `dbStatus=UP`, `scaleRegistryStatus=UP` 또는 동등 기준으로 정상 확인되기 전에는 bootstrap 과 운영 스모크 테스트로 넘어가지 않는다.
 
 주의:

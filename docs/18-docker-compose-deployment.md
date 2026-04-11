@@ -71,6 +71,9 @@
 Copy-Item .env.docker.example .env
 ```
 
+이 `.env` 파일은 반드시 `docker-compose.yml` 과 같은 저장소 루트에 둔다.
+다른 폴더에 두면 `docker compose` 가 자동으로 읽지 못한다.
+
 ### 3.1 필수값
 
 - `APP_DB_URL_DOCKER`
@@ -89,29 +92,29 @@ Copy-Item .env.docker.example .env
   - 운영 MariaDB 기준 기본 예시는 `org.mariadb.jdbc.Driver` 다.
   - `docker compose config` 결과에서 비어 있으면 진행하지 않는다.
 
-### 3.2 운영 정책에 따라 조정할 값
+### 3.2 기본값 또는 운영 정책에 따라 확인할 값
 
-- `APP_SESSION_TIMEOUT`
-  - 세션 기반 인증 유지 시간이다.
-- `APP_FORWARD_HEADERS_STRATEGY`
-  - reverse proxy 뒤에서만 실제 운영값으로 조정한다.
-- `APP_TRUST_PROXY_HEADERS`
-  - 신뢰 가능한 내부 reverse proxy 뒤면 `true`, 아니면 `false` 다.
-- `APP_DB_DUMP_COMMAND`
-  - 컨테이너 내부 DB dump 바이너리 절대 경로다.
-  - 현재 공식 backend Docker 이미지에는 `mariadb-dump` / `mysqldump` 가 기본 포함되지 않으므로, 운영 DB dump 는 DB 서버 또는 운영 호스트에서 별도 수행하거나 파생 이미지로 보완한다.
+| 이름 | 현재 기본값 | 의미 | 값을 비우면 |
+|---|---|---|---|
+| `APP_SERVER_PORT` | `8080` | backend 노출 포트이며 frontend 가 backend 에 연결할 때도 같은 값을 기준으로 본다 | `docker-compose.yml` 기본값 `8080` 이 사용된다 |
+| `APP_FRONTEND_PORT` | `4173` | frontend 노출 포트다 | 기본값 `4173` 이 사용된다 |
+| `APP_BACKEND_UPSTREAM_HOST` | `backend` | frontend 컨테이너가 compose 네트워크 안에서 backend 를 찾는 호스트명이다 | 기본값 `backend` 가 사용된다 |
+| `APP_HEALTHCHECK_PATH` | `/api/v1/health` | backend healthcheck 와 운영 확인 URL 에 쓰는 경로다 | 기본값 `/api/v1/health` 가 사용된다 |
+| `APP_SESSION_TIMEOUT` | `120m` | 세션 기반 인증 유지 시간이다 | 기본값 `120m` 이 사용된다 |
+| `APP_FORWARD_HEADERS_STRATEGY` | `none` | reverse proxy 헤더 처리 전략이다 | 기본값 `none` 이 사용된다 |
+| `APP_TRUST_PROXY_HEADERS` | `false` | proxy 헤더를 신뢰할지 여부다 | 기본값 `false` 가 사용된다 |
+| `APP_DB_DUMP_COMMAND` | 빈 값 | 컨테이너 내부 DB dump 바이너리 절대 경로다 | 빈 값이 유지되며 컨테이너 내부 dump 실행은 사용할 수 없다 |
+| `BACKEND_LOGS_HOST_PATH` | `./logs` | backend 파일 로그가 남는 호스트 경로다 | 기본값 `./logs` 가 사용된다 |
+| `BACKEND_TMP_HOST_PATH` | `./tmp` | CSV export 임시 파일이 남는 호스트 경로다 | 기본값 `./tmp` 가 사용된다 |
+| `BACKEND_BACKUPS_HOST_PATH` | `./local-backups` | 백업 파일이 남는 호스트 경로다 | 기본값 `./local-backups` 가 사용된다 |
 
-### 3.3 호스트 경로값
+### 3.3 비전공자용 해석
 
-- `BACKEND_LOGS_HOST_PATH`
-  - 기본값 `./logs`
-  - backend 파일 로그가 남는 호스트 경로다.
-- `BACKEND_TMP_HOST_PATH`
-  - 기본값 `./tmp`
-  - CSV export 임시 파일이 남는 호스트 경로다.
-- `BACKEND_BACKUPS_HOST_PATH`
-  - 기본값 `./local-backups`
-  - backend 가 파일 기반 백업 산출물을 남길 호스트 경로다.
+- `APP_DB_URL_DOCKER` 는 backend 가 붙을 DB 주소다. 이 값이 틀리면 앱은 다른 DB 를 보거나 아예 뜨지 않는다.
+- `APP_DB_USERNAME` 과 `APP_DB_PASSWORD` 는 DB 로그인 정보다. 값이 비면 compose 단계에서 멈춘다.
+- `APP_DB_DRIVER` 는 DB 종류를 알려 주는 값이다. MariaDB 기준 기본값은 `org.mariadb.jdbc.Driver` 다.
+- `APP_HEALTHCHECK_PATH` 기본값은 `/api/v1/health` 이다. 운영자가 앱 상태를 확인할 때도 같은 경로를 본다.
+- `BACKEND_LOGS_HOST_PATH`, `BACKEND_TMP_HOST_PATH`, `BACKEND_BACKUPS_HOST_PATH` 는 컨테이너 밖 실제 폴더다. 경로가 틀리거나 쓰기 불가면 로그, export, 백업 파일이 기대한 곳에 남지 않는다.
 
 ### 3.4 기동 전 실제 반영값 확인
 
@@ -253,19 +256,40 @@ COMMIT;
 
 실제 운영 반영은 2.1 과 3.4 의 중단 조건이 모두 해소된 뒤에만 진행한다.
 
-1. [docs/20-production-input-sheet.md](./20-production-input-sheet.md) 최종 확인 체크 완료
-2. 외부 MariaDB 에 `backend/src/main/resources/schema.sql` 선적용 완료
-3. 루트 `.env` 생성
-4. `.env` 값 입력
-5. `docker compose config` 로 backend 실제 반영값 대조
-6. 컨테이너 기동
+1. example env 복사
 
 ```powershell
-docker compose up -d
+Copy-Item .env.docker.example .env
+```
+
+2. 필수 DB 값 입력
+   - `APP_DB_URL_DOCKER`, `APP_DB_USERNAME`, `APP_DB_PASSWORD`, `APP_DB_DRIVER`
+   - 하나라도 비어 있거나 placeholder 상태면 `docker compose config` 또는 backend 시작 단계에서 멈춘다.
+3. 경로와 기본값 확인
+   - `APP_SERVER_PORT=8080`
+   - `APP_FRONTEND_PORT=4173`
+   - `APP_BACKEND_UPSTREAM_HOST=backend`
+   - `APP_HEALTHCHECK_PATH=/api/v1/health`
+   - `BACKEND_LOGS_HOST_PATH=./logs`
+   - `BACKEND_TMP_HOST_PATH=./tmp`
+   - `BACKEND_BACKUPS_HOST_PATH=./local-backups`
+4. `docker compose config` 로 누락 변수와 실제 치환 결과 점검
+
+```powershell
+docker compose config
+```
+
+5. `docker compose up -d --build` 실행
+
+```powershell
+docker compose up -d --build
 docker compose ps
 ```
 
-7. 기동 직후 health 확인
+6. health endpoint 확인
+   - 기본값 기준 backend 는 `http://127.0.0.1:8080/api/v1/health`
+   - 기본값 기준 frontend 는 `http://127.0.0.1:4173/api/v1/health`
+   - 포트나 path 를 바꿨다면 `http://127.0.0.1:<APP_SERVER_PORT><APP_HEALTHCHECK_PATH>` 와 `http://127.0.0.1:<APP_FRONTEND_PORT><APP_HEALTHCHECK_PATH>` 로 확인한다.
 
 ```powershell
 Invoke-RestMethod -Uri http://127.0.0.1:8080/api/v1/health | ConvertTo-Json -Depth 10
