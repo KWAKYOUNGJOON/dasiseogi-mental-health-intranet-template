@@ -109,9 +109,52 @@
 
 ### 3. 실행 방법
 
-가장 단순한 로컬 확인 경로는 single-container bundle 이고, 기존 분리형 로컬 확인 경로는 Docker Compose와 로컬 DB override를 함께 쓰는 방식입니다.
+기본 로컬 실행 경로는 저장소 루트의 `docker-compose.yml` 을 사용하는 멀티 컨테이너 스택입니다. Windows + Docker Desktop 기준으로는 이 경로만 따라가면 `db / backend / frontend` 가 한 프로젝트 아래에서 함께 올라옵니다.
 
-#### Docker Compose - local single-container bundle 경로
+#### 기본 로컬 실행 경로: Docker Compose 멀티 컨테이너
+
+```bash
+cp .env.docker.example .env
+docker compose config
+docker compose up -d --build
+docker compose ps
+curl -fsS http://127.0.0.1:8080/api/v1/health
+curl -fsS http://127.0.0.1:4173/api/v1/health
+```
+
+- Windows PowerShell에서는 `Copy-Item .env.docker.example .env`
+- 기준 파일은 저장소 루트 [`docker-compose.yml`](./docker-compose.yml) 입니다.
+- Docker Desktop 에서는 프로젝트 이름이 `dasiseogi-mental-health-intranet-template` 으로 보이고, 그 아래에 `db`, `backend`, `frontend` 컨테이너가 보여야 정상입니다.
+- backend 는 compose 네트워크 내부 호스트명 `db` 로 MariaDB 에 접속합니다.
+- 첫 기동에서 DB volume 이 비어 있으면 [`backend/src/main/resources/schema.sql`](./backend/src/main/resources/schema.sql) 이 자동 적용되고, `local` profile 기준 시드 데이터가 들어갑니다.
+- 바로 확인할 수 있는 관리자 계정은 `admina / Test1234!` 입니다.
+- `.env.docker.example` 만 준비하면 되고, `APP_DB_URL_DOCKER` 를 수동으로 채우지 않아도 기본 로컬 경로에서는 compose 내부 DB 주소가 자동으로 사용됩니다.
+
+#### 접속 주소
+
+- 프론트엔드 기본 주소: `http://127.0.0.1:4173`
+- 프론트엔드 경유 health: `http://127.0.0.1:4173/api/v1/health`
+- 백엔드 직접 health: `http://127.0.0.1:8080/api/v1/health`
+- health 경로 기본값은 `APP_HEALTHCHECK_PATH=/api/v1/health` 이고, 포트를 바꿨다면 `http://127.0.0.1:<APP_SERVER_PORT><APP_HEALTHCHECK_PATH>` 와 `http://127.0.0.1:<APP_FRONTEND_PORT><APP_HEALTHCHECK_PATH>` 로 확인하면 됩니다.
+
+#### 재빌드, 중지, 초기화
+
+```bash
+docker compose up -d --build
+docker compose down
+docker compose down -v
+```
+
+- `.env` 값을 바꿨다면 `docker compose up -d --build` 또는 `docker compose up -d --force-recreate` 로 다시 반영합니다.
+- `down -v` 는 로컬 DB volume `local_db_data` 까지 제거하므로, 로컬 데이터를 완전히 초기화할 때만 사용합니다.
+
+#### 호환용 파일
+
+- [`docker-compose.local-db.yml`](./docker-compose.local-db.yml) 은 예전 명령과의 호환을 위한 deprecated no-op 파일입니다.
+- 기존 `docker compose -f docker-compose.yml -f docker-compose.local-db.yml up -d --build` 명령을 써도 결과는 현재 기본 멀티 컨테이너 스택과 같습니다.
+- [`.env.docker.local-db.example`](./.env.docker.local-db.example) 도 같은 이유로 남겨 두었으며, 기본 경로에서는 필수가 아닙니다.
+
+#### 선택형 경로: single-container bundle
 
 ```bash
 docker compose -f docker-compose.single-container.yml config
@@ -120,25 +163,9 @@ docker compose -f docker-compose.single-container.yml ps
 curl -fsS http://127.0.0.1:4173/api/v1/health
 ```
 
+- [`docker-compose.single-container.yml`](./docker-compose.single-container.yml) 은 optional 경로이며, 더 이상 기본 사용 경로가 아닙니다.
 - 서비스는 `bundle` 1개만 올라가며, 컨테이너 내부에서 `MariaDB + Spring Boot backend + Nginx frontend` 가 함께 실행됩니다.
-- 외부 포트는 `4173` 하나만 노출됩니다.
-- 첫 기동 시 MariaDB data directory 가 비어 있으면 DB 초기화, 앱 DB/계정 생성, [`backend/src/main/resources/schema.sql`](./backend/src/main/resources/schema.sql) 적용이 자동으로 수행됩니다.
-- backend 는 `local` profile 로 내부 MariaDB 를 사용하고, DB 가 비어 있으면 seed 데이터가 들어갑니다.
-- 기본 seed 관리자 계정은 `admina / Test1234!` 입니다.
-- MariaDB data 는 named volume 으로 유지되고, backend logs 와 backups 는 각각 `./logs`, `./local-backups` 로 유지됩니다.
 - 상세 동작은 [`docs/local-single-container.md`](./docs/local-single-container.md) 를 참고합니다.
-
-#### 가장 빠른 로컬 확인
-
-```bash
-cp .env.docker.example .env
-docker compose -f docker-compose.yml -f docker-compose.local-db.yml up -d --build
-docker compose -f docker-compose.yml -f docker-compose.local-db.yml ps
-```
-
-- Windows PowerShell에서는 `Copy-Item .env.docker.example .env`
-- 첫 실행에서 volume이 비어 있으면 로컬 MariaDB 스키마와 시드 데이터가 함께 적용됩니다.
-- 바로 확인할 수 있는 관리자 계정은 `admina / Test1234!` 입니다.
 
 #### 백엔드만 직접 실행
 
@@ -162,60 +189,16 @@ npm run dev
 - 현재 Vite 프록시 대상은 `http://host.docker.internal:8080` 입니다.
 - 이 호스트명이 동작하지 않는 환경이면 Docker 경로를 쓰거나 네트워크 구성을 맞춰야 합니다.
 
-#### Docker Compose - 외부 DB 경로
+#### 운영/배포용 경로
 
 ```bash
-cp .env.docker.example .env
-# 저장소 루트 .env 에 필수 DB 값을 실제 값으로 입력
-docker compose config
-docker compose up -d --build
-docker compose ps
-curl -fsS http://127.0.0.1:8080/api/v1/health
+docker compose -f docker-compose.prod.yml --env-file .env.prod config
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+docker compose -f docker-compose.prod.yml --env-file .env.prod ps
 ```
 
-- 기준 파일은 `docker-compose.yml` 입니다.
-- 백엔드와 프론트엔드만 띄우고 DB는 외부 MariaDB를 사용합니다.
-- 현재 운영 문서의 기본 경로는 이 조합입니다.
-- `.env` 파일은 `docker-compose.yml` 과 같은 저장소 루트에 둡니다.
-- 반드시 채워야 하는 값은 `APP_DB_URL_DOCKER`, `APP_DB_USERNAME`, `APP_DB_PASSWORD`, `APP_DB_DRIVER` 입니다.
-- `APP_DB_URL_DOCKER` 는 backend 컨테이너가 접속할 외부 MariaDB 주소, `APP_DB_USERNAME`/`APP_DB_PASSWORD` 는 DB 계정, `APP_DB_DRIVER` 는 JDBC 드라이버입니다.
-- 위 4개 중 하나라도 비어 있거나 placeholder 상태면 `docker compose config` 또는 backend 시작 단계에서 멈추며 backend 가 뜨지 않습니다. 운영 Docker 경로에서는 H2 로 대체되지 않습니다.
-- 기본값으로 같이 확인할 값은 `APP_SERVER_PORT=8080`, `APP_FRONTEND_PORT=4173`, `APP_BACKEND_UPSTREAM_HOST=backend`, `APP_HEALTHCHECK_PATH=/api/v1/health`, `BACKEND_LOGS_HOST_PATH=./logs`, `BACKEND_TMP_HOST_PATH=./tmp`, `BACKEND_BACKUPS_HOST_PATH=./local-backups` 입니다.
-- 운영자가 따라가기 쉬운 최소 순서는 `example env 복사 -> 필수 DB 값 입력 -> 경로 값 확인 -> docker compose config -> docker compose up -d --build -> health 확인` 입니다.
-
-#### Docker Compose - 로컬 DB override 경로
-
-```bash
-cp .env.docker.example .env
-# 필요하면 .env.docker.local-db.example 의 LOCAL_DB_* 값을 .env 에 추가
-docker compose -f docker-compose.yml -f docker-compose.local-db.yml config
-docker compose -f docker-compose.yml -f docker-compose.local-db.yml up -d --build
-docker compose -f docker-compose.yml -f docker-compose.local-db.yml ps
-```
-
-- `docker-compose.local-db.yml` 을 함께 쓰면 backend는 `local` profile로 실행됩니다.
-- 같은 Compose 프로젝트 안에서 `db` 서비스 MariaDB가 함께 실행됩니다.
-- 빈 volume 기준 첫 기동 시 [`backend/src/main/resources/schema.sql`](./backend/src/main/resources/schema.sql) 이 적용되고 시드 데이터도 함께 들어갑니다.
-
-#### 접속 주소
-
-- 백엔드 health 기본값: `http://127.0.0.1:8080/api/v1/health`
-- 프론트엔드 실행 이미지 기본값: `http://127.0.0.1:4173`
-- 프론트엔드 프록시 health 기본값: `http://127.0.0.1:4173/api/v1/health`
-- 프론트엔드 개발 서버: `http://127.0.0.1:5173`
-- health 경로 기본값은 `APP_HEALTHCHECK_PATH=/api/v1/health` 이고, 포트를 바꿨다면 `http://127.0.0.1:<APP_SERVER_PORT><APP_HEALTHCHECK_PATH>` 와 `http://127.0.0.1:<APP_FRONTEND_PORT><APP_HEALTHCHECK_PATH>` 로 확인하면 됩니다.
-
-#### 중지와 초기화
-
-```bash
-docker compose down
-docker compose -f docker-compose.yml -f docker-compose.local-db.yml down
-docker compose -f docker-compose.yml -f docker-compose.local-db.yml down -v
-docker compose -f docker-compose.single-container.yml down
-docker compose -f docker-compose.single-container.yml down -v
-```
-
-- `down -v` 는 로컬 DB volume까지 지울 때만 사용합니다.
+- 로컬 Windows 기본 확인 경로는 위 명령이 아니라 루트 `docker compose up -d --build` 입니다.
+- 운영용 값은 [`.env.prod.example`](./.env.prod.example) 를 참고해 별도 `.env.prod` 로 준비합니다.
 
 #### 시드 데이터
 
@@ -295,9 +278,9 @@ npm run test:e2e:full-stack
 - [`backend/src/main/resources/application-local.yml`](./backend/src/main/resources/application-local.yml): `APP_DB_*` 환경변수를 우선 사용하고, 없으면 H2 파일 DB로 대체하며 시드 데이터가 켜져 있습니다.
 - [`backend/src/main/resources/application-prod.yml`](./backend/src/main/resources/application-prod.yml): `ddl-auto=validate`, `app.seed.enabled=false` 기준으로 동작하며 DB와 로그/백업 경로를 환경변수로 받습니다.
 - [`backend/docker-entrypoint.sh`](./backend/docker-entrypoint.sh): Docker 에서는 `APP_DB_URL_DOCKER` 를 `APP_DB_URL` 로 넘기고, `prod` 경로에서 필수 DB 값이 비어 있거나 placeholder 이거나 H2 URL 이면 즉시 실패합니다.
-- [`.env.docker.example`](./.env.docker.example): `docker-compose.yml` 과 함께 쓰는 기본 Docker 템플릿입니다.
-- [`.env.docker.local-db.example`](./.env.docker.local-db.example): `docker-compose.local-db.yml` 로 로컬 MariaDB를 함께 띄울 때 참고하는 override 예시입니다.
-- [`.env.prod.example`](./.env.prod.example): 현재 운영 문서의 기본 경로인 `docker-compose.yml` + 외부 MariaDB 예시를 먼저 담고, 필요 시 [`docker-compose.prod.yml`](./docker-compose.prod.yml) 용 `PROD_DB_*` 값도 같이 적어 둔 운영 템플릿입니다.
+- [`.env.docker.example`](./.env.docker.example): 저장소 루트 기본 멀티 컨테이너 경로인 `docker compose up -d --build` 와 함께 쓰는 기본 Docker 템플릿입니다.
+- [`.env.docker.local-db.example`](./.env.docker.local-db.example): 예전 `docker-compose.local-db.yml` 명령과의 호환을 위해 남겨 둔 참고 예시이며, 현재 기본 경로에서는 필수가 아닙니다.
+- [`.env.prod.example`](./.env.prod.example): [`docker-compose.prod.yml`](./docker-compose.prod.yml) 용 운영 템플릿입니다.
 - 기본 호스트 경로는 `logs/`, `tmp/`, `local-backups/` 아래를 사용합니다.
 
 #### 운영 시 주의사항
@@ -305,7 +288,7 @@ npm run test:e2e:full-stack
 - 운영 DB 주소, 계정, 비밀번호 같은 실제 비밀값은 저장소에 두지 말고 별도 운영 문서나 비밀 저장소에서 관리해야 합니다.
 - 운영 `prod` 경로는 `spring.jpa.hibernate.ddl-auto=validate` 이므로 앱 기동 전에 [`backend/src/main/resources/schema.sql`](./backend/src/main/resources/schema.sql) 을 먼저 적용해야 합니다.
 - 운영 기준으로는 시드 관리자 자동 생성이 없으므로 초기 관리자 계정은 [`docs/19-production-bootstrap.md`](./docs/19-production-bootstrap.md) 절차로 준비해야 합니다.
-- Docker 운영 경로에서는 `APP_DB_URL_DOCKER`, `APP_DB_USERNAME`, `APP_DB_PASSWORD`, `APP_DB_DRIVER` 중 하나라도 비어 있거나 placeholder 이면 `docker compose config` 또는 backend 시작 단계에서 즉시 실패하므로, 운영 반영 전 `docker compose config` 확인이 필요합니다.
+- [`docker-compose.prod.yml`](./docker-compose.prod.yml) 같은 운영 경로에서는 `APP_DB_URL_DOCKER`, `APP_DB_USERNAME`, `APP_DB_PASSWORD`, `APP_DB_DRIVER` 중 하나라도 비어 있거나 placeholder 이면 `docker compose config` 또는 backend 시작 단계에서 즉시 실패하므로, 운영 반영 전 `docker compose config` 확인이 필요합니다.
 - `/api/v1/health` 는 로그인 없이 열리므로 내부망 또는 프록시 ACL로 접근 범위를 제한하는 편이 안전합니다.
 - `APP_TRUST_PROXY_HEADERS=true` 는 신뢰 가능한 reverse proxy 뒤에서만 켜야 합니다. 그렇지 않으면 활동 로그 IP가 왜곡될 수 있습니다.
 - 백업 이력의 `backupMethod` 는 구분해서 봐야 합니다. `DB_DUMP` 는 DB SQL이 포함된 백업이고, `SNAPSHOT` 은 설정/척도/메타데이터 중심 백업입니다.

@@ -1,6 +1,6 @@
 # Local Single-Container Bundle
 
-`docker-compose.single-container.yml` 은 local 전용 1컨테이너 실행 경로입니다. 기존 `docker-compose.yml`, `docker-compose.local-db.yml`, `docker-compose.prod.yml` 흐름은 그대로 두고, 로컬에서 빠르게 한 번에 확인할 수 있는 번들 이미지를 추가했습니다.
+`docker-compose.single-container.yml` 은 local 전용 선택형 1컨테이너 실행 경로입니다. 기본 로컬 실행 경로는 저장소 루트 `docker compose up -d --build` 로 올라오는 멀티 컨테이너 스택(`db / backend / frontend`) 이며, 이 문서는 single-container 번들이 꼭 필요할 때만 참고합니다.
 
 ## 실행 명령
 

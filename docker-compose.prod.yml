@@ -54,7 +54,7 @@ services:
       - dasiseogi-network
 
   db:
-    image: dasiseogi-db:local
+    image: mariadb:11.4
     restart: always
     environment:
       MARIADB_DATABASE: ${PROD_DB_NAME:?PROD_DB_NAME is required}
