@@ -5,6 +5,7 @@ import com.dasisuhgi.mentalhealth.scale.service.ScaleResourceLoader;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.Ordered;
@@ -119,14 +120,17 @@ public class ReferenceCatalogSynchronizer implements ApplicationRunner {
             throw new IllegalStateException("Alert-type catalog metadata is empty or malformed.");
         }
 
+        List<AlertTypeCatalogResourceItem> items = Objects.requireNonNull(resourceFile.items(), "alertTypeCatalog.items");
         Timestamp syncedAt = Timestamp.valueOf(LocalDateTime.now());
-        for (int index = 0; index < resourceFile.items().size(); index++) {
-            AlertTypeCatalogResourceItem item = resourceFile.items().get(index);
-            if (item == null || item.code() == null || item.code().isBlank()) {
+        for (int index = 0; index < items.size(); index++) {
+            AlertTypeCatalogResourceItem item = Objects.requireNonNull(items.get(index), "alertTypeCatalog.items[" + index + "]");
+            String code = Objects.requireNonNull(item.code(), "alertTypeCatalog code").trim();
+            if (code.isBlank()) {
                 throw new IllegalStateException("Alert-type catalog contains an invalid code.");
             }
-            if (item.label() == null || item.label().isBlank()) {
-                throw new IllegalStateException("Alert-type catalog contains a blank label for code " + item.code());
+            String label = Objects.requireNonNull(item.label(), "alertTypeCatalog label").trim();
+            if (label.isBlank()) {
+                throw new IllegalStateException("Alert-type catalog contains a blank label for code " + code);
             }
 
             int updated = jdbcTemplate.update("""
@@ -136,10 +140,10 @@ public class ReferenceCatalogSynchronizer implements ApplicationRunner {
                                 synced_at = ?
                             WHERE alert_type = ?
                             """,
-                    item.label().trim(),
+                    label,
                     index + 1,
                     syncedAt,
-                    item.code().trim()
+                    code
             );
 
             if (updated == 0) {
@@ -151,8 +155,8 @@ public class ReferenceCatalogSynchronizer implements ApplicationRunner {
                                     synced_at
                                 ) VALUES (?, ?, ?, ?)
                                 """,
-                        item.code().trim(),
-                        item.label().trim(),
+                        code,
+                        label,
                         index + 1,
                         syncedAt
                 );
@@ -168,16 +172,20 @@ public class ReferenceCatalogSynchronizer implements ApplicationRunner {
     }
 
     private void assertNoMissingReference(String sourceTable, String sourceColumn, String referenceTable, String referenceColumn) {
-        Integer invalidReferenceCount = jdbcTemplate.queryForObject("""
+        String query = Objects.requireNonNull("""
                 SELECT COUNT(*)
                 FROM %s source_row
                 LEFT JOIN %s reference_row
                   ON source_row.%s = reference_row.%s
                 WHERE source_row.%s IS NOT NULL
                   AND reference_row.%s IS NULL
-                """.formatted(sourceTable, referenceTable, sourceColumn, referenceColumn, sourceColumn, referenceColumn), Integer.class);
+                """.formatted(sourceTable, referenceTable, sourceColumn, referenceColumn, sourceColumn, referenceColumn), "missing reference query");
+        int invalidReferenceCount = Objects.requireNonNull(
+                jdbcTemplate.queryForObject(query, Integer.class),
+                "invalidReferenceCount"
+        );
 
-        if (invalidReferenceCount != null && invalidReferenceCount > 0) {
+        if (invalidReferenceCount > 0) {
             throw new IllegalStateException(
                     "Reference catalog is missing " + invalidReferenceCount + " value(s) for "
                             + sourceTable + "." + sourceColumn + " -> " + referenceTable + "." + referenceColumn

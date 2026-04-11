@@ -2,7 +2,16 @@ package com.dasisuhgi.mentalhealth.assessment.service;
 
 import com.dasisuhgi.mentalhealth.assessment.dto.AnswerRequest;
 import com.dasisuhgi.mentalhealth.assessment.dto.SelectedScaleRequest;
+import com.dasisuhgi.mentalhealth.assessment.repository.AssessmentQueryRepository;
+import com.dasisuhgi.mentalhealth.assessment.repository.AssessmentSessionRepository;
+import com.dasisuhgi.mentalhealth.assessment.repository.SessionAlertRepository;
+import com.dasisuhgi.mentalhealth.assessment.repository.SessionAnswerRepository;
+import com.dasisuhgi.mentalhealth.assessment.repository.SessionScaleRepository;
+import com.dasisuhgi.mentalhealth.audit.service.ActivityLogService;
+import com.dasisuhgi.mentalhealth.client.repository.ClientRepository;
 import com.dasisuhgi.mentalhealth.common.error.AppException;
+import com.dasisuhgi.mentalhealth.common.security.AccessPolicyService;
+import com.dasisuhgi.mentalhealth.common.sequence.IdentifierGeneratorService;
 import com.dasisuhgi.mentalhealth.scale.registry.ScaleAlertRule;
 import com.dasisuhgi.mentalhealth.scale.registry.ScaleDefinition;
 import com.dasisuhgi.mentalhealth.scale.service.ScaleService;
@@ -10,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,7 +35,27 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AssessmentServiceTest {
     @Mock
+    private AssessmentSessionRepository assessmentSessionRepository;
+    @Mock
+    private SessionScaleRepository sessionScaleRepository;
+    @Mock
+    private SessionAnswerRepository sessionAnswerRepository;
+    @Mock
+    private SessionAlertRepository sessionAlertRepository;
+    @Mock
+    private ClientRepository clientRepository;
+    @Mock
+    private AssessmentQueryRepository assessmentQueryRepository;
+    @Mock
+    private AccessPolicyService accessPolicyService;
+    @Mock
+    private IdentifierGeneratorService identifierGeneratorService;
+    @Mock
+    private SessionSaveFailureSimulator sessionSaveFailureSimulator;
+    @Mock
     private ScaleService scaleService;
+    @Mock
+    private ActivityLogService activityLogService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -34,19 +64,19 @@ class AssessmentServiceTest {
     @BeforeEach
     void setUp() {
         assessmentService = new AssessmentService(
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
+                assessmentSessionRepository,
+                sessionScaleRepository,
+                sessionAnswerRepository,
+                sessionAlertRepository,
+                clientRepository,
+                assessmentQueryRepository,
+                accessPolicyService,
+                identifierGeneratorService,
+                sessionSaveFailureSimulator,
                 scaleService,
                 objectMapper,
                 "테스트 기관",
-                null
+                activityLogService
         );
     }
 
@@ -71,11 +101,7 @@ class AssessmentServiceTest {
         ));
         when(scaleService.getActiveDefinition("CRI")).thenReturn(definition);
 
-        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
-                assessmentService,
-                "evaluateScale",
-                new SelectedScaleRequest("CRI", toCriAnswerRequests(criAnswersForNoCrisis()))
-        ))
+        assertThatThrownBy(() -> invokeEvaluation(new SelectedScaleRequest("CRI", toCriAnswerRequests(criAnswersForNoCrisis()))))
                 .isInstanceOf(AppException.class)
                 .satisfies(exception -> {
                     AppException appException = (AppException) exception;
@@ -113,9 +139,9 @@ class AssessmentServiceTest {
         List<?> matchedAlerts = invokeBuildAlertData(definition, "A", "극도의 위기 단계");
         assertThat(matchedAlerts).hasSize(1);
         Object matchedAlert = matchedAlerts.get(0);
-        assertThat((String) ReflectionTestUtils.invokeMethod(matchedAlert, "code")).isEqualTo("CRI_RESULT_A");
-        assertThat((String) ReflectionTestUtils.invokeMethod(matchedAlert, "message")).isEqualTo("CRI 결과 A: 극도의 위기");
-        assertThat((String) ReflectionTestUtils.invokeMethod(matchedAlert, "triggerValue")).isEqualTo("극도의 위기 단계");
+        assertThat(invokeStringMethod(matchedAlert, "code")).isEqualTo("CRI_RESULT_A");
+        assertThat(invokeStringMethod(matchedAlert, "message")).isEqualTo("CRI 결과 A: 극도의 위기");
+        assertThat(invokeStringMethod(matchedAlert, "triggerValue")).isEqualTo("극도의 위기 단계");
 
         List<?> unmatchedAlerts = invokeBuildAlertData(definition, "B", "A - 극도의 위기");
         assertThat(unmatchedAlerts).isEmpty();
@@ -144,7 +170,7 @@ class AssessmentServiceTest {
                 )
         );
 
-        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(assessmentService, "evaluateScale", request))
+        assertThatThrownBy(() -> invokeEvaluation(request))
                 .isInstanceOf(AppException.class)
                 .satisfies(exception -> {
                     AppException appException = (AppException) exception;
@@ -175,11 +201,10 @@ class AssessmentServiceTest {
                 )
         );
 
-        Object evaluation = ReflectionTestUtils.invokeMethod(assessmentService, "evaluateScale", request);
+        Object evaluation = invokeEvaluation(request);
 
-        assertThat(evaluation).isNotNull();
-        assertThat(((Number) ReflectionTestUtils.invokeMethod(evaluation, "totalScore")).intValue()).isEqualTo(1);
-        assertThat(((List<?>) ReflectionTestUtils.invokeMethod(evaluation, "answers"))).hasSize(13);
+        assertThat(invokeIntMethod(evaluation, "totalScore")).isEqualTo(1);
+        assertThat(invokeListMethod(evaluation, "answers")).hasSize(13);
     }
 
     @Test
@@ -206,12 +231,12 @@ class AssessmentServiceTest {
                 )
         );
 
-        Object evaluation = ReflectionTestUtils.invokeMethod(assessmentService, "evaluateScale", request);
+        Object evaluation = invokeEvaluation(request);
 
-        assertThat(((Number) ReflectionTestUtils.invokeMethod(evaluation, "totalScore")).intValue()).isEqualTo(7);
-        assertThat((String) ReflectionTestUtils.invokeMethod(evaluation, "resultLevelCode")).isEqualTo("POSITIVE_SCREEN");
-        assertThat((String) ReflectionTestUtils.invokeMethod(evaluation, "resultLevel")).isEqualTo("양성 의심");
-        assertThat(((List<?>) ReflectionTestUtils.invokeMethod(evaluation, "answers"))).hasSize(14);
+        assertThat(invokeIntMethod(evaluation, "totalScore")).isEqualTo(7);
+        assertThat(invokeStringMethod(evaluation, "resultLevelCode")).isEqualTo("POSITIVE_SCREEN");
+        assertThat(invokeStringMethod(evaluation, "resultLevel")).isEqualTo("양성 의심");
+        assertThat(invokeListMethod(evaluation, "answers")).hasSize(14);
     }
 
     private void assertCriEvaluation(
@@ -225,16 +250,11 @@ class AssessmentServiceTest {
             int expectedSupportTotal,
             int expectedRisk8PlusMental
     ) {
-        Object evaluation = ReflectionTestUtils.invokeMethod(
-                assessmentService,
-                "evaluateScale",
-                new SelectedScaleRequest("CRI", toCriAnswerRequests(rawAnswers))
-        );
+        Object evaluation = invokeEvaluation(new SelectedScaleRequest("CRI", toCriAnswerRequests(rawAnswers)));
 
-        assertThat(evaluation).isNotNull();
-        assertThat(((Number) ReflectionTestUtils.invokeMethod(evaluation, "totalScore")).intValue()).isEqualTo(expectedTotalScore);
-        assertThat((String) ReflectionTestUtils.invokeMethod(evaluation, "resultLevelCode")).isEqualTo(expectedCode);
-        assertThat((String) ReflectionTestUtils.invokeMethod(evaluation, "resultLevel")).isEqualTo(expectedDisplayLabel);
+        assertThat(invokeIntMethod(evaluation, "totalScore")).isEqualTo(expectedTotalScore);
+        assertThat(invokeStringMethod(evaluation, "resultLevelCode")).isEqualTo(expectedCode);
+        assertThat(invokeStringMethod(evaluation, "resultLevel")).isEqualTo(expectedDisplayLabel);
         assertThat(readResultDetailValue(evaluation, "selfOtherTotal")).isEqualTo(Integer.toString(expectedSelfOtherTotal));
         assertThat(readResultDetailValue(evaluation, "mentalTotal")).isEqualTo(Integer.toString(expectedMentalTotal));
         assertThat(readResultDetailValue(evaluation, "functionTotal")).isEqualTo(Integer.toString(expectedFunctionTotal));
@@ -243,7 +263,7 @@ class AssessmentServiceTest {
     }
 
     private List<?> invokeBuildAlertData(ScaleDefinition definition, String resultLevelCode, String resultLevel) {
-        return (List<?>) ReflectionTestUtils.invokeMethod(
+        return invokeListMethod(
                 assessmentService,
                 "buildAlertData",
                 definition,
@@ -255,19 +275,47 @@ class AssessmentServiceTest {
     }
 
     private String readResultDetailValue(Object evaluation, String key) {
-        List<?> resultDetails = (List<?>) ReflectionTestUtils.invokeMethod(evaluation, "resultDetails");
+        List<?> resultDetails = invokeListMethod(evaluation, "resultDetails");
         return resultDetails.stream()
-                .filter(detail -> key.equals(ReflectionTestUtils.invokeMethod(detail, "key")))
-                .map(detail -> (String) ReflectionTestUtils.invokeMethod(detail, "value"))
+                .filter(detail -> key.equals(invokeStringMethod(detail, "key")))
+                .map(detail -> invokeStringMethod(detail, "value"))
                 .findFirst()
                 .orElseThrow();
     }
 
     private ScaleDefinition loadScaleDefinition(String filename) throws Exception {
         try (InputStream inputStream = AssessmentServiceTest.class.getResourceAsStream("/scales/" + filename)) {
-            assertThat(inputStream).isNotNull();
-            return objectMapper.readValue(inputStream, ScaleDefinition.class);
+            return objectMapper.readValue(Objects.requireNonNull(inputStream, "scale definition: " + filename), ScaleDefinition.class);
         }
+    }
+
+    private Object invokeEvaluation(SelectedScaleRequest request) {
+        return invokeRequiredMethod(assessmentService, "evaluateScale", request);
+    }
+
+    private Object invokeRequiredMethod(Object target, String methodName, Object... args) {
+        return Objects.requireNonNull(
+                ReflectionTestUtils.invokeMethod(target, methodName, args),
+                methodName + " should not return null"
+        );
+    }
+
+    private String invokeStringMethod(Object target, String methodName, Object... args) {
+        Object result = invokeRequiredMethod(target, methodName, args);
+        assertThat(result).isInstanceOf(String.class);
+        return (String) result;
+    }
+
+    private int invokeIntMethod(Object target, String methodName, Object... args) {
+        Object result = invokeRequiredMethod(target, methodName, args);
+        assertThat(result).isInstanceOf(Number.class);
+        return ((Number) result).intValue();
+    }
+
+    private List<?> invokeListMethod(Object target, String methodName, Object... args) {
+        Object result = invokeRequiredMethod(target, methodName, args);
+        assertThat(result).isInstanceOf(List.class);
+        return (List<?>) result;
     }
 
     private ScaleDefinition createCriDefinitionWithResultLevelLabels(Map<String, String> resultLevelLabels) {

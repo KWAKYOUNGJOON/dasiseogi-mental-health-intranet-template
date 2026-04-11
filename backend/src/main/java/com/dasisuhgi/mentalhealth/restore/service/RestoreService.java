@@ -45,6 +45,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
@@ -127,7 +128,7 @@ public class RestoreService {
         this.datasourcePassword = datasourcePassword;
         this.dbImportCommand = dbImportCommand;
         this.dbImportTimeoutSeconds = dbImportTimeoutSeconds > 0 ? dbImportTimeoutSeconds : DEFAULT_IMPORT_TIMEOUT_SECONDS;
-        this.writeTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.writeTransactionTemplate = new TransactionTemplate(Objects.requireNonNull(transactionManager, "transactionManager"));
         this.writeTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
     }
 
@@ -310,9 +311,12 @@ public class RestoreService {
 
         ManualBackupRunResponse preBackupResult;
         try {
-            preBackupResult = backupService.runPreRestoreBackup(
-                    "restoreId=" + history.getId() + " pre-restore backup",
-                    currentUser
+            preBackupResult = Objects.requireNonNull(
+                    backupService.runPreRestoreBackup(
+                            "restoreId=" + history.getId() + " pre-restore backup",
+                            currentUser
+                    ),
+                    "preRestoreBackupResult"
             );
         } catch (Exception exception) {
             String failureReason = buildFailureReason(exception);
@@ -332,8 +336,8 @@ public class RestoreService {
             return buildExecuteResponse(history, "복원 직전 자동 백업에 실패했습니다.");
         }
 
-        history.setPreBackupId(preBackupResult.backupId());
-        history.setPreBackupFileName(preBackupResult.fileName());
+        history.setPreBackupId(Objects.requireNonNull(preBackupResult.backupId(), "preRestoreBackupResult.backupId"));
+        history.setPreBackupFileName(Objects.requireNonNull(preBackupResult.fileName(), "preRestoreBackupResult.fileName"));
         history.setStatus(RestoreStatus.RESTORING);
         history = saveRestoreHistory(history);
 
@@ -409,7 +413,8 @@ public class RestoreService {
 
     private RestoreHistory saveRestoreHistory(RestoreHistory history) {
         return executeInWriteTransaction(() -> {
-            if (history.getId() != null && restoreHistoryRepository.existsById(history.getId())) {
+            Long historyId = history.getId();
+            if (historyId != null && restoreHistoryRepository.existsById(historyId)) {
                 return restoreHistoryRepository.saveAndFlush(history);
             }
             insertRestoreHistory(history);
@@ -1273,7 +1278,7 @@ public class RestoreService {
     private record ValidationResult(
             String formatVersion,
             String datasourceType,
-            Long backupId,
+            long backupId,
             List<RestoreDetectedItemResponse> detectedItems
     ) {
     }
@@ -1295,7 +1300,7 @@ public class RestoreService {
     private record ManifestData(
             String formatVersion,
             String datasourceType,
-            Long backupId,
+            long backupId,
             ManifestSummaryData summary,
             List<ManifestEntryData> entries
     ) {
