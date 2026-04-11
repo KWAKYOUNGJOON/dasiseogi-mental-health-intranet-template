@@ -1,0 +1,45 @@
+name: dasiseogi-single-container
+
+services:
+  bundle:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/single-container/Dockerfile
+    image: dasiseogi-single-container:local
+    environment:
+      TZ: Asia/Seoul
+      SPRING_PROFILES_ACTIVE: local
+      APP_SERVER_PORT: 8080
+      APP_FRONTEND_PORT: 4173
+      APP_HEALTHCHECK_PATH: /api/v1/health
+      MARIADB_PORT: 3306
+      APP_DB_NAME: mental_health_local
+      APP_DB_USERNAME: mental_user
+      APP_DB_PASSWORD: mental_pass
+      APP_DB_DRIVER: org.mariadb.jdbc.Driver
+      APP_SEED_ENABLED: "true"
+      APP_BACKUP_ROOT_PATH: /data/backups
+      APP_EXPORT_TEMP_PATH: /data/tmp/exports
+      APP_DB_DUMP_COMMAND: mariadb-dump
+      LOGGING_FILE_PATH: /data/logs
+      APP_LOG_FILE_PATH: /data/logs
+    volumes:
+      - single_container_mariadb_data:/var/lib/mysql
+      - ./logs:/data/logs
+      - ./local-backups:/data/backups
+    ports:
+      - "4173:4173"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:4173/api/v1/health > /dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+
+volumes:
+  single_container_mariadb_data:

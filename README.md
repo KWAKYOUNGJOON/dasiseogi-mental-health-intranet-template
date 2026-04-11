@@ -87,11 +87,20 @@
 │   ├── src/
 │   ├── tests/
 │   └── e2e/
+├── docker/
+│   └── single-container/
+│       ├── Dockerfile
+│       ├── entrypoint.sh
+│       ├── init-db.sh
+│       ├── nginx.conf
+│       └── supervisord.conf
 ├── docs/
+│   └── local-single-container.md
 ├── scripts/
 ├── local-backups/
 ├── docker-compose.yml
 ├── docker-compose.local-db.yml
+├── docker-compose.single-container.yml
 ├── docker-compose.prod.yml
 ├── .env.docker.example
 ├── .env.docker.local-db.example
@@ -100,7 +109,24 @@
 
 ### 3. 실행 방법
 
-가장 재현하기 쉬운 로컬 확인 경로는 Docker Compose와 로컬 DB override를 함께 쓰는 방식입니다.
+가장 단순한 로컬 확인 경로는 single-container bundle 이고, 기존 분리형 로컬 확인 경로는 Docker Compose와 로컬 DB override를 함께 쓰는 방식입니다.
+
+#### Docker Compose - local single-container bundle 경로
+
+```bash
+docker compose -f docker-compose.single-container.yml config
+docker compose -f docker-compose.single-container.yml up -d --build
+docker compose -f docker-compose.single-container.yml ps
+curl -fsS http://127.0.0.1:4173/api/v1/health
+```
+
+- 서비스는 `bundle` 1개만 올라가며, 컨테이너 내부에서 `MariaDB + Spring Boot backend + Nginx frontend` 가 함께 실행됩니다.
+- 외부 포트는 `4173` 하나만 노출됩니다.
+- 첫 기동 시 MariaDB data directory 가 비어 있으면 DB 초기화, 앱 DB/계정 생성, [`backend/src/main/resources/schema.sql`](./backend/src/main/resources/schema.sql) 적용이 자동으로 수행됩니다.
+- backend 는 `local` profile 로 내부 MariaDB 를 사용하고, DB 가 비어 있으면 seed 데이터가 들어갑니다.
+- 기본 seed 관리자 계정은 `admina / Test1234!` 입니다.
+- MariaDB data 는 named volume 으로 유지되고, backend logs 와 backups 는 각각 `./logs`, `./local-backups` 로 유지됩니다.
+- 상세 동작은 [`docs/local-single-container.md`](./docs/local-single-container.md) 를 참고합니다.
 
 #### 가장 빠른 로컬 확인
 
@@ -185,6 +211,8 @@ docker compose -f docker-compose.yml -f docker-compose.local-db.yml ps
 docker compose down
 docker compose -f docker-compose.yml -f docker-compose.local-db.yml down
 docker compose -f docker-compose.yml -f docker-compose.local-db.yml down -v
+docker compose -f docker-compose.single-container.yml down
+docker compose -f docker-compose.single-container.yml down -v
 ```
 
 - `down -v` 는 로컬 DB volume까지 지울 때만 사용합니다.
