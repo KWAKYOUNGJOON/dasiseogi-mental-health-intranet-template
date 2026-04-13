@@ -28,6 +28,17 @@ function getClientIdFromUrl(url: string) {
   return clientId
 }
 
+function getSessionIdFromUrl(url: string) {
+  const matchedSessionId = new URL(url).pathname.match(/\/assessments\/sessions\/(\d+)$/)?.[1]
+  const sessionId = Number(matchedSessionId)
+
+  if (!Number.isInteger(sessionId) || sessionId <= 0) {
+    throw new Error(`Could not parse a session id from URL: ${url}`)
+  }
+
+  return sessionId
+}
+
 async function expectLoginScreen(page: Page) {
   await expect(page).toHaveURL(LOGIN_PATH_PATTERN)
   await expect(page.getByRole('heading', { name: LOGIN_HEADING })).toBeVisible()
@@ -206,6 +217,10 @@ async function openClientDetailFromList(page: Page, clientName: string) {
   await expect(page.getByRole('heading', { name: `${clientName} 상세` })).toBeVisible()
 }
 
+function getSessionDetailField(page: Page, label: string) {
+  return page.locator('.card.grid-2 .field').filter({ hasText: label }).locator('strong').first()
+}
+
 async function markCurrentClientMisregistered(page: Page, reason: string) {
   await page.getByRole('button', { name: '오등록 처리' }).click()
 
@@ -218,6 +233,22 @@ async function markCurrentClientMisregistered(page: Page, reason: string) {
   await expect(page.getByText('오등록 처리되었습니다.')).toBeVisible()
   await expect(page.getByText('오등록', { exact: true })).toBeVisible()
   await expect(page.getByText(reason)).toBeVisible()
+}
+
+async function searchAssessmentRecords(
+  page: Page,
+  input: {
+    clientName: string
+    includeMisentered: boolean
+  },
+) {
+  await page.goto('/assessment-records')
+  await expect(page).toHaveURL(ASSESSMENT_RECORDS_PATH_PATTERN)
+  await expect(page.getByRole('heading', { name: '검사기록 목록' })).toBeVisible()
+
+  await page.getByPlaceholder('대상자명').fill(input.clientName)
+  await setCheckboxState(page.getByLabel('오입력 포함'), input.includeMisentered)
+  await page.getByRole('button', { name: '조회' }).click()
 }
 
 async function answerQuestion(page: Page, questionIndex: number, optionIndex: number) {
@@ -263,6 +294,8 @@ async function createPhq9SessionThroughUi(
   await expect(page).toHaveURL(/\/assessments\/sessions\/\d+/)
   await expect(page.getByRole('heading', { name: '세션 상세' })).toBeVisible()
 
+  const detailUrl = page.url()
+
   const sessionNo = (await page.locator('.card.grid-2 .field').filter({ hasText: '세션번호' }).locator('strong').first().textContent())?.trim()
 
   if (!sessionNo) {
@@ -270,8 +303,21 @@ async function createPhq9SessionThroughUi(
   }
 
   return {
+    detailUrl,
+    sessionId: getSessionIdFromUrl(detailUrl),
     sessionNo,
   }
+}
+
+async function markCurrentSessionMisentered(page: Page, reason: string) {
+  await page.getByRole('button', { name: '오입력 처리' }).click()
+
+  const dialog = page.getByRole('dialog')
+
+  await expect(dialog.getByRole('heading', { name: '세션 오입력 처리' })).toBeVisible()
+  await expect(dialog.getByText('세션과 하위 결과는 유지한 채 상태만 MISENTERED로 변경합니다.')).toBeVisible()
+  await dialog.getByRole('textbox').fill(reason)
+  await dialog.getByRole('button', { name: '오입력 처리' }).click()
 }
 
 test.describe('실브라우저 핵심 업무 흐름', () => {
@@ -393,5 +439,110 @@ test.describe('실브라우저 핵심 업무 흐름', () => {
     const recentSessionRow = page.locator('tbody tr').filter({ hasText: sessionNo }).first()
     await expect(recentSessionRow).toContainText('있음')
     await expect(recentSessionRow.getByRole('link', { name: '세션 상세' })).toBeVisible()
+  })
+
+  test('관리자는 저장된 검사 세션을 UI에서 오입력 처리하고 상태 반영과 접근 정책을 검증한다', async ({ page }) => {
+    test.slow()
+
+    const token = createUniqueToken()
+    const clientName = `PW 세션 오입력 ${token}`
+    const sessionMemo = `Playwright 세션 오입력 검증 ${token}`
+    const misenteredReason = `Playwright 세션 오입력 사유 ${token}`
+
+    await login(page, ADMIN_LOGIN_ID, DEFAULT_PASSWORD, '관리자A')
+
+    const client = await createClientThroughUi(page, {
+      name: clientName,
+      gender: 'FEMALE',
+      birthDate: '19940315',
+      phone: '01045678901',
+    })
+
+    const { detailUrl, sessionId, sessionNo } = await createPhq9SessionThroughUi(page, {
+      clientName,
+      memo: sessionMemo,
+    })
+
+    await expect(page.getByText('세션이 저장되었습니다.')).toBeVisible()
+    await expect(getSessionDetailField(page, '세션번호')).toHaveText(sessionNo)
+    await expect(getSessionDetailField(page, '상태')).toHaveText('완료')
+    await expect(getSessionDetailField(page, '세션 메모')).toHaveText(sessionMemo)
+    await expect(page.locator('[data-testid="session-scale-PHQ9"]')).toContainText('총점 1 / 최소')
+    await expect(page.getByText('[PHQ-9] 9번 문항 응답으로 인해 추가 안전 확인이 필요합니다.')).toBeVisible()
+
+    await searchAssessmentRecords(page, { clientName, includeMisentered: false })
+
+    const completedRecordRow = page.locator('tbody tr').filter({ hasText: clientName }).first()
+    const completedRecordDetailLink = completedRecordRow.getByRole('link', { name: '상세 보기' })
+
+    await expect(completedRecordRow).toContainText('PHQ-9')
+    await expect(completedRecordRow).toContainText('최소')
+    await expect(completedRecordRow.locator('[data-status="COMPLETED"]')).toHaveText('정상')
+    await expect(
+      completedRecordDetailLink,
+    ).toHaveAttribute('href', new RegExp(`/assessments/sessions/${sessionId}\\?highlightScaleCode=PHQ9`))
+
+    await page.goto(client.detailUrl)
+    await expect(page.getByRole('heading', { name: `${clientName} 상세` })).toBeVisible()
+    await expect(page.getByText('최근 검사 세션')).toBeVisible()
+
+    const recentSessionRow = page.locator('tbody tr').filter({ hasText: sessionNo }).first()
+    const recentSessionDetailLink = recentSessionRow.getByRole('link', { name: '세션 상세' })
+
+    await expect(recentSessionRow).toContainText('있음')
+    await expect(recentSessionDetailLink).toHaveAttribute('href', `/assessments/sessions/${sessionId}`)
+    await recentSessionDetailLink.click()
+
+    await expect(page).toHaveURL(new RegExp(`/assessments/sessions/${sessionId}$`))
+    await expect(page.url()).toBe(detailUrl)
+    await expect(getSessionDetailField(page, '세션번호')).toHaveText(sessionNo)
+
+    await markCurrentSessionMisentered(page, misenteredReason)
+
+    await expect(page.getByText('오입력 처리되었습니다.')).toBeVisible()
+    await expect(getSessionDetailField(page, '세션번호')).toHaveText(sessionNo)
+    await expect(getSessionDetailField(page, '상태')).toHaveText('오입력')
+    await expect(getSessionDetailField(page, '세션 메모')).toHaveText(sessionMemo)
+    await expect(getSessionDetailField(page, '오입력 처리 시각')).not.toHaveText('-')
+    await expect(getSessionDetailField(page, '처리자')).toHaveText('관리자A')
+    await expect(getSessionDetailField(page, '사유')).toHaveText(misenteredReason)
+    await expect(page.locator('[data-testid="session-scale-PHQ9"]')).toContainText('총점 1 / 최소')
+    await expect(page.getByText('[PHQ-9] 9번 문항 응답으로 인해 추가 안전 확인이 필요합니다.')).toBeVisible()
+    await expect(page.getByRole('button', { name: '오입력 처리' })).toHaveCount(0)
+
+    await searchAssessmentRecords(page, { clientName, includeMisentered: false })
+    await expect(page.getByText('조회된 검사기록이 없습니다.')).toBeVisible()
+
+    await searchAssessmentRecords(page, { clientName, includeMisentered: true })
+
+    const misenteredRecordRow = page.locator('tbody tr').filter({ hasText: clientName }).first()
+    const misenteredRecordDetailLink = misenteredRecordRow.getByRole('link', { name: '상세 보기' })
+
+    await expect(misenteredRecordRow).toContainText('PHQ-9')
+    await expect(misenteredRecordRow.locator('[data-status="MISENTERED"]')).toHaveText('오입력')
+    await expect(
+      misenteredRecordDetailLink,
+    ).toHaveAttribute('href', new RegExp(`/assessments/sessions/${sessionId}\\?highlightScaleCode=PHQ9`))
+    await misenteredRecordDetailLink.click()
+
+    await expect(page).toHaveURL(new RegExp(`/assessments/sessions/${sessionId}\\?highlightScaleCode=PHQ9`))
+    await expect(getSessionDetailField(page, '세션번호')).toHaveText(sessionNo)
+    await expect(getSessionDetailField(page, '상태')).toHaveText('오입력')
+    await expect(getSessionDetailField(page, '사유')).toHaveText(misenteredReason)
+    await expect(page.getByTestId('session-scale-PHQ9')).toHaveAttribute('data-highlighted', 'true')
+
+    await page.goto(client.detailUrl)
+    await expect(page.getByRole('heading', { name: `${clientName} 상세` })).toBeVisible()
+    await expect(page.getByText('아직 저장된 검사 세션이 없습니다.')).toBeVisible()
+
+    await logout(page)
+
+    await login(page, USER_LOGIN_ID, DEFAULT_PASSWORD, '사용자A')
+    await searchAssessmentRecords(page, { clientName, includeMisentered: true })
+    await expect(page.getByText('조회된 검사기록이 없습니다.')).toBeVisible()
+
+    await page.goto(`/assessments/sessions/${sessionId}`)
+    await expect(page.getByText('세션 상세를 볼 수 없습니다.')).toBeVisible()
+    await expect(page.getByText('해당 세션을 조회할 권한이 없습니다.')).toBeVisible()
   })
 })
