@@ -1,8 +1,34 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { getDefaultStatisticsSeoulDateRange } from '../../src/shared/utils/dateText'
 
 const ADMIN_LOGIN_ID = 'admina'
 const DEFAULT_PASSWORD = 'Test1234!'
 const CLIENT_LIST_PATH_PATTERN = /\/clients$/
+const ALERT_PAGE_SIZE = 10
+const FUTURE_DATE = '2099-01-01'
+const PHQ9_CRITICAL_ALERT_TEXT = '9번 문항 응답으로 인해 추가 안전 확인이 필요합니다.'
+const GAD7_CAUTION_ALERT_TEXT = '불안 증상 추가 평가 권고'
+
+type SingleScaleAssessmentInput = {
+  checkboxName: RegExp
+  inputHeading: string
+  summaryRowName: string
+  optionIndexes: number[]
+}
+
+const PHQ9_CRITICAL_INPUT: SingleScaleAssessmentInput = {
+  checkboxName: /PHQ-9/,
+  inputHeading: 'PHQ-9 입력',
+  summaryRowName: 'PHQ-9',
+  optionIndexes: [0, 0, 0, 0, 0, 0, 0, 0, 1],
+}
+
+const GAD7_CAUTION_INPUT: SingleScaleAssessmentInput = {
+  checkboxName: /GAD-7/,
+  inputHeading: 'GAD-7 입력',
+  summaryRowName: 'GAD-7',
+  optionIndexes: [2, 2, 2, 2, 2, 0, 0],
+}
 
 function createUniqueToken() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.slice(0, 12)
@@ -34,7 +60,7 @@ function getSessionDetailField(page: Page, label: string) {
 }
 
 function getStatisticsSection(page: Page, heading: string) {
-  return page.locator('.card.stack').filter({ has: page.getByRole('heading', { name: heading }) }).first()
+  return page.getByRole('heading', { name: heading }).locator('xpath=ancestor::div[contains(@class, "card") and contains(@class, "stack")][1]')
 }
 
 async function expectLoginScreen(page: Page) {
@@ -105,6 +131,10 @@ async function createClientThroughUi(
 
   await expect(page).toHaveURL(/\/clients\/\d+$/)
   await expect(page.getByRole('heading', { name: `${input.name} 상세` })).toBeVisible()
+
+  return {
+    detailUrl: page.url(),
+  }
 }
 
 async function answerQuestion(page: Page, questionIndex: number, optionIndex: number) {
@@ -113,36 +143,32 @@ async function answerQuestion(page: Page, questionIndex: number, optionIndex: nu
   await question.locator('label.assessment-option').nth(optionIndex).click()
 }
 
-async function createPhq9SessionThroughUi(
+async function createSingleScaleSessionFromCurrentClientDetail(
   page: Page,
   input: {
-    clientName: string
     memo: string
+    scale: SingleScaleAssessmentInput
   },
 ) {
-  await searchClients(page, input.clientName, false)
-  await openClientDetailFromList(page, input.clientName)
-
   await page.getByRole('link', { name: '검사 시작' }).click()
 
   await expect(page).toHaveURL(/\/assessments\/start\/\d+(?:\/scales)?$/)
   await expect(page.getByRole('heading', { name: '척도 선택' })).toBeVisible()
 
-  await page.getByRole('checkbox', { name: /PHQ-9/ }).check()
+  await page.getByRole('checkbox', { name: input.scale.checkboxName }).check()
   await page.getByRole('button', { name: '검사 시작' }).click()
 
-  await expect(page.getByRole('heading', { name: 'PHQ-9 입력' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: input.scale.inputHeading })).toBeVisible()
 
-  for (let questionIndex = 0; questionIndex < 8; questionIndex += 1) {
-    await answerQuestion(page, questionIndex, 0)
+  for (const [questionIndex, optionIndex] of input.scale.optionIndexes.entries()) {
+    await answerQuestion(page, questionIndex, optionIndex)
   }
-  await answerQuestion(page, 8, 1)
 
-  await expect(page.getByText('응답 완료 9 / 9')).toBeVisible()
+  await expect(page.getByText(`응답 완료 ${input.scale.optionIndexes.length} / ${input.scale.optionIndexes.length}`)).toBeVisible()
   await page.getByRole('button', { name: '다음' }).click()
 
   await expect(page.getByRole('heading', { name: '세션 요약' })).toBeVisible()
-  await expect(page.locator('tbody tr').filter({ hasText: 'PHQ-9' }).first()).toBeVisible()
+  await expect(page.locator('tbody tr').filter({ hasText: input.scale.summaryRowName }).first()).toBeVisible()
 
   await page.getByLabel('세션 메모').fill(input.memo)
   await page.getByRole('button', { name: '세션 저장' }).click()
@@ -157,6 +183,39 @@ async function createPhq9SessionThroughUi(
   return {
     sessionId: getSessionIdFromUrl(detailUrl),
   }
+}
+
+async function createSingleScaleSessionFromClientDetailUrl(
+  page: Page,
+  input: {
+    clientDetailUrl: string
+    memo: string
+    scale: SingleScaleAssessmentInput
+  },
+) {
+  await page.goto(input.clientDetailUrl)
+  await expect(page.getByRole('link', { name: '검사 시작' })).toBeVisible()
+
+  return createSingleScaleSessionFromCurrentClientDetail(page, {
+    memo: input.memo,
+    scale: input.scale,
+  })
+}
+
+async function createPhq9SessionThroughUi(
+  page: Page,
+  input: {
+    clientName: string
+    memo: string
+  },
+) {
+  await searchClients(page, input.clientName, false)
+  await openClientDetailFromList(page, input.clientName)
+
+  return createSingleScaleSessionFromCurrentClientDetail(page, {
+    memo: input.memo,
+    scale: PHQ9_CRITICAL_INPUT,
+  })
 }
 
 async function markCurrentSessionMisentered(page: Page, reason: string) {
@@ -193,6 +252,8 @@ async function runStatisticsQuery(
   await page.getByLabel('시작일').fill(input.dateFrom)
   await page.getByLabel('종료일').fill(input.dateTo)
   await expect(page.getByLabel('경고 척도').locator('option[value="PHQ9"]')).toHaveCount(1)
+  await expect(page.getByLabel('경고 척도').locator('option[value="GAD7"]')).toHaveCount(1)
+  await expect(page.getByLabel('경고 유형').locator('option[value="CAUTION"]')).toHaveCount(1)
   await expect(page.getByLabel('경고 유형').locator('option[value="CRITICAL_ITEM"]')).toHaveCount(1)
   await page.getByLabel('경고 척도').selectOption(input.alertScaleCode ?? '')
   await page.getByLabel('경고 유형').selectOption(input.alertType ?? '')
@@ -226,20 +287,53 @@ async function getScaleTableCounts(page: Page, scaleName: string) {
 }
 
 async function getAlertRecordTotalCount(page: Page) {
+  return (await getAlertRecordSummary(page)).totalItems
+}
+
+async function getAlertRecordSummary(page: Page) {
+  const section = getStatisticsSection(page, '경고 기록')
+
+  if (await section.getByText('경고 기록이 없습니다.').isVisible()) {
+    return {
+      page: 0,
+      totalItems: 0,
+    }
+  }
+
+  const summaryText = await section.getByText(/\d+건 \/ \d+페이지/).first().textContent()
+  const matchedSummary = summaryText?.match(/(\d+)건 \/ (\d+)페이지/)
+
+  if (!matchedSummary) {
+    throw new Error(`Could not parse alert summary from text: ${summaryText}`)
+  }
+
+  return {
+    page: Number(matchedSummary[2]),
+    totalItems: Number(matchedSummary[1]),
+  }
+}
+
+async function getAlertRecordRowCount(page: Page) {
   const section = getStatisticsSection(page, '경고 기록')
 
   if (await section.getByText('경고 기록이 없습니다.').isVisible()) {
     return 0
   }
 
-  const summaryText = await section.getByText(/\d+건 \/ \d+페이지/).first().textContent()
-  const matchedCount = summaryText?.match(/(\d+)건/)
+  return section.locator('tbody tr').count()
+}
 
-  if (!matchedCount) {
-    throw new Error(`Could not parse alert total count from text: ${summaryText}`)
-  }
+async function goToNextAlertPage(page: Page, expectedPage: number) {
+  await Promise.all([
+    page.waitForResponse((response) => {
+      if (!response.url().includes('/api/v1/statistics/alerts') || !response.ok()) {
+        return false
+      }
 
-  return Number(matchedCount[1])
+      return new URL(response.url()).searchParams.get('page') === String(expectedPage)
+    }),
+    page.getByRole('button', { name: '다음' }).click(),
+  ])
 }
 
 test.describe('실브라우저 통계 오입력 반영', () => {
@@ -337,5 +431,132 @@ test.describe('실브라우저 통계 오입력 반영', () => {
     await expect(getSessionDetailField(page, '대상자')).toHaveText(normalClientName)
     await expect(getSessionDetailField(page, '상태')).toHaveText('완료')
     await expect(page.getByTestId('session-scale-PHQ9')).toHaveAttribute('data-highlighted', 'true')
+  })
+})
+
+test.describe('실브라우저 통계 필터와 페이지네이션', () => {
+  test('통계 화면은 날짜 범위와 경고 필터, 페이지네이션을 실제 브라우저에서 반영한다', async ({ page }) => {
+    test.slow()
+
+    const token = createUniqueToken()
+    const statisticsClientName = `PW 통계 필터 대상자 ${token}`
+    const defaultDateRange = getDefaultStatisticsSeoulDateRange()
+    const today = defaultDateRange.dateTo
+
+    await login(page, ADMIN_LOGIN_ID, DEFAULT_PASSWORD, '관리자A')
+
+    await page.goto('/statistics')
+    await waitForStatisticsPage(page)
+
+    await expect(page.getByLabel('시작일')).toHaveValue(defaultDateRange.dateFrom)
+    await expect(page.getByLabel('종료일')).toHaveValue(defaultDateRange.dateTo)
+    await expect(getStatisticsSection(page, '현재 운영 척도').locator('table.table')).toBeVisible()
+    await expect(getStatisticsSection(page, '경고 기록')).toBeVisible()
+
+    await runStatisticsQuery(page, {
+      dateFrom: today,
+      dateTo: today,
+      alertScaleCode: 'PHQ9',
+      alertType: 'CRITICAL_ITEM',
+    })
+    const baselinePhq9CriticalCount = await getAlertRecordTotalCount(page)
+
+    await runStatisticsQuery(page, {
+      dateFrom: today,
+      dateTo: today,
+      alertScaleCode: 'GAD7',
+      alertType: 'CAUTION',
+    })
+    const baselineGad7CautionCount = await getAlertRecordTotalCount(page)
+
+    const createdClient = await createClientThroughUi(page, {
+      name: statisticsClientName,
+      gender: 'MALE',
+      birthDate: '19910721',
+      phone: '01099998888',
+    })
+
+    for (let sessionIndex = 0; sessionIndex < ALERT_PAGE_SIZE + 1; sessionIndex += 1) {
+      await createSingleScaleSessionFromClientDetailUrl(page, {
+        clientDetailUrl: createdClient.detailUrl,
+        memo: `Playwright 통계 PHQ-9 필터 세션 ${token} ${sessionIndex + 1}`,
+        scale: PHQ9_CRITICAL_INPUT,
+      })
+    }
+
+    await createSingleScaleSessionFromClientDetailUrl(page, {
+      clientDetailUrl: createdClient.detailUrl,
+      memo: `Playwright 통계 GAD-7 필터 세션 ${token}`,
+      scale: GAD7_CAUTION_INPUT,
+    })
+
+    await page.goto('/statistics')
+    await waitForStatisticsPage(page)
+
+    await runStatisticsQuery(page, {
+      dateFrom: FUTURE_DATE,
+      dateTo: FUTURE_DATE,
+    })
+
+    expect(await getStatisticsCardValue(page, '전체 세션')).toBe(0)
+    expect(await getStatisticsCardValue(page, '전체 척도 시행')).toBe(0)
+    expect(await getStatisticsCardValue(page, '경고 세션')).toBe(0)
+    expect(await getStatisticsCardValue(page, '경고 척도')).toBe(0)
+
+    const futurePhq9Counts = await getScaleTableCounts(page, 'PHQ-9')
+    expect(futurePhq9Counts.totalCount).toBe(0)
+    expect(futurePhq9Counts.alertCount).toBe(0)
+    await expect(getStatisticsSection(page, '경고 기록')).toContainText('경고 기록이 없습니다.')
+
+    await runStatisticsQuery(page, {
+      dateFrom: today,
+      dateTo: today,
+      alertScaleCode: 'PHQ9',
+      alertType: 'CRITICAL_ITEM',
+    })
+
+    await expect(getStatisticsSection(page, '경고 기록')).toContainText(/필터: PHQ-9(?: \(우울\))? \/ 개별 위험 항목/)
+
+    const phq9Summary = await getAlertRecordSummary(page)
+
+    expect(phq9Summary.totalItems).toBe(baselinePhq9CriticalCount + ALERT_PAGE_SIZE + 1)
+    expect(phq9Summary.page).toBe(1)
+    expect(await getAlertRecordRowCount(page)).toBe(ALERT_PAGE_SIZE)
+
+    const phq9AlertSection = getStatisticsSection(page, '경고 기록')
+
+    await expect(phq9AlertSection.locator('tbody tr').first()).toContainText(statisticsClientName)
+    await expect(phq9AlertSection.locator('tbody tr').first()).toContainText(PHQ9_CRITICAL_ALERT_TEXT)
+    await expect(page.getByRole('button', { name: '이전' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: '다음' })).toBeEnabled()
+
+    await goToNextAlertPage(page, 2)
+
+    const phq9NextPageSummary = await getAlertRecordSummary(page)
+
+    expect(phq9NextPageSummary.totalItems).toBe(phq9Summary.totalItems)
+    expect(phq9NextPageSummary.page).toBe(2)
+    expect(await getAlertRecordRowCount(page)).toBeGreaterThan(0)
+    await expect(page.getByRole('button', { name: '이전' })).toBeEnabled()
+
+    await runStatisticsQuery(page, {
+      dateFrom: today,
+      dateTo: today,
+      alertScaleCode: 'GAD7',
+      alertType: 'CAUTION',
+    })
+
+    await expect(getStatisticsSection(page, '경고 기록')).toContainText(/필터: GAD-7(?: \(불안\))? \/ 주의/)
+
+    const gad7Summary = await getAlertRecordSummary(page)
+
+    expect(gad7Summary.totalItems).toBe(baselineGad7CautionCount + 1)
+    expect(gad7Summary.page).toBe(1)
+
+    const gad7AlertRow = getStatisticsSection(page, '경고 기록').locator('tbody tr').filter({ hasText: statisticsClientName }).first()
+
+    await expect(gad7AlertRow).toContainText('GAD-7')
+    await expect(gad7AlertRow).toContainText('주의')
+    await expect(gad7AlertRow).toContainText(GAD7_CAUTION_ALERT_TEXT)
   })
 })
