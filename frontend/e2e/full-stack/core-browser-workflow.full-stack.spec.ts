@@ -221,6 +221,10 @@ function getSessionDetailField(page: Page, label: string) {
   return page.locator('.card.grid-2 .field').filter({ hasText: label }).locator('strong').first()
 }
 
+function getSessionPrintField(page: Page, label: string) {
+  return page.locator('.card.grid-2 .field').filter({ hasText: label }).locator('strong').first()
+}
+
 async function markCurrentClientMisregistered(page: Page, reason: string) {
   await page.getByRole('button', { name: '오등록 처리' }).click()
 
@@ -318,6 +322,40 @@ async function markCurrentSessionMisentered(page: Page, reason: string) {
   await expect(dialog.getByText('세션과 하위 결과는 유지한 채 상태만 MISENTERED로 변경합니다.')).toBeVisible()
   await dialog.getByRole('textbox').fill(reason)
   await dialog.getByRole('button', { name: '오입력 처리' }).click()
+}
+
+async function openSessionPrintPageFromDetail(page: Page) {
+  const printPagePromise = page.context().waitForEvent('page')
+
+  await page.getByRole('button', { name: '출력 보기' }).click()
+
+  const printPage = await printPagePromise
+  await printPage.waitForLoadState('domcontentloaded')
+  return printPage
+}
+
+async function expectPhq9PrintPage(
+  printPage: Page,
+  input: {
+    sessionId: number
+    clientName: string
+    sessionNo: string
+  },
+) {
+  await expect(printPage).toHaveURL(new RegExp(`/assessments/sessions/${input.sessionId}/print$`))
+  await expect(printPage.locator('h1')).toHaveText(/\S+/)
+  await expect(printPage.getByText("세션 상세의 출력용 화면입니다. 인쇄하려면 '인쇄'를 누르세요.")).toBeVisible()
+  await expect(printPage.getByRole('button', { name: '인쇄' })).toBeVisible()
+  await expect(getSessionPrintField(printPage, '대상자')).toHaveText(input.clientName)
+  await expect(getSessionPrintField(printPage, '세션 번호')).toHaveText(input.sessionNo)
+  await expect(printPage.getByText('총 1개 척도 시행, 경고 1건')).toBeVisible()
+
+  const phq9Row = printPage.locator('tbody tr').filter({ hasText: 'PHQ-9' }).first()
+
+  await expect(phq9Row.locator('td').nth(0)).toHaveText('PHQ-9')
+  await expect(phq9Row.locator('td').nth(1)).toHaveText('1')
+  await expect(phq9Row.locator('td').nth(2)).toContainText('최소')
+  await expect(phq9Row.locator('td').nth(3)).toHaveText('9번 문항 응답으로 인해 추가 안전 확인이 필요합니다.')
 }
 
 test.describe('실브라우저 핵심 업무 흐름', () => {
@@ -544,5 +582,66 @@ test.describe('실브라우저 핵심 업무 흐름', () => {
     await page.goto(`/assessments/sessions/${sessionId}`)
     await expect(page.getByText('세션 상세를 볼 수 없습니다.')).toBeVisible()
     await expect(page.getByText('해당 세션을 조회할 권한이 없습니다.')).toBeVisible()
+  })
+
+  test('관리자는 세션 상세의 출력 보기와 오입력 세션 출력 정책을 실제 UI로 검증한다', async ({ page }) => {
+    test.slow()
+
+    const token = createUniqueToken()
+    const clientName = `PW 출력 대상자 ${token}`
+    const sessionMemo = `Playwright 출력 검증 ${token}`
+    const misenteredReason = `Playwright 출력 오입력 사유 ${token}`
+
+    await login(page, ADMIN_LOGIN_ID, DEFAULT_PASSWORD, '관리자A')
+
+    await createClientThroughUi(page, {
+      name: clientName,
+      gender: 'MALE',
+      birthDate: '19911212',
+      phone: '01056781234',
+    })
+
+    const { sessionId, sessionNo } = await createPhq9SessionThroughUi(page, {
+      clientName,
+      memo: sessionMemo,
+    })
+
+    await expect(page.getByText('세션이 저장되었습니다.')).toBeVisible()
+    await expect(getSessionDetailField(page, '상태')).toHaveText('완료')
+    await expect(page.getByRole('button', { name: '출력 보기' })).toBeVisible()
+
+    const completedPrintPage = await openSessionPrintPageFromDetail(page)
+
+    await expectPhq9PrintPage(completedPrintPage, {
+      sessionId,
+      clientName,
+      sessionNo,
+    })
+    await completedPrintPage.close()
+
+    await markCurrentSessionMisentered(page, misenteredReason)
+
+    await expect(page.getByText('오입력 처리되었습니다.')).toBeVisible()
+    await expect(getSessionDetailField(page, '상태')).toHaveText('오입력')
+    await expect(getSessionDetailField(page, '사유')).toHaveText(misenteredReason)
+    await expect(page.getByRole('button', { name: '출력 보기' })).toBeVisible()
+
+    const misenteredPrintPage = await openSessionPrintPageFromDetail(page)
+
+    await expectPhq9PrintPage(misenteredPrintPage, {
+      sessionId,
+      clientName,
+      sessionNo,
+    })
+    await misenteredPrintPage.close()
+
+    await logout(page)
+
+    await login(page, USER_LOGIN_ID, DEFAULT_PASSWORD, '사용자A')
+    await page.goto(`/assessments/sessions/${sessionId}/print`)
+
+    await expect(page).toHaveURL(new RegExp(`/assessments/sessions/${sessionId}/print$`))
+    await expect(page.getByText('해당 세션을 조회할 권한이 없습니다.')).toBeVisible()
+    await expect(page.getByText("세션 상세의 출력용 화면입니다. 인쇄하려면 '인쇄'를 누르세요.")).toHaveCount(0)
   })
 })
