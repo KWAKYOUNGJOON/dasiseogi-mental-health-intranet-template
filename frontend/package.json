@@ -22,6 +22,7 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:full-stack": "playwright test --config playwright.full-stack.config.ts --project=chromium",
+    "test:e2e:full-stack:smoke": "playwright test --config playwright.full-stack.config.ts --project=chromium --grep @full-stack-smoke",
     "test:e2e:full-stack:headed": "playwright test --config playwright.full-stack.config.ts --project=chromium --headed"
   },
   "dependencies": {

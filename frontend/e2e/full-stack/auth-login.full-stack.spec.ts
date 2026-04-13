@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('seeded admin can log in and reach admin user management', async ({ page }) => {
+test('seeded admin can log in and reach admin user management @full-stack-smoke', async ({ page }) => {
   await page.goto('/login')
 
   await expect(page.getByRole('heading', { name: '다시서기 정신건강 평가관리 시스템' })).toBeVisible()

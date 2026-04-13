@@ -359,7 +359,7 @@ async function expectPhq9PrintPage(
 }
 
 test.describe('실브라우저 핵심 업무 흐름', () => {
-  test('비로그인 사용자는 보호 라우트 접근 시 로그인 화면으로 이동한다', async ({ page }) => {
+  test('비로그인 사용자는 보호 라우트 접근 시 로그인 화면으로 이동한다 @full-stack-smoke', async ({ page }) => {
     await expectGuestRedirectToLogin(page, '/clients/new')
     await expectGuestRedirectToLogin(page, '/admin/users')
   })
@@ -393,7 +393,7 @@ test.describe('실브라우저 핵심 업무 흐름', () => {
     await expectAdminSurfaceHiddenForRegularUser(page)
   })
 
-  test('관리자는 대상자 오등록 처리와 검사 저장 후 세션 상세를 실제 UI로 검증한다', async ({ page }) => {
+  test('관리자는 대상자 오등록 처리와 검사 저장 후 세션 상세를 실제 UI로 검증한다 @full-stack-smoke', async ({ page }) => {
     test.slow()
 
     const token = createUniqueToken()
@@ -479,7 +479,7 @@ test.describe('실브라우저 핵심 업무 흐름', () => {
     await expect(recentSessionRow.getByRole('link', { name: '세션 상세' })).toBeVisible()
   })
 
-  test('관리자는 저장된 검사 세션을 UI에서 오입력 처리하고 상태 반영과 접근 정책을 검증한다', async ({ page }) => {
+  test('관리자는 저장된 검사 세션을 UI에서 오입력 처리하고 상태 반영과 접근 정책을 검증한다 @full-stack-smoke', async ({ page }) => {
     test.slow()
 
     const token = createUniqueToken()
@@ -584,7 +584,7 @@ test.describe('실브라우저 핵심 업무 흐름', () => {
     await expect(page.getByText('해당 세션을 조회할 권한이 없습니다.')).toBeVisible()
   })
 
-  test('관리자는 세션 상세의 출력 보기와 오입력 세션 출력 정책을 실제 UI로 검증한다', async ({ page }) => {
+  test('관리자는 세션 상세의 출력 보기와 오입력 세션 출력 정책을 실제 UI로 검증한다 @full-stack-smoke', async ({ page }) => {
     test.slow()
 
     const token = createUniqueToken()

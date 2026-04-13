@@ -81,7 +81,7 @@ async function expectBackupMetadataRow(
 }
 
 test.describe('실브라우저 백업 관리', () => {
-  test('관리자가 백업을 생성하면 목록과 현재 UI의 다운로드 노출 상태가 반영된다', async ({ page }) => {
+  test('관리자가 백업을 생성하면 목록과 현재 UI의 다운로드 노출 상태가 반영된다 @full-stack-smoke', async ({ page }) => {
     test.slow()
 
     const token = createUniqueToken()

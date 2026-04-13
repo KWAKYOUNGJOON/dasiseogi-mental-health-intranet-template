@@ -133,6 +133,7 @@ How stale frontend reuse is avoided:
 Default commands:
 
 - `npm run test:e2e:full-stack`
+- `npm run test:e2e:full-stack:smoke`
 - `npm run test:e2e:full-stack:headed`
 
 Specific spec example:
@@ -140,3 +141,36 @@ Specific spec example:
 - `npm run test:e2e:full-stack -- e2e/full-stack/client-scale-trend.full-stack.spec.ts`
 
 If port `4174` is already in use, stop that stray process first. The command is expected to fail fast instead of reusing an unknown older frontend build.
+
+### Full-stack smoke suite
+
+Use `npm run test:e2e:full-stack:smoke` when you want one pre-deploy command that checks only the highest-risk operational flows instead of the whole real-browser regression set.
+
+Smoke selection criteria:
+
+- Route protection and seeded admin login still work
+- A manager can create a client, save a single-scale PHQ-9 session, and reach session detail
+- A saved session can still be marked misentered with the main visibility restrictions applied
+- The print view still opens and keeps the misentered-session print policy
+- Manual backup execution still works from the admin backup page
+
+Current smoke-tagged tests:
+
+- `e2e/full-stack/auth-login.full-stack.spec.ts`
+- `e2e/full-stack/core-browser-workflow.full-stack.spec.ts`
+- `e2e/full-stack/backup-management.full-stack.spec.ts`
+
+Kept in full regression only:
+
+- Signup approval and role branching
+- Activity log verification
+- Statistics misentered exclusion policy
+- Multi-scale session coverage
+- Client scale trend flow
+- Regular user login-only coverage
+
+First checks when smoke fails:
+
+- Confirm the backend/database stack is already running behind the frontend `/api` proxy and that the seeded test users such as `admina` and `usera` are available
+- Confirm port `4174` is free so Playwright can start the dedicated Vite server
+- If the backup smoke test fails, confirm the backup directory and dump execution path are writable/usable in the current environment
