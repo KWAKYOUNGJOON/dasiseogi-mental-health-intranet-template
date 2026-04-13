@@ -1,12 +1,20 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 const ADMIN_LOGIN_ID = 'admina'
+const USER_LOGIN_ID = 'usera'
 const DEFAULT_PASSWORD = 'Test1234!'
 const LOGIN_HEADING = '다시서기 정신건강 평가관리 시스템'
+const ADMIN_NAME = '관리자A'
+const USER_NAME = '사용자A'
 const CLIENT_LIST_PATH_PATTERN = /\/clients$/
 const ASSESSMENT_RECORDS_PATH_PATTERN = /\/assessment-records(?:\?.*)?$/
+const ASSESSMENT_INPUT_PATH_PATTERN = /\/assessments\/start\/\d+\/input$/
+const ASSESSMENT_SUMMARY_PATH_PATTERN = /\/assessments\/start\/\d+\/summary$/
+const SESSION_DETAIL_PATH_PATTERN = /\/assessments\/sessions\/\d+(?:\?.*)?$/
 const PHQ9_ALERT_TEXT = '9번 문항 응답으로 인해 추가 안전 확인이 필요합니다.'
 const GAD7_ALERT_TEXT = '불안 증상 추가 평가 권고'
+const PRINT_GUIDE_TEXT = "세션 상세의 출력용 화면입니다. 인쇄하려면 '인쇄'를 누르세요."
+const MULTI_SCALE_PRINT_SUMMARY_TEXT = '총 2개 척도 시행, 경고 2건'
 
 type ScaleInput = {
   scaleCode: 'PHQ9' | 'GAD7'
@@ -67,6 +75,18 @@ function getSessionIdFromUrl(url: string) {
   return sessionId
 }
 
+function getSessionDetailPathPattern(sessionId: number, scaleCode?: ScaleInput['scaleCode']) {
+  if (!scaleCode) {
+    return new RegExp(`/assessments/sessions/${sessionId}(?:\\?.*)?$`)
+  }
+
+  return new RegExp(`/assessments/sessions/${sessionId}\\?highlightScaleCode=${scaleCode}(?:&.*)?$`)
+}
+
+function getSessionPrintPathPattern(sessionId: number) {
+  return new RegExp(`/assessments/sessions/${sessionId}/print$`)
+}
+
 function getSessionDetailField(page: Page, label: string) {
   return page.locator('.card.grid-2 .field').filter({ hasText: label }).locator('strong').first()
 }
@@ -110,6 +130,11 @@ async function login(page: Page, loginId: string, password: string, expectedName
   await expect(page.locator('.topbar-user')).toContainText(expectedName)
 }
 
+async function logout(page: Page) {
+  await page.getByRole('button', { name: '로그아웃' }).click()
+  await expectLoginScreen(page)
+}
+
 async function createClientThroughUi(
   page: Page,
   input: {
@@ -136,7 +161,32 @@ async function createClientThroughUi(
 
   return {
     clientId: getClientIdFromUrl(page.url()),
+    detailUrl: page.url(),
   }
+}
+
+async function setCheckboxState(locator: Locator, checked: boolean) {
+  if ((await locator.isChecked()) === checked) {
+    return
+  }
+
+  await locator.click()
+}
+
+async function searchAssessmentRecords(
+  page: Page,
+  input: {
+    clientName: string
+    includeMisentered: boolean
+  },
+) {
+  await page.goto('/assessment-records')
+  await expect(page).toHaveURL(ASSESSMENT_RECORDS_PATH_PATTERN)
+  await expect(page.getByRole('heading', { name: '검사기록 목록' })).toBeVisible()
+
+  await page.getByPlaceholder('대상자명').fill(input.clientName)
+  await setCheckboxState(page.getByLabel('오입력 포함'), input.includeMisentered)
+  await page.getByRole('button', { name: '조회' }).click()
 }
 
 async function answerQuestion(page: Page, questionIndex: number, optionIndex: number) {
@@ -145,7 +195,26 @@ async function answerQuestion(page: Page, questionIndex: number, optionIndex: nu
   await question.locator('label.assessment-option').nth(optionIndex).click()
 }
 
+async function startMultiScaleAssessmentFromCurrentClientDetail(page: Page) {
+  await page.getByRole('link', { name: '검사 시작' }).click()
+
+  await expect(page).toHaveURL(/\/assessments\/start\/\d+(?:\/scales)?$/)
+  await expect(page.getByRole('heading', { name: '척도 선택' })).toBeVisible()
+
+  const phq9Checkbox = page.getByRole('checkbox', { name: /PHQ-9/ })
+  const gad7Checkbox = page.getByRole('checkbox', { name: /GAD-7/ })
+
+  await phq9Checkbox.check()
+  await gad7Checkbox.check()
+  await expect(phq9Checkbox).toBeChecked()
+  await expect(gad7Checkbox).toBeChecked()
+
+  await page.getByRole('button', { name: '검사 시작' }).click()
+  await expect(page).toHaveURL(ASSESSMENT_INPUT_PATH_PATTERN)
+}
+
 async function answerScaleQuestions(page: Page, scale: ScaleInput, stepIndex: number, scaleCount: number) {
+  await expect(page).toHaveURL(ASSESSMENT_INPUT_PATH_PATTERN)
   await expect(page.getByRole('heading', { name: `${scale.scaleName} 입력` })).toBeVisible()
   await expect(page.getByText(`현재 단계 ${stepIndex} / ${scaleCount}`)).toBeVisible()
 
@@ -154,6 +223,103 @@ async function answerScaleQuestions(page: Page, scale: ScaleInput, stepIndex: nu
   }
 
   await expect(page.getByText(`응답 완료 ${scale.expectedAnsweredCount} / ${scale.expectedAnsweredCount}`)).toBeVisible()
+}
+
+async function completeMultiScaleSession(page: Page, sessionMemo: string) {
+  await startMultiScaleAssessmentFromCurrentClientDetail(page)
+
+  await answerScaleQuestions(page, MULTI_SCALE_INPUTS[0], 1, MULTI_SCALE_INPUTS.length)
+  await page.getByRole('button', { name: '다음' }).click()
+
+  await answerScaleQuestions(page, MULTI_SCALE_INPUTS[1], 2, MULTI_SCALE_INPUTS.length)
+  await page.getByRole('button', { name: '다음' }).click()
+
+  await expect(page).toHaveURL(ASSESSMENT_SUMMARY_PATH_PATTERN)
+  await expect(page.getByRole('heading', { name: '세션 요약' })).toBeVisible()
+
+  for (const scale of MULTI_SCALE_INPUTS) {
+    const summaryRow = getSummaryRow(page, scale.scaleName)
+
+    await expect(summaryRow.locator('td').nth(0)).toHaveText(scale.scaleName)
+    await expect(summaryRow.locator('td').nth(1)).toHaveText(`${scale.expectedAnsweredCount} / ${scale.expectedAnsweredCount}`)
+    await expect(summaryRow.locator('td').nth(2)).toHaveText(String(scale.expectedPreviewTotalScore))
+  }
+
+  await page.getByLabel('세션 메모').fill(sessionMemo)
+  await page.getByRole('button', { name: '세션 저장' }).click()
+
+  await expect(page).toHaveURL(SESSION_DETAIL_PATH_PATTERN)
+  await expect(page.getByRole('heading', { name: '세션 상세' })).toBeVisible()
+
+  const detailUrl = page.url()
+  const sessionNo = (await getSessionDetailField(page, '세션번호').textContent())?.trim()
+
+  if (!sessionNo) {
+    throw new Error('Could not read the saved session number from the session detail page.')
+  }
+
+  return {
+    detailUrl,
+    sessionId: getSessionIdFromUrl(detailUrl),
+    sessionNo,
+  }
+}
+
+async function expectMultiScaleSessionDetail(
+  page: Page,
+  input: {
+    sessionNo: string
+    sessionMemo: string
+    status: '완료' | '오입력'
+    misenteredReason?: string
+  },
+) {
+  await expect(page.locator('[data-testid^="session-scale-"]')).toHaveCount(MULTI_SCALE_INPUTS.length)
+  await expect(getSessionDetailField(page, '세션번호')).toHaveText(input.sessionNo)
+  await expect(getSessionDetailField(page, '상태')).toHaveText(input.status)
+  await expect(getSessionDetailField(page, '세션 메모')).toHaveText(input.sessionMemo)
+
+  if (input.status === '오입력') {
+    await expect(getSessionDetailField(page, '오입력 처리 시각')).not.toHaveText('-')
+    await expect(getSessionDetailField(page, '처리자')).toHaveText(ADMIN_NAME)
+    await expect(getSessionDetailField(page, '사유')).toHaveText(input.misenteredReason ?? '')
+  }
+
+  for (const scale of MULTI_SCALE_INPUTS) {
+    const scaleCard = page.getByTestId(`session-scale-${scale.scaleCode}`)
+
+    await expect(scaleCard).toContainText(scale.scaleName)
+    await expect(scaleCard).toContainText(`총점 ${scale.expectedTotalScore} / ${scale.expectedResultLevel}`)
+    await expect(scaleCard).toContainText(scale.expectedAlertText)
+  }
+
+  await expect(page.getByRole('heading', { name: '경고' })).toBeVisible()
+  await expect(page.getByText(`[PHQ-9] ${PHQ9_ALERT_TEXT}`)).toBeVisible()
+  await expect(page.getByText(`[GAD-7] ${GAD7_ALERT_TEXT}`)).toBeVisible()
+}
+
+async function expectMultiScaleAssessmentRecords(
+  page: Page,
+  input: {
+    clientName: string
+    sessionId: number
+    statusLabel: '정상' | '오입력'
+  },
+) {
+  const expectedDataStatus = input.statusLabel === '정상' ? 'COMPLETED' : 'MISENTERED'
+
+  await expect(page.locator('table.table tbody tr')).toHaveCount(MULTI_SCALE_INPUTS.length)
+
+  for (const scale of MULTI_SCALE_INPUTS) {
+    const recordRow = getAssessmentRecordRow(page, input.clientName, scale.scaleName)
+    const detailLink = recordRow.getByRole('link', { name: '상세 보기' })
+
+    await expect(recordRow).toContainText(String(scale.expectedTotalScore))
+    await expect(recordRow).toContainText(scale.expectedResultLevel)
+    await expect(recordRow).toContainText('있음')
+    await expect(recordRow.locator(`[data-status="${expectedDataStatus}"]`)).toHaveText(input.statusLabel)
+    await expect(detailLink).toHaveAttribute('href', getSessionDetailPathPattern(input.sessionId, scale.scaleCode))
+  }
 }
 
 async function openSessionPrintPageFromDetail(page: Page) {
@@ -166,6 +332,44 @@ async function openSessionPrintPageFromDetail(page: Page) {
   return printPage
 }
 
+async function expectMultiScalePrintPage(
+  printPage: Page,
+  input: {
+    sessionId: number
+    clientName: string
+    sessionNo: string
+  },
+) {
+  await expect(printPage).toHaveURL(getSessionPrintPathPattern(input.sessionId))
+  await expect(printPage.locator('h1')).toHaveText(/\S+/)
+  await expect(printPage.getByText(PRINT_GUIDE_TEXT)).toBeVisible()
+  await expect(printPage.getByRole('button', { name: '인쇄' })).toBeVisible()
+  await expect(getSessionPrintField(printPage, '대상자')).toHaveText(input.clientName)
+  await expect(getSessionPrintField(printPage, '세션 번호')).toHaveText(input.sessionNo)
+  await expect(printPage.getByText(MULTI_SCALE_PRINT_SUMMARY_TEXT)).toBeVisible()
+  await expect(printPage.locator('table.table tbody tr')).toHaveCount(MULTI_SCALE_INPUTS.length)
+
+  for (const scale of MULTI_SCALE_INPUTS) {
+    const printRow = getPrintScaleRow(printPage, scale.scaleName)
+
+    await expect(printRow.locator('td').nth(0)).toHaveText(scale.scaleName)
+    await expect(printRow.locator('td').nth(1)).toHaveText(String(scale.expectedTotalScore))
+    await expect(printRow.locator('td').nth(2)).toContainText(scale.expectedResultLevel)
+    await expect(printRow.locator('td').nth(3)).toHaveText(scale.expectedAlertText)
+  }
+}
+
+async function markCurrentSessionMisentered(page: Page, reason: string) {
+  await page.getByRole('button', { name: '오입력 처리' }).click()
+
+  const dialog = page.getByRole('dialog')
+
+  await expect(dialog.getByRole('heading', { name: '세션 오입력 처리' })).toBeVisible()
+  await expect(dialog.getByText('세션과 하위 결과는 유지한 채 상태만 MISENTERED로 변경합니다.')).toBeVisible()
+  await dialog.getByRole('textbox').fill(reason)
+  await dialog.getByRole('button', { name: '오입력 처리' }).click()
+}
+
 test.describe('실브라우저 다중 척도 세션 저장', () => {
   test('한 세션에서 PHQ-9와 GAD-7을 함께 저장하고 세션 단위 반영을 검증한다', async ({ page }) => {
     test.slow()
@@ -174,140 +378,165 @@ test.describe('실브라우저 다중 척도 세션 저장', () => {
     const clientName = `PW 다중 척도 대상자 ${token}`
     const sessionMemo = `Playwright 다중 척도 세션 ${token}`
 
-    await login(page, ADMIN_LOGIN_ID, DEFAULT_PASSWORD, '관리자A')
+    await login(page, ADMIN_LOGIN_ID, DEFAULT_PASSWORD, ADMIN_NAME)
 
-    const { clientId } = await createClientThroughUi(page, {
+    const client = await createClientThroughUi(page, {
       name: clientName,
       gender: 'FEMALE',
       birthDate: '19920418',
       phone: '01067891234',
     })
 
-    await page.getByRole('link', { name: '검사 시작' }).click()
+    const { sessionId, sessionNo } = await completeMultiScaleSession(page, sessionMemo)
 
-    await expect(page).toHaveURL(/\/assessments\/start\/\d+(?:\/scales)?$/)
-    await expect(page.getByRole('heading', { name: '척도 선택' })).toBeVisible()
+    await expect(page.getByText('세션이 저장되었습니다.')).toBeVisible()
+    await expectMultiScaleSessionDetail(page, {
+      sessionNo,
+      sessionMemo,
+      status: '완료',
+    })
 
-    const phq9Checkbox = page.getByRole('checkbox', { name: /PHQ-9/ })
-    const gad7Checkbox = page.getByRole('checkbox', { name: /GAD-7/ })
+    await searchAssessmentRecords(page, { clientName, includeMisentered: false })
+    await expectMultiScaleAssessmentRecords(page, {
+      clientName,
+      sessionId,
+      statusLabel: '정상',
+    })
 
-    await phq9Checkbox.check()
-    await gad7Checkbox.check()
-    await expect(phq9Checkbox).toBeChecked()
-    await expect(gad7Checkbox).toBeChecked()
+    const highlightedScale = MULTI_SCALE_INPUTS[0]
+    const highlightedRecordRow = getAssessmentRecordRow(page, clientName, highlightedScale.scaleName)
 
-    await page.getByRole('button', { name: '검사 시작' }).click()
+    await highlightedRecordRow.getByRole('link', { name: '상세 보기' }).click()
 
-    await answerScaleQuestions(page, MULTI_SCALE_INPUTS[0], 1, MULTI_SCALE_INPUTS.length)
-    await page.getByRole('button', { name: '다음' }).click()
+    await expect(page).toHaveURL(getSessionDetailPathPattern(sessionId, highlightedScale.scaleCode))
+    await expectMultiScaleSessionDetail(page, {
+      sessionNo,
+      sessionMemo,
+      status: '완료',
+    })
+    await expect(page.getByTestId(`session-scale-${highlightedScale.scaleCode}`)).toHaveAttribute('data-highlighted', 'true')
 
-    await answerScaleQuestions(page, MULTI_SCALE_INPUTS[1], 2, MULTI_SCALE_INPUTS.length)
-    await page.getByRole('button', { name: '다음' }).click()
-
-    await expect(page.getByRole('heading', { name: '세션 요약' })).toBeVisible()
-
-    for (const scale of MULTI_SCALE_INPUTS) {
-      const summaryRow = getSummaryRow(page, scale.scaleName)
-
-      await expect(summaryRow.locator('td').nth(0)).toHaveText(scale.scaleName)
-      await expect(summaryRow.locator('td').nth(1)).toHaveText(`${scale.expectedAnsweredCount} / ${scale.expectedAnsweredCount}`)
-      await expect(summaryRow.locator('td').nth(2)).toHaveText(String(scale.expectedPreviewTotalScore))
-    }
-
-    await page.getByLabel('세션 메모').fill(sessionMemo)
-    await page.getByRole('button', { name: '세션 저장' }).click()
-
-    await expect(page).toHaveURL(/\/assessments\/sessions\/\d+(?:\?.*)?$/)
-    await expect(page.getByRole('heading', { name: '세션 상세' })).toBeVisible()
-
-    const sessionId = getSessionIdFromUrl(page.url())
-    const sessionNo = (await getSessionDetailField(page, '세션번호').textContent())?.trim()
-
-    if (!sessionNo) {
-      throw new Error('Could not read the saved session number from the session detail page.')
-    }
-
-    await expect(page.locator('[data-testid^="session-scale-"]')).toHaveCount(2)
-    await expect(getSessionDetailField(page, '세션번호')).toHaveText(sessionNo)
-    await expect(getSessionDetailField(page, '상태')).toHaveText('완료')
-    await expect(getSessionDetailField(page, '세션 메모')).toHaveText(sessionMemo)
-
-    for (const scale of MULTI_SCALE_INPUTS) {
-      const scaleCard = page.getByTestId(`session-scale-${scale.scaleCode}`)
-
-      await expect(scaleCard).toContainText(scale.scaleName)
-      await expect(scaleCard).toContainText(`총점 ${scale.expectedTotalScore} / ${scale.expectedResultLevel}`)
-      await expect(scaleCard).toContainText(scale.expectedAlertText)
-    }
-
-    await expect(page.getByRole('heading', { name: '경고' })).toBeVisible()
-    await expect(page.getByText(`[PHQ-9] ${PHQ9_ALERT_TEXT}`)).toBeVisible()
-    await expect(page.getByText(`[GAD-7] ${GAD7_ALERT_TEXT}`)).toBeVisible()
-
-    await page.goto('/assessment-records')
-    await expect(page).toHaveURL(ASSESSMENT_RECORDS_PATH_PATTERN)
-    await expect(page.getByRole('heading', { name: '검사기록 목록' })).toBeVisible()
-
-    await page.getByPlaceholder('대상자명').fill(clientName)
-    await page.getByRole('button', { name: '조회' }).click()
-
-    await expect(page.locator('table.table tbody tr')).toHaveCount(2)
-
-    for (const scale of MULTI_SCALE_INPUTS) {
-      const recordRow = getAssessmentRecordRow(page, clientName, scale.scaleName)
-      const detailLink = recordRow.getByRole('link', { name: '상세 보기' })
-
-      await expect(recordRow).toContainText(String(scale.expectedTotalScore))
-      await expect(recordRow).toContainText(scale.expectedResultLevel)
-      await expect(recordRow).toContainText('있음')
-      await expect(recordRow).toContainText('정상')
-      await expect(detailLink).toHaveAttribute(
-        'href',
-        new RegExp(`/assessments/sessions/${sessionId}\\?highlightScaleCode=${scale.scaleCode}`),
-      )
-    }
-
-    await page.goto(`/clients/${clientId}`)
+    await page.goto(client.detailUrl)
     await expect(page.getByRole('heading', { name: `${clientName} 상세` })).toBeVisible()
     await expect(page.getByText('최근 검사 세션')).toBeVisible()
 
     const recentSessionsSection = getRecentSessionsSection(page)
-    const recentSessionRows = recentSessionsSection.locator('tbody tr')
-
-    await expect(recentSessionRows).toHaveCount(1)
-
-    const recentSessionRow = recentSessionRows.first()
+    const recentSessionRow = recentSessionsSection.locator('tbody tr').filter({ hasText: sessionNo }).first()
     const recentSessionCells = recentSessionRow.locator('td')
     const recentSessionDetailLink = recentSessionRow.getByRole('link', { name: '세션 상세' })
 
+    await expect(recentSessionRow).toBeVisible()
     await expect(recentSessionCells.nth(0)).toHaveText(sessionNo)
-    await expect(recentSessionCells.nth(3)).toHaveText('2')
+    await expect(recentSessionCells.nth(3)).toHaveText(String(MULTI_SCALE_INPUTS.length))
     await expect(recentSessionCells.nth(4)).toHaveText('있음')
     await expect(recentSessionDetailLink).toHaveAttribute('href', `/assessments/sessions/${sessionId}`)
 
     await recentSessionDetailLink.click()
     await expect(page).toHaveURL(new RegExp(`/assessments/sessions/${sessionId}$`))
-    await expect(getSessionDetailField(page, '세션번호')).toHaveText(sessionNo)
+    await expectMultiScaleSessionDetail(page, {
+      sessionNo,
+      sessionMemo,
+      status: '완료',
+    })
 
     const printPage = await openSessionPrintPageFromDetail(page)
 
-    await expect(printPage).toHaveURL(new RegExp(`/assessments/sessions/${sessionId}/print$`))
-    await expect(printPage.locator('h1')).toHaveText(/\S+/)
-    await expect(printPage.getByText("세션 상세의 출력용 화면입니다. 인쇄하려면 '인쇄'를 누르세요.")).toBeVisible()
-    await expect(getSessionPrintField(printPage, '대상자')).toHaveText(clientName)
-    await expect(getSessionPrintField(printPage, '세션 번호')).toHaveText(sessionNo)
-    await expect(printPage.getByText('총 2개 척도 시행, 경고 2건')).toBeVisible()
-    await expect(printPage.locator('table.table tbody tr')).toHaveCount(2)
-
-    for (const scale of MULTI_SCALE_INPUTS) {
-      const printRow = getPrintScaleRow(printPage, scale.scaleName)
-
-      await expect(printRow.locator('td').nth(0)).toHaveText(scale.scaleName)
-      await expect(printRow.locator('td').nth(1)).toHaveText(String(scale.expectedTotalScore))
-      await expect(printRow.locator('td').nth(2)).toContainText(scale.expectedResultLevel)
-      await expect(printRow.locator('td').nth(3)).toHaveText(scale.expectedAlertText)
-    }
-
+    await expectMultiScalePrintPage(printPage, {
+      sessionId,
+      clientName,
+      sessionNo,
+    })
     await printPage.close()
+  })
+
+  test('관리자는 다중 척도 세션을 오입력 처리하고 목록과 출력 및 접근 정책을 검증한다', async ({ page }) => {
+    test.slow()
+
+    const token = createUniqueToken()
+    const clientName = `PW 다중 척도 오입력 ${token}`
+    const sessionMemo = `Playwright 다중 척도 오입력 ${token}`
+    const misenteredReason = `Playwright 다중 척도 오입력 사유 ${token}`
+
+    await login(page, ADMIN_LOGIN_ID, DEFAULT_PASSWORD, ADMIN_NAME)
+
+    const client = await createClientThroughUi(page, {
+      name: clientName,
+      gender: 'MALE',
+      birthDate: '19910312',
+      phone: '01045671234',
+    })
+
+    const { sessionId, sessionNo } = await completeMultiScaleSession(page, sessionMemo)
+
+    await expect(page.getByText('세션이 저장되었습니다.')).toBeVisible()
+    await expectMultiScaleSessionDetail(page, {
+      sessionNo,
+      sessionMemo,
+      status: '완료',
+    })
+
+    await markCurrentSessionMisentered(page, misenteredReason)
+
+    await expect(page.getByText('오입력 처리되었습니다.')).toBeVisible()
+    await expectMultiScaleSessionDetail(page, {
+      sessionNo,
+      sessionMemo,
+      status: '오입력',
+      misenteredReason,
+    })
+    await expect(page.getByRole('button', { name: '오입력 처리' })).toHaveCount(0)
+
+    const misenteredPrintPage = await openSessionPrintPageFromDetail(page)
+
+    await expectMultiScalePrintPage(misenteredPrintPage, {
+      sessionId,
+      clientName,
+      sessionNo,
+    })
+    await misenteredPrintPage.close()
+
+    await searchAssessmentRecords(page, { clientName, includeMisentered: false })
+    await expect(page.getByText('조회된 검사기록이 없습니다.')).toBeVisible()
+
+    await searchAssessmentRecords(page, { clientName, includeMisentered: true })
+    await expectMultiScaleAssessmentRecords(page, {
+      clientName,
+      sessionId,
+      statusLabel: '오입력',
+    })
+
+    const highlightedScale = MULTI_SCALE_INPUTS[1]
+    const misenteredRecordRow = getAssessmentRecordRow(page, clientName, highlightedScale.scaleName)
+
+    await misenteredRecordRow.getByRole('link', { name: '상세 보기' }).click()
+
+    await expect(page).toHaveURL(getSessionDetailPathPattern(sessionId, highlightedScale.scaleCode))
+    await expectMultiScaleSessionDetail(page, {
+      sessionNo,
+      sessionMemo,
+      status: '오입력',
+      misenteredReason,
+    })
+    await expect(page.getByTestId(`session-scale-${highlightedScale.scaleCode}`)).toHaveAttribute('data-highlighted', 'true')
+
+    await page.goto(client.detailUrl)
+    await expect(page.getByRole('heading', { name: `${clientName} 상세` })).toBeVisible()
+    await expect(page.getByText('아직 저장된 검사 세션이 없습니다.')).toBeVisible()
+
+    await logout(page)
+
+    await login(page, USER_LOGIN_ID, DEFAULT_PASSWORD, USER_NAME)
+
+    await searchAssessmentRecords(page, { clientName, includeMisentered: true })
+    await expect(page.getByText('조회된 검사기록이 없습니다.')).toBeVisible()
+
+    await page.goto(`/assessments/sessions/${sessionId}`)
+    await expect(page.getByText('세션 상세를 볼 수 없습니다.')).toBeVisible()
+    await expect(page.getByText('해당 세션을 조회할 권한이 없습니다.')).toBeVisible()
+
+    await page.goto(`/assessments/sessions/${sessionId}/print`)
+    await expect(page).toHaveURL(getSessionPrintPathPattern(sessionId))
+    await expect(page.getByText('해당 세션을 조회할 권한이 없습니다.')).toBeVisible()
+    await expect(page.getByText(PRINT_GUIDE_TEXT)).toHaveCount(0)
   })
 })
