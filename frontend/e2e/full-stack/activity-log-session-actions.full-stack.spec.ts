@@ -1,10 +1,31 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page, type Request } from '@playwright/test'
 
 const ADMIN_LOGIN_ID = 'admina'
 const DEFAULT_PASSWORD = 'Test1234!'
 const LOGIN_HEADING = '다시서기 정신건강 평가관리 시스템'
 const CLIENT_LIST_PATH_PATTERN = /\/clients$/
 const ADMIN_LOGS_PATH_PATTERN = /\/admin\/logs$/
+const INVALID_DATE_RANGE_MESSAGE = '조회 기간을 다시 확인해주세요. 시작일은 종료일보다 늦을 수 없습니다.'
+const ACTIVITY_LOG_LIST_ERROR_MESSAGE = '입력값을 다시 확인해주세요.'
+const ACTIVITY_LOG_TABLE_FAILURE_MESSAGE = '로그 조회에 실패했습니다.'
+
+type ApiEnvelope<T> = {
+  success: boolean
+  data: T
+  message: string | null
+  errorCode: string | null
+  fieldErrors: Array<{
+    field?: string
+    reason?: string
+    message?: string
+  }>
+}
+
+type AuthUser = {
+  id: number
+  loginId: string
+  name: string
+}
 
 function createUniqueToken() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.slice(0, 12)
@@ -33,6 +54,10 @@ function getCurrentSeoulDateText(now = new Date()) {
   return `${lookup.get('year')}-${lookup.get('month')}-${lookup.get('day')}`
 }
 
+function isActivityLogRequest(requestUrl: string) {
+  return new URL(requestUrl).pathname.endsWith('/api/v1/admin/activity-logs')
+}
+
 function getSessionDetailField(page: Page, label: string) {
   return page.locator('.card.grid-2 .field').filter({ hasText: label }).locator('strong').first()
 }
@@ -58,6 +83,58 @@ async function login(page: Page, loginId: string, password: string, expectedName
   await expect(page).toHaveURL(CLIENT_LIST_PATH_PATTERN)
   await expect(page.getByRole('heading', { name: '대상자 목록' })).toBeVisible()
   await expect(page.locator('.topbar-user')).toContainText(expectedName)
+}
+
+async function callApi<T>(
+  page: Page,
+  path: string,
+  init?: {
+    method?: 'GET' | 'POST'
+    body?: unknown
+  },
+) {
+  const response = await page.evaluate(
+    async ({ path: requestPath, init: requestInit }) => {
+      const httpResponse = await fetch(`/api/v1${requestPath}`, {
+        method: requestInit?.method ?? 'GET',
+        headers: requestInit?.body ? { 'Content-Type': 'application/json' } : undefined,
+        body: requestInit?.body ? JSON.stringify(requestInit.body) : undefined,
+        credentials: 'same-origin',
+      })
+      const rawText = await httpResponse.text()
+      let payload: ApiEnvelope<unknown> | null = null
+
+      try {
+        payload = rawText ? (JSON.parse(rawText) as ApiEnvelope<unknown>) : null
+      } catch {
+        payload = null
+      }
+
+      return {
+        ok: httpResponse.ok,
+        status: httpResponse.status,
+        payload,
+        rawText,
+      }
+    },
+    { path, init },
+  )
+
+  if (!response.ok || !response.payload?.success) {
+    const errorMessage =
+      response.payload?.message ??
+      response.payload?.errorCode ??
+      response.rawText.trim() ??
+      'Unknown API error'
+
+    throw new Error(`${init?.method ?? 'GET'} ${path} failed (${response.status}): ${errorMessage}`)
+  }
+
+  return response.payload.data as T
+}
+
+async function fetchCurrentUser(page: Page) {
+  return callApi<AuthUser>(page, '/auth/me')
 }
 
 async function createClientThroughUi(
@@ -161,18 +238,34 @@ async function openActivityLogPage(page: Page) {
   await expect(page.getByRole('button', { name: '조회', exact: true })).toBeEnabled()
 }
 
+async function waitForActivityLogResponse(
+  page: Page,
+  predicate?: (url: URL) => boolean,
+) {
+  return page.waitForResponse((response) => {
+    if (!response.ok() || response.request().method() !== 'GET' || !isActivityLogRequest(response.url())) {
+      return false
+    }
+
+    return predicate ? predicate(new URL(response.url())) : true
+  })
+}
+
 async function filterActivityLogs(
   page: Page,
   input: {
     dateFrom: string
     dateTo: string
+    userId?: string
     actionType: 'PRINT_SESSION' | 'SESSION_MARK_MISENTERED'
+    pageSize?: '20' | '50' | '100'
   },
 ) {
   await page.getByLabel('시작일').fill(input.dateFrom)
   await page.getByLabel('종료일').fill(input.dateTo)
+  await page.getByLabel('사용자 ID').fill(input.userId ?? '')
   await page.getByLabel('기능 유형').selectOption(input.actionType)
-  await page.getByLabel('페이지 크기').selectOption('50')
+  await page.getByLabel('페이지 크기').selectOption(input.pageSize ?? '50')
   await page.getByRole('button', { name: '조회', exact: true }).click()
 }
 
@@ -202,6 +295,7 @@ test.describe('실브라우저 활동 로그 세션 액션', () => {
     const today = getCurrentSeoulDateText()
 
     await login(page, ADMIN_LOGIN_ID, DEFAULT_PASSWORD, '관리자A')
+    const currentUser = await fetchCurrentUser(page)
 
     await createClientThroughUi(page, {
       name: clientName,
@@ -235,13 +329,38 @@ test.describe('실브라우저 활동 로그 세션 액션', () => {
     await expect(getSessionDetailField(page, '사유')).toHaveText(misenteredReason)
     await expect(getSessionDetailField(page, '처리자')).toHaveText('관리자A')
 
-    await openActivityLogPage(page)
+    await Promise.all([waitForActivityLogResponse(page), openActivityLogPage(page)])
+    await expect(page.getByText(/^총 \d+건$/).first()).toBeVisible()
+    await expect(page.locator('tbody tr').first()).toBeVisible()
+
+    const printFilterResponsePromise = waitForActivityLogResponse(page, (url) => {
+      return (
+        url.searchParams.get('dateFrom') === today &&
+        url.searchParams.get('dateTo') === today &&
+        url.searchParams.get('userId') === String(currentUser.id) &&
+        url.searchParams.get('actionType') === 'PRINT_SESSION' &&
+        url.searchParams.get('page') === '1' &&
+        url.searchParams.get('size') === '50'
+      )
+    })
 
     await filterActivityLogs(page, {
       dateFrom: today,
       dateTo: today,
+      userId: String(currentUser.id),
       actionType: 'PRINT_SESSION',
+      pageSize: '50',
     })
+
+    const printFilterResponse = await printFilterResponsePromise
+    const printFilterUrl = new URL(printFilterResponse.url())
+
+    expect(printFilterUrl.searchParams.get('dateFrom')).toBe(today)
+    expect(printFilterUrl.searchParams.get('dateTo')).toBe(today)
+    expect(printFilterUrl.searchParams.get('userId')).toBe(String(currentUser.id))
+    expect(printFilterUrl.searchParams.get('actionType')).toBe('PRINT_SESSION')
+    expect(printFilterUrl.searchParams.get('page')).toBe('1')
+    expect(printFilterUrl.searchParams.get('size')).toBe('50')
 
     const printLogRow = getActivityLogRow(page, {
       actionLabel: 'PRINT_SESSION (출력 보기)',
@@ -254,11 +373,34 @@ test.describe('실브라우저 활동 로그 세션 액션', () => {
     await expect(printLogRow).toContainText(`${sessionNo} (SESSION #${sessionId})`)
     await expect(printLogRow).toContainText('세션 출력 데이터 조회')
 
+    const misenteredFilterResponsePromise = waitForActivityLogResponse(page, (url) => {
+      return (
+        url.searchParams.get('dateFrom') === today &&
+        url.searchParams.get('dateTo') === today &&
+        url.searchParams.get('userId') === String(currentUser.id) &&
+        url.searchParams.get('actionType') === 'SESSION_MARK_MISENTERED' &&
+        url.searchParams.get('page') === '1' &&
+        url.searchParams.get('size') === '50'
+      )
+    })
+
     await filterActivityLogs(page, {
       dateFrom: today,
       dateTo: today,
+      userId: String(currentUser.id),
       actionType: 'SESSION_MARK_MISENTERED',
+      pageSize: '50',
     })
+
+    const misenteredFilterResponse = await misenteredFilterResponsePromise
+    const misenteredFilterUrl = new URL(misenteredFilterResponse.url())
+
+    expect(misenteredFilterUrl.searchParams.get('dateFrom')).toBe(today)
+    expect(misenteredFilterUrl.searchParams.get('dateTo')).toBe(today)
+    expect(misenteredFilterUrl.searchParams.get('userId')).toBe(String(currentUser.id))
+    expect(misenteredFilterUrl.searchParams.get('actionType')).toBe('SESSION_MARK_MISENTERED')
+    expect(misenteredFilterUrl.searchParams.get('page')).toBe('1')
+    expect(misenteredFilterUrl.searchParams.get('size')).toBe('50')
 
     const misenteredLogRow = getActivityLogRow(page, {
       actionLabel: 'SESSION_MARK_MISENTERED (검사 오입력 처리)',
@@ -266,9 +408,91 @@ test.describe('실브라우저 활동 로그 세션 액션', () => {
       sessionNo,
     })
 
+    await expect(printLogRow).toHaveCount(0)
     await expect(misenteredLogRow).toContainText('관리자A')
     await expect(misenteredLogRow).toContainText('SESSION_MARK_MISENTERED (검사 오입력 처리)')
     await expect(misenteredLogRow).toContainText(`${sessionNo} (SESSION #${sessionId})`)
     await expect(misenteredLogRow).toContainText('세션 오입력 처리')
+  })
+
+  test('관리자는 잘못된 날짜 범위를 입력하면 조회를 막고 검증 오류를 본다', async ({ page }) => {
+    let activityLogRequestCount = 0
+
+    await login(page, ADMIN_LOGIN_ID, DEFAULT_PASSWORD, '관리자A')
+    await Promise.all([waitForActivityLogResponse(page), openActivityLogPage(page)])
+
+    const requestListener = (request: Request) => {
+      if (request.method() === 'GET' && isActivityLogRequest(request.url())) {
+        activityLogRequestCount += 1
+      }
+    }
+
+    page.on('request', requestListener)
+
+    try {
+      const requestCountBeforeSubmit = activityLogRequestCount
+
+      await page.getByLabel('시작일').fill('2026-04-13')
+      await page.getByLabel('종료일').fill('2026-04-12')
+      await page.getByRole('button', { name: '조회', exact: true }).click()
+
+      await expect(page.getByRole('alert')).toContainText(INVALID_DATE_RANGE_MESSAGE)
+      await page.waitForTimeout(500)
+      expect(activityLogRequestCount).toBe(requestCountBeforeSubmit)
+    } finally {
+      page.off('request', requestListener)
+    }
+  })
+
+  test('관리자는 로그 조회 실패 후 다시 시도로 회복한다', async ({ page }) => {
+    let failedOnce = false
+
+    await login(page, ADMIN_LOGIN_ID, DEFAULT_PASSWORD, '관리자A')
+    await Promise.all([waitForActivityLogResponse(page), openActivityLogPage(page)])
+
+    await page.route('**/api/v1/admin/activity-logs**', async (route) => {
+      if (route.request().method() !== 'GET' || !isActivityLogRequest(route.request().url())) {
+        await route.continue()
+        return
+      }
+
+      const requestUrl = new URL(route.request().url())
+
+      if (!failedOnce && requestUrl.searchParams.get('actionType') === 'LOGIN') {
+        failedOnce = true
+        await route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: false,
+            data: null,
+            message: ACTIVITY_LOG_LIST_ERROR_MESSAGE,
+            errorCode: 'VALIDATION_ERROR',
+            fieldErrors: [],
+          } satisfies ApiEnvelope<null>),
+        })
+        return
+      }
+
+      await route.continue()
+    })
+
+    await page.getByLabel('기능 유형').selectOption('LOGIN')
+    await page.getByRole('button', { name: '조회', exact: true }).click()
+
+    await expect(page.getByRole('alert')).toContainText(ACTIVITY_LOG_LIST_ERROR_MESSAGE)
+    await expect(page.getByText(ACTIVITY_LOG_TABLE_FAILURE_MESSAGE)).toBeVisible()
+
+    const retryResponsePromise = waitForActivityLogResponse(
+      page,
+      (url) => url.searchParams.get('page') === '1' && url.searchParams.get('actionType') === 'LOGIN',
+    )
+
+    await page.getByRole('button', { name: '다시 시도' }).click()
+
+    await retryResponsePromise
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await expect(page.getByText(ACTIVITY_LOG_TABLE_FAILURE_MESSAGE)).toHaveCount(0)
+    await expect(page.getByRole('cell', { name: 'LOGIN (로그인)' }).first()).toBeVisible()
   })
 })
